@@ -1,0 +1,18 @@
+[package]
+name = "noumenon"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+half = "2.1.0"
+binrw = "0.11.2"
+time = "0.3.28"
+
+image = "0.24.2"
+squish = "2.0.0-beta1"
+
+# gltf = "1.3.0"
+# gltf-json = {version = "0.15.2", features = ["names"]}
+fbxcel = {version = "0.9.0", features = ["writer", "tree"]}
+
+ironworks = {git = "https://github.com/ackwell/ironworks", rev = "bd787883d324f3a150bce5f1ab348d86e770e23e", features = ["ffxiv", "sqpack"]}

@@ -1,0 +1,9 @@
+[workspace]
+resolver = "2"
+members = [
+	"aetherment",
+	"client",
+	# "plugin",
+	"renderer",
+	"noumenon"
+]

@@ -1,0 +1,11 @@
+[package]
+name = "plugin"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "aetherment_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+aetherment = {path = "../aetherment", features = ["plugin"]}

@@ -5,7 +5,7 @@
 	"Description": "TODO",
 	"InternalName": "Aetherment",
 	"ApplicableVersion": "any",
-	"DalamudApiLevel": 9,
+	"DalamudApiLevel": 10,
 	"LoadPriority": 1,
 	"Tags": []
 }

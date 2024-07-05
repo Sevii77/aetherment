@@ -120,7 +120,7 @@ public partial class TexFinder {
 							if(j % 3 != 0)
 								ImGui.SameLine();
 							
-							var i = j + ninegrid->PartID;
+							var i = j + ninegrid->PartId;
 							
 							ImGui.BeginChild($"{i}9grid", size);
 							var part = node->PartsList->Parts[i];
@@ -192,13 +192,13 @@ public partial class TexFinder {
 		unsafe {
 			nodes.Clear();
 			
-			var layersAddress = (IntPtr)AtkStage.GetSingleton()->RaptureAtkUnitManager;
+			var layersAddress = (IntPtr)AtkStage.Instance()->RaptureAtkUnitManager;
 			for(var layerI = 12; layerI >= 0; layerI--) {
 				var layer = Marshal.PtrToStructure<AtkUnitList>(layersAddress + 0x30 + 0x810 * layerI);
 				
 				for(var atkI = 0; atkI < layer.Count; atkI++) {
 					// var atk = (AtkUnitBase*)(&layer.Entries)[atkI];
-					var atk = layer.EntriesSpan[atkI].Value;
+					var atk = layer.Entries[atkI].Value;
 					if(atk->IsVisible)
 						CheckNodes(atk->UldManager, ref nodes);
 				}
@@ -242,7 +242,7 @@ public partial class TexFinder {
 	
 	private unsafe bool GlobalNodeVisible(AtkResNode* node) {
 		while(node != null) {
-			if(!node->IsVisible)
+			if(!node->IsVisible())
 				return false;
 			
 			node = node->ParentNode;

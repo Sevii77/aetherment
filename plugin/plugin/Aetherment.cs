@@ -1,27 +1,19 @@
-global using Dalamud.Logging;
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Dalamud.Game.Command;
-using Dalamud.Interface.Internal.Notifications;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using ImGuiNET;
 
 namespace Aetherment;
 
 public class Aetherment : IDalamudPlugin {
 	public string Name => "Aetherment";
 	
-	[PluginService][RequiredVersion("1.0")] public static DalamudPluginInterface Interface {get; private set;} = null!;
-	[PluginService][RequiredVersion("1.0")] public static ICommandManager        Commands  {get; private set;} = null!;
-	[PluginService][RequiredVersion("1.0")] public static IPluginLog             Logger    {get; private set;} = null!;
-	[PluginService][RequiredVersion("1.0")] public static IObjectTable           Objects   {get; private set;} = null!;
+	[PluginService] public static IDalamudPluginInterface Interface {get; private set;} = null!;
+	[PluginService] public static ICommandManager         Commands  {get; private set;} = null!;
+	[PluginService] public static IPluginLog              Logger    {get; private set;} = null!;
+	[PluginService] public static IObjectTable            Objects   {get; private set;} = null!;
 	// [PluginService][RequiredVersion("1.0")] public static TitleScreenMenu        TitleMenu  {get; private set;} = null!;
 	
 	private const string maincommand = "/aetherment";

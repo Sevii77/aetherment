@@ -61,7 +61,7 @@ public unsafe class Penumbra: IDisposable {
 	public delegate void RedrawSelfDelegate();
 	public void RedrawSelf() {
 		try {
-			Aetherment.Interface.GetIpcSubscriber<GameObject, byte, object>("Penumbra.RedrawObject").InvokeAction(Aetherment.Objects[0]!, 0);
+			Aetherment.Interface.GetIpcSubscriber<IGameObject, byte, object>("Penumbra.RedrawObject").InvokeAction(Aetherment.Objects[0]!, 0);
 		} catch(Exception e) {
 			Aetherment.Logger.Error(e, "Penumbra IPC RedrawSelf");
 		}

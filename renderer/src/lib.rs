@@ -119,6 +119,10 @@ impl<'a> Ui<'a> {
 		
 		resp
 	}
+	
+	pub fn tooltip_text<S: AsRef<str>>(&mut self, text: S) {
+		self.tooltip(|ui| ui.label(text));
+	}
 }
 
 // ----------

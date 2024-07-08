@@ -72,6 +72,14 @@ impl<'a> Ui<'a> {
 		self.ui.ctx().pointer_interact_pos().map_or_else(|| self.ui.ctx().pointer_latest_pos().map_or_else(|| [0.0f32; 2], |v| [v.x, v.y]), |v| [v.x, v.y])
 	}
 	
+	pub fn set_clipboard<S: AsRef<str>>(&mut self, text: S) {
+		todo!()
+	}
+	
+	pub fn get_clipboard(&mut self) -> String {
+		todo!()
+	}
+	
 	pub fn modifiers(&mut self) -> crate::Modifiers {
 		let v = self.ui.ctx().input(|v| v.modifiers);
 		crate::Modifiers {
@@ -99,6 +107,10 @@ impl<'a> Ui<'a> {
 	
 	pub fn set_width(&mut self, width: f32) {
 		self.next_width = Some(width);
+	}
+	
+	pub fn tooltip(&mut self, contents: impl FnOnce(&mut Ui)) {
+		egui::show_tooltip_at_pointer(self.ui.ctx(), egui::Id::new("tooltip"), |ui| contents(&mut Ui::new(ui)));
 	}
 	
 	// Elements

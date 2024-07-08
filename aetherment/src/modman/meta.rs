@@ -13,6 +13,7 @@ pub struct Meta {
 	pub tags: Vec<String>,
 	pub dependencies: Vec<String>,
 	pub options: Vec<Option>,
+	pub presets: Vec<super::settings::Preset>,
 	
 	pub files: HashMap<String, String>,
 	pub file_swaps: HashMap<String, String>,
@@ -30,6 +31,7 @@ impl Default for Meta {
 			tags: Vec::new(),
 			dependencies: Vec::new(),
 			options: Vec::new(),
+			presets: Vec::new(),
 			
 			files: HashMap::new(),
 			file_swaps: HashMap::new(),

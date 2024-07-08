@@ -219,6 +219,7 @@ impl super::Backend for Penumbra {
 				
 				Ok(())
 			})() {
+				log!(err, "{err}");
 				progress.current_mod.set_msg(&err.to_string());
 			}
 			
@@ -284,12 +285,13 @@ impl super::Backend for Penumbra {
 			let mut settings = crate::modman::settings::Settings::from_meta(&m.meta);
 			for (option, sub_options) in get_mod_settings(collection_id, &mod_id, true).options {
 				let Some(meta_option) = m.meta.options.iter().find(|v| v.name == option) else {log!("{mod_id} didnt have option {option} in its meta"); continue};
-				let Some(setting) = settings.iter_mut().find(|(v, _)| v == &option) else {continue};
+				// let Some(setting) = settings.iter_mut().find(|(v, _)| v == &option) else {continue};
+				let Some(setting) = settings.get_mut(&option) else {continue};
 				
 				match &meta_option.settings {
 					meta::OptionSettings::SingleFiles(v) => {
 						if let Some(sub_option) = v.options.iter().enumerate().find_map(|(i, v)| if v.name == sub_options[0] {Some(i)} else {None}) {
-							setting.1 = crate::modman::settings::Value::SingleFiles(sub_option as u32);
+							*setting = crate::modman::settings::Value::SingleFiles(sub_option as u32);
 						}
 					}
 					
@@ -300,7 +302,7 @@ impl super::Backend for Penumbra {
 								sub_option |= 1 << i;
 							}
 						}
-						setting.1 = crate::modman::settings::Value::MultiFiles(sub_option);
+						*setting = crate::modman::settings::Value::MultiFiles(sub_option);
 					}
 					
 					_ => {}
@@ -486,7 +488,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			}
 			
 			crate::modman::Path::Option(id, sub_id) => {
-				let Some(setting) = settings.get(&id) else {return None};
+				let Some(setting) = settings.get(id) else {return None};
 				let crate::modman::settings::Value::Path(i) = setting else {return None};
 				let Some(option) = meta.options.iter().find(|v| v.name == *id) else {return None};
 				let meta::OptionSettings::Path(v) = &option.settings else {return None};

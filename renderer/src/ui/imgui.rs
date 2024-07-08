@@ -1,4 +1,4 @@
-use std::{ffi::CString, hash::{Hash, Hasher}};
+use std::{ffi::{CStr, CString}, hash::{Hash, Hasher}};
 use crate::Response as Resp;
 
 #[path = "imgui/bindings.rs"]
@@ -93,6 +93,15 @@ impl<'a> Ui<'a> {
 		}
 	}
 	
+	pub fn set_clipboard<S: AsRef<str>>(&mut self, text: S) {
+		let text = CString::new(text.as_ref()).unwrap();
+		unsafe{sys::igSetClipboardText(text.as_ptr())};
+	}
+	
+	pub fn get_clipboard(&mut self) -> String {
+		unsafe{CStr::from_ptr(sys::igGetClipboardText())}.to_str().map_or_else(|_| String::new(), |v| v.to_string())
+	}
+	
 	pub fn modifiers(&mut self) -> crate::Modifiers {
 		let io = unsafe{&*sys::igGetIO()};
 		crate::Modifiers {
@@ -130,6 +139,12 @@ impl<'a> Ui<'a> {
 	
 	pub fn set_width(&mut self, width: f32) {
 		unsafe{sys::igSetNextItemWidth(width)};
+	}
+	
+	pub fn tooltip(&mut self, contents: impl FnOnce(&mut Ui)) {
+		unsafe{sys::igBeginTooltip()};
+		contents(self);
+		unsafe{sys::igEndTooltip()};
 	}
 	
 	// Elements

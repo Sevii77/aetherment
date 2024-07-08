@@ -6,6 +6,7 @@ pub struct Mods {
 	selected_mod: String,
 	
 	import_picker: Option<renderer::FilePicker>,
+	new_preset_name: String,
 	
 	mods: Vec<String>,
 	collections: HashMap<String, String>,
@@ -22,6 +23,7 @@ impl Mods {
 			selected_mod: String::new(),
 			
 			import_picker: None,
+			new_preset_name: String::new(),
 			
 			mods: Vec::new(),
 			collections: HashMap::new(),
@@ -126,10 +128,112 @@ impl Mods {
 				let Some(meta) = backend.get_mod_meta(&self.selected_mod) else {return};
 				let Some(mod_settings) = self.mod_settings.get_mut(&self.selected_mod) else {return};
 				let Some(settings) = mod_settings.get_mut(&self.active_collection) else {return};
-				
 				let mut changed = false;
-				for (setting_id, val) in settings.iter_mut() {
-					let Some(option) = meta.options.iter().find(|o| o.name == *setting_id) else {continue};
+				
+				ui.label(&meta.description);
+				
+				let mut selected_preset = "Custom".to_string();
+				'default: {
+					for (name, value) in settings.iter() {
+						if crate::modman::settings::Value::from_meta_option(meta.options.iter().find(|v| v.name == *name).unwrap()) != *value {break 'default}
+					}
+					
+					selected_preset = "Default".to_owned();
+				}
+				
+				let mut check_presets = |presets: &Vec<crate::modman::settings::Preset>| {
+					'preset: for v in presets.iter() {
+						for (name, value) in settings.iter() {
+							match v.settings.get(name) {
+								Some(v) => if v != value {continue 'preset},
+								None => if crate::modman::settings::Value::from_meta_option(meta.options.iter().find(|v| v.name == *name).unwrap()) != *value {continue 'preset}
+							}
+						}
+						
+						selected_preset = v.name.to_owned();
+					}
+				};
+				check_presets(&meta.presets);
+				check_presets(&settings.presets);
+				
+				ui.combo("Preset", &selected_preset, |ui| {
+					let mut set_settings = |values: &HashMap<String, crate::modman::settings::Value>| {
+						for (name, value) in settings.settings.iter_mut() {
+							*value = values.get(name).map_or_else(|| crate::modman::settings::Value::from_meta_option(meta.options.iter().find(|v| v.name == *name).unwrap()), |v| v.to_owned());
+						}
+						
+						changed = true;
+					};
+					
+					for p in &meta.presets {
+						if ui.selectable(&p.name, p.name == selected_preset).clicked {
+							set_settings(&p.settings);
+						}
+					}
+					
+					let mut delete = None;
+					for (i, p) in settings.presets.iter().enumerate() {
+						ui.horizontal(|ui| {
+							let resp = ui.button("D");
+							if resp.clicked {
+								delete = Some(i);
+							}
+							if resp.hovered {
+								ui.tooltip_text("Delete");
+							}
+							
+							let resp = ui.button("S");
+							if resp.clicked {
+								if let Ok(json) = serde_json::to_vec(p) {
+									log!("copied {}", base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, &json));
+									ui.set_clipboard(base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, json));
+								}
+							}
+							if resp.hovered {
+								ui.tooltip_text("Copy to clipboard");
+							}
+							
+							if ui.selectable(&p.name, p.name == selected_preset).clicked {
+								set_settings(&p.settings);
+							}
+						});
+					}
+					
+					if let Some(delete) = delete {
+						settings.presets.remove(delete);
+						changed = true;
+					}
+					
+					ui.horizontal(|ui| {
+						if ui.button("+").clicked && self.new_preset_name.len() > 0 && self.new_preset_name != "Custom" && self.new_preset_name != "Default" && !meta.presets.iter().any(|v| v.name == self.new_preset_name) {
+							settings.presets.push(crate::modman::settings::Preset {
+								name: self.new_preset_name.clone(),
+								settings: settings.settings.iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect()
+							});
+							self.new_preset_name.clear();
+							changed = true;
+						}
+						ui.input_text("", &mut self.new_preset_name);
+					});
+					
+					if ui.button("Import").clicked {
+						if let Ok(json) = base64::Engine::decode(&base64::prelude::BASE64_STANDARD_NO_PAD, ui.get_clipboard()) {
+							if let Ok(preset) = serde_json::from_slice::<crate::modman::settings::Preset>(&json) {
+								if preset.name.len() > 0 && preset.name != "Custom" && preset.name != "Default" && !meta.presets.iter().any(|v| v.name == preset.name) {
+									if let Some(existing) = settings.presets.iter_mut().find(|v| v.name == preset.name) {
+										*existing = preset;
+									} else {
+										settings.presets.push(preset);
+									}
+								}
+							}
+						}
+					}
+				});
+				
+				for option in meta.options.iter() {
+					let setting_id = &o.name;
+					let val = settings.get_mut(setting_id).unwrap();
 					
 					match val {
 						SingleFiles(val) => {
@@ -235,6 +339,10 @@ impl Mods {
 						backend.finalize_apply(self.apply_progress.clone())
 					}
 				});
+				
+				if changed {
+					settings.save(&self.selected_mod, &self.active_collection);
+				}
 			}
 		});
 		

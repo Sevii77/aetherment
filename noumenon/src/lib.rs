@@ -18,7 +18,7 @@ pub mod format;
 /// - tex / atex
 /// - dds
 /// - png
-/// - tiff
+/// - tiff / tif
 /// - tga
 pub enum Convert {
 	// Mdl,
@@ -201,7 +201,7 @@ impl From<std::str::Utf8Error> for Error {
 
 struct VoidReader;
 impl ironworks::file::File for VoidReader {
-	fn read<'a>(_data: impl Into<std::borrow::Cow<'a, [u8]>>) -> format::game::Result<Self> {
+	fn read(_data: impl ironworks::FileStream) -> format::game::Result<Self> {
 		Ok(VoidReader)
 	}
 }
@@ -236,7 +236,7 @@ P: AsRef<Path> {
 	if let Some(gamepath) = gamepath {
 		if gamepath.as_ref().exists() && gamepath.as_ref().join("game").exists() {
 			return Some(Noumenon(ironworks::Ironworks::new()
-				.with_resource(ironworks::sqpack::SqPack::new(ironworks::ffxiv::FsResource::at(gamepath.as_ref())))));
+				.with_resource(ironworks::sqpack::SqPack::new(ironworks::sqpack::Install::at(gamepath.as_ref())))));
 		}
 	} else {
 		// super basic windows autodetect
@@ -251,7 +251,7 @@ P: AsRef<Path> {
 				let try_path = PathBuf::from(format!("{drive_letter}{path}"));
 				if try_path.exists() {
 					return Some(Noumenon(ironworks::Ironworks::new()
-						.with_resource(ironworks::sqpack::SqPack::new(ironworks::ffxiv::FsResource::at(try_path.as_ref())))));
+						.with_resource(ironworks::sqpack::SqPack::new(ironworks::sqpack::Install::at(try_path.as_ref())))));
 				}
 			}
 		}

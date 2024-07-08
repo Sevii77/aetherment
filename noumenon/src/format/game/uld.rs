@@ -36,8 +36,8 @@ pub struct Uld {
 
 // used to load from spack using ironworks
 impl ironworks::file::File for Uld {
-	fn read<'a>(data: impl Into<std::borrow::Cow<'a, [u8]>>) -> super::Result<Self> {
-		Uld::read(&mut std::io::Cursor::new(&data.into())).map_err(|e| ironworks::Error::Resource(e.into()))
+	fn read(mut data: impl ironworks::FileStream) -> super::Result<Self> {
+		Uld::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
 	}
 }
 

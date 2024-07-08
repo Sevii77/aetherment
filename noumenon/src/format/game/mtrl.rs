@@ -2,7 +2,7 @@
 
 // TODO: rewrite the reader/writer to use Binread/Binwrite
 
-use std::{borrow::Cow, io::{Cursor, Read, Seek, Write}, collections::BTreeMap};
+use std::{io::{Read, Seek, Write}, collections::BTreeMap};
 use binrw::{binrw, BinRead, BinWrite};
 use half::f16;
 use crate::{Error, NullReader, format::game::Result};
@@ -980,8 +980,8 @@ pub struct Mtrl {
 }
 
 impl ironworks::file::File for Mtrl {
-	fn read<'a>(data: impl Into<Cow<'a, [u8]>>) -> Result<Self> {
-		Ok(Mtrl::read(&mut Cursor::new(&data.into())).unwrap())
+	fn read(mut data: impl ironworks::FileStream) -> Result<Self> {
+		Ok(Mtrl::read(&mut data).unwrap())
 	}
 }
 

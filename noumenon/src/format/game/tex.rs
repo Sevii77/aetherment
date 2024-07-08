@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::{io::{Read, Seek, Write, SeekFrom, BufReader}, borrow::Cow};
+use std::io::{Read, Seek, Write, SeekFrom, BufReader};
 use binrw::{BinRead, BinReaderExt, BinWrite, binrw};
 use image::{codecs::{png::PngEncoder, tiff::TiffEncoder, tga::TgaEncoder}, ImageEncoder, ColorType};
 use crate::{Error, format::external::{dds::{Dds, Format as DFormat}, png::Png, tiff::Tiff, tga::Tga}};
@@ -118,8 +118,8 @@ impl std::panic::UnwindSafe for Tex {}
 
 // used to load from spack using ironworks
 impl ironworks::file::File for Tex {
-	fn read<'a>(data: impl Into<Cow<'a, [u8]>>) -> super::Result<Self> {
-		Tex::read(&mut std::io::Cursor::new(&data.into())).map_err(|e| ironworks::Error::Resource(e.into()))
+	fn read(mut data: impl ironworks::FileStream) -> super::Result<Self> {
+		Tex::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
 	}
 }
 
@@ -182,7 +182,6 @@ impl Tex {
 	
 	pub fn read<T>(reader: &mut T) -> Result<Self, Error>
 	where T: Read + Seek {
-		// unwrap cuz ? doesn't seem to like it and cba figuring out why or using match
 		let header = <Header as BinRead>::read(reader)?;
 		
 		reader.seek(SeekFrom::End(0))?;

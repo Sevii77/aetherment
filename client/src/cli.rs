@@ -92,10 +92,15 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 			};
 			
 			let gamepath = sub.get_one::<String>("path").ok_or("path is required")?;
-			let Ok(data) = noumenon.file::<Vec<u8>>(&gamepath) else {
-				println!("Provided file path is invalid");
-				return Ok(());
+			let data = match noumenon.file::<Vec<u8>>(&gamepath) {
+				Ok(v) => v,
+				Err(err) => {println!("Failed loading file {err:?}"); return Ok(())}
 			};
+			
+			// let Ok(data) = noumenon.file::<Vec<u8>>(&gamepath) else {
+			// 	println!("Provided file path is invalid");
+			// 	return Ok(());
+			// };
 			
 			let gameext = gamepath.split(".").last().unwrap().to_owned();
 			let defaultext = default_target_ext(&gameext);
@@ -201,6 +206,12 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 fn default_target_ext(ext: &str) -> &str {
 	match ext {
 		"tex" => "png",
+		"atex" => "png",
+		"png" => "tex",
+		"tif" => "tex",
+		"tiff" => "tex",
+		"tga" => "tex",
+		"dds" => "tex",
 		_ => ext,
 	}
 }

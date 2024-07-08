@@ -68,7 +68,7 @@ T: noumenon::File {
 	let mut file = File::open(real_path).map_err(|_| ExplorerError::RealPath2(real_path.to_owned()))?;
 	let mut buf = Vec::new();
 	file.read_to_end(&mut buf)?;
-	Ok(noumenon::File::read(&buf)?)
+	Ok(noumenon::File::read(std::io::Cursor::new(buf))?)
 }
 
 // TODO: ability to load from active mod even if only given a game path (uld resources)

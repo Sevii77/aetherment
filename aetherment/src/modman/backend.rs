@@ -121,6 +121,7 @@ pub trait Backend {
 	
 	fn apply_mod_settings(&mut self, mod_id: &str, collection_id: &str, settings: SettingsType);
 	fn finalize_apply(&mut self, progress: ApplyProgress);
+	fn apply_queue_size(&self) -> usize;
 	
 	// fn get_aeth_meta(&self, mod_id: &str) -> Option<super::meta::Meta>;
 	

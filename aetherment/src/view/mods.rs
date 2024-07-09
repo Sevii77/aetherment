@@ -97,6 +97,16 @@ impl Mods {
 					self.refresh();
 				}
 				
+				ui.enabled(!is_busy, |ui| {
+					let queue_size = backend.apply_queue_size();
+					if queue_size > 0 {
+						ui.label(format!("{queue_size} mods have changes that might require an apply"));
+						if ui.button("Apply").clicked {
+							backend.finalize_apply(apply_progress.clone());
+						}
+					}
+				});
+				
 				// ui.combo("Active Collection", &self.collections[&self.active_collection], |ui| {
 				ui.combo("Active Collection", self.collections.get(&self.active_collection).map_or("Invalid Collection", |v| v.as_str()), |ui| {
 					for (id, name) in &self.collections {
@@ -346,14 +356,15 @@ impl Mods {
 					}
 				}
 				
-				ui.enabled(!is_busy, |ui| {
-					if ui.button("Apply").clicked {
-						backend.apply_mod_settings(&self.selected_mod, &self.active_collection, SettingsType::Some(settings.clone()));
-						backend.finalize_apply(apply_progress.clone())
-					}
-				});
+				// ui.enabled(!is_busy, |ui| {
+				// 	if ui.button("Apply").clicked {
+				// 		backend.apply_mod_settings(&self.selected_mod, &self.active_collection, SettingsType::Some(settings.clone()));
+				// 		backend.finalize_apply(apply_progress.clone())
+				// 	}
+				// });
 				
 				if changed {
+					backend.apply_mod_settings(&self.selected_mod, &self.active_collection, SettingsType::Some(settings.clone()));
 					settings.save(&self.selected_mod, &self.active_collection);
 				}
 			}

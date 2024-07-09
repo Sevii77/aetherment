@@ -28,6 +28,21 @@ pub(crate) fn get_mod_settings(collection_id: &str, mod_id: &str, inherit: bool)
 fn current_collection() -> super::Collection {unsafe {(FUNCS.as_ref().unwrap().current_collection)()}}
 fn get_collections() -> Vec<super::Collection> {unsafe {(FUNCS.as_ref().unwrap().get_collections)()}}
 
+// TODO: this forces aetherment mods to be fully reapplied when we disable the mod, we shouldnt need to do this
+#[allow(improper_ctypes_definitions)]
+#[no_mangle]
+pub extern fn backend_penumbraipc_modchanged(typ: u8, collection_id: &str, mod_id: &str) {
+	// log!("{mod_id} {collection_id}");
+	// super fucking cheesy, idc
+	if typ == 3 { // settings
+		if !root_path().join(mod_id).join("aetherment").exists() {
+			crate::backend().apply_mod_settings(mod_id, collection_id, super::SettingsType::Keep);
+		}
+	} else {
+		crate::backend().apply_mod_settings(mod_id, collection_id, super::SettingsType::Keep);
+	}
+}
+
 pub struct PenumbraFunctions {
 	pub config_dir: std::path::PathBuf,
 	pub redraw: Box<dyn Fn()>,
@@ -258,6 +273,10 @@ impl super::Backend for Penumbra {
 		squeue.clear();
 	}
 	
+	fn apply_queue_size(&self) -> usize {
+		self.apply_queue.lock().unwrap().len()
+	}
+	
 	fn load_mods(&mut self) {
 		let root = root_path();
 		
@@ -444,7 +463,9 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	let root = root_path();
 	let mod_dir = root.join(mod_id);
 	let aeth_dir = mod_dir.join("aetherment");
-	if !aeth_dir.exists() {return Ok(changed_files)} // TODO: set non aetherment settings
+	if !aeth_dir.exists() {
+		return Ok(get_mod_files(collection_id, mod_id).map_or(changed_files, |v| v.into_iter().map(|(v, _)| v).collect()));
+	}
 	let files_dir = mod_dir.join("files");
 	let files_comp_dir = mod_dir.join("files_comp");
 	_ = std::fs::create_dir(&files_comp_dir);
@@ -881,6 +902,58 @@ fn get_mod_cache() -> ModFileCache {
 	}
 	
 	mod_file_cache
+}
+
+fn get_mod_files(collection_id: &str, mod_id: &str) -> Option<HashMap<String, String>> {
+	let mut files = HashMap::new();
+	let root = root_path();
+	let Ok(dir_entries) = std::fs::read_dir(root.join(&mod_id)) else {return None};
+	let dir_entries = dir_entries.filter_map(|v| v.ok())
+		.map(|v| v.file_name().to_string_lossy().into_owned())
+		.collect::<Vec<_>>();
+	
+	let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
+		Ok(v) => v,
+		Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); return None},
+	};
+	
+	let settings = get_mod_settings(collection_id, mod_id, false);
+	if !settings.exists || !settings.enabled {return None};
+	
+	for (game_path, real_path) in default.Files {
+		files.insert(game_path, real_path);
+	}
+	
+	let options = settings.options;
+	for (option, enabled_sub_options) in &options {
+		if enabled_sub_options.len() == 0 {continue}
+		
+		let group_name = format!("{}.json", clean_path(&option));
+		// let Some(group) = group_cache.entry(group_name.clone()).or_insert_with(|| {
+		// 	let Some(group_name) = dir_entries.iter().find(|v| v.ends_with(&group_name)) else {log!(err, "Failed to find group file ({group_name}) for mod ({mod_id})"); return None};
+		// 	match read_json::<PGroup>(&root.join(&mod_id).join(&group_name)) {
+		// 		Ok(v) => Some(v),
+		// 		Err(e) => {log!(err, "Failed to load or parse group file {group_name} for mod {mod_id}\n{e:?}"); None},
+		// 	}
+		// }) else {continue};
+		
+		let Some(group_name) = dir_entries.iter().find(|v| v.ends_with(&group_name)) else {log!(err, "Failed to find group file ({group_name}) for mod ({mod_id})"); return None};
+		let group = match read_json::<PGroup>(&root.join(&mod_id).join(&group_name)) {
+			Ok(v) => v,
+			Err(e) => {log!(err, "Failed to load or parse group file {group_name} for mod {mod_id}\n{e:?}"); return None},
+		};
+		
+		for o in group.Options {
+			if enabled_sub_options.contains(&o.Name) {
+				for (game_path, real_path) in o.Files {
+					files.insert(game_path, real_path);
+					// insert(&col.id, &mod_id, priority, game_path, real_path);
+				}
+			}
+		}
+	}
+	
+	Some(files)
 }
 
 fn get_composite_info(mods: Vec<&str>) -> CompositeInfo {

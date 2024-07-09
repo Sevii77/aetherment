@@ -31,10 +31,14 @@ public unsafe class Penumbra: IDisposable {
 		
 		// postSettingsDraw = Aetherment.Interface.GetIpcSubscriber<string, object>("Penumbra.PostSettingsDraw");
 		// postSettingsDraw.Subscribe(DrawSettings);
+		
+		modSettingChanged = Aetherment.Interface.GetIpcSubscriber<int, Guid, string, bool, object>("Penumbra.ModSettingChanged.V5");
+		modSettingChanged.Subscribe(ModSettingChanged);
 	}
 	
 	public void Dispose() {
 		// postSettingsDraw.Unsubscribe(DrawSettings);
+		modSettingChanged.Unsubscribe(ModSettingChanged);
 	}
 	
 	// private static void DrawSettings(string id) {
@@ -46,6 +50,14 @@ public unsafe class Penumbra: IDisposable {
 	// 		PluginLog.Error("draw_settings somehow paniced, even tho it's supposed to catch those, wtf", e);
 	// 	}
 	// }
+	
+	private ICallGateSubscriber<int, Guid, string, bool, object> modSettingChanged;
+	private static void ModSettingChanged(int type, Guid collection_id, string mod_id, bool inherited) {
+		// Aetherment.Logger.Debug($"{type} - {collection_id} - {mod_id} - {inherited}");
+		if(!inherited) {
+			backend_penumbraipc_modchanged((byte)type, collection_id.ToString(), mod_id);
+		}
+	}
 	
 	public RedrawDelegate redraw;
 	public delegate void RedrawDelegate();
@@ -279,4 +291,6 @@ public unsafe class Penumbra: IDisposable {
 	// 	
 	// 	return collections_str;
 	// }
+	
+	[DllImport("aetherment_core.dll")] private static extern unsafe void backend_penumbraipc_modchanged(byte type, FFI.Str collection_id, FFI.Str mod_id);
 }

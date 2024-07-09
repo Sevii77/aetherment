@@ -157,7 +157,7 @@ impl<'a> Ui<'a> {
 	
 	// Elements
 	pub fn window(&mut self, args: crate::WindowArgs, contents: impl FnOnce(&mut Ui)) {
-		unsafe {
+		if unsafe {
 			let mut flags = 0;
 			
 			match args.pos {
@@ -184,12 +184,12 @@ impl<'a> Ui<'a> {
 			};
 			
 			let title = CString::new(args.title).unwrap();
-			sys::igBegin(title.as_ptr(), if let Some(open) = args.open {open} else {0 as _}, flags as i32);
+			sys::igBegin(title.as_ptr(), if let Some(open) = args.open {open} else {0 as _}, flags as i32)
+		} {
+			contents(&mut Self::new());
+			
+			unsafe{sys::igEnd()};
 		}
-		
-		contents(&mut Self::new());
-		
-		unsafe{sys::igEnd()}
 	}
 	
 	pub fn child(&mut self, id: impl Hash, size: [f32; 2], contents: impl FnOnce(&mut Ui)) {

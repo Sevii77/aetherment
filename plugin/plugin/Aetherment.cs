@@ -133,10 +133,11 @@ public class Aetherment : IDalamudPlugin {
 	private LogDelegate log;
 	private unsafe delegate void LogDelegate(byte mode, FFI.Str str);
 	private unsafe void Log(byte mode, FFI.Str str) {
-		if(mode == 255)
+		if(mode == 255) {
 			// Kill(str, 2);
 			Logger.Debug("TODO: kill plugin");
-		else if(mode == 1)
+			Logger.Error(str);
+		} else if(mode == 1)
 			Logger.Error(str);
 		else
 			Logger.Debug(str);

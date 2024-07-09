@@ -11,7 +11,7 @@ impl Tools {
 		}
 	}
 	
-	pub fn draw(&mut self, ui: &mut renderer::Ui) {
+	pub fn draw(&mut self, _ui: &mut renderer::Ui) {
 		
 	}
 }

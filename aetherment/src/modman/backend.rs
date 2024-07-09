@@ -114,7 +114,10 @@ pub trait Backend {
 	fn get_active_collection(&self) -> String;
 	fn get_collections(&self) -> Vec<Collection>;
 	// fn install_mod(&mut self, file: &std::path::Path) -> Result<String, crate::resource_loader::BacktraceError>;
-	fn install_mods(&mut self, progress: InstallProgress, files: Vec<std::path::PathBuf>);
+	fn install_mods_path(&mut self, progress: InstallProgress, files: Vec<std::path::PathBuf>) {
+		self.install_mods(progress, files.into_iter().filter_map(|v| std::fs::File::open(&v).ok().map(|f| (v.file_name().map_or_else(|| String::new(), |v| v.to_string_lossy().to_string()), f))).collect())
+	}
+	fn install_mods(&mut self, progress: InstallProgress, files: Vec<(String, std::fs::File)>);
 	
 	fn apply_mod_settings(&mut self, mod_id: &str, collection_id: &str, settings: SettingsType);
 	fn finalize_apply(&mut self, progress: ApplyProgress);

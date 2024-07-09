@@ -13,9 +13,9 @@ pub struct GetModSettings {
 
 static mut FUNCS: Option<PenumbraFunctions> = None;
 
-pub(crate) fn config_dir() -> Option<std::path::PathBuf> {unsafe {FUNCS.as_ref().map(|v| Some(v.config_dir.clone())).unwrap_or(None)}}
-fn redraw() {unsafe {(FUNCS.as_ref().unwrap().redraw)()}}
-fn redraw_self() {unsafe {(FUNCS.as_ref().unwrap().redraw_self)()}}
+#[allow(unused)] pub(crate) fn config_dir() -> Option<std::path::PathBuf> {unsafe {FUNCS.as_ref().map(|v| Some(v.config_dir.clone())).unwrap_or(None)}}
+#[allow(unused)] fn redraw() {unsafe {(FUNCS.as_ref().unwrap().redraw)()}}
+#[allow(unused)] fn redraw_self() {unsafe {(FUNCS.as_ref().unwrap().redraw_self)()}}
 fn root_path() -> std::path::PathBuf {unsafe {(FUNCS.as_ref().unwrap().root_path)()}}
 fn mod_list() -> Vec<String> {unsafe {(FUNCS.as_ref().unwrap().mod_list)()}}
 fn add_mod_entry(mod_id: &str) -> u8 {unsafe {(FUNCS.as_ref().unwrap().add_mod_entry)(mod_id)}}
@@ -112,7 +112,7 @@ impl super::Backend for Penumbra {
 	// only mods that originally started with ui/ with be considered, game paths are not checked
 	// we only rewrite "remap" as this way we dont have to rewrite any other files
 	// TODO: possibly change this?
-	fn install_mods(&mut self, progress: super::InstallProgress, files: Vec<std::path::PathBuf>) {
+	fn install_mods(&mut self, progress: super::InstallProgress, files: Vec<(String, std::fs::File)>) {
 		progress.set_busy(true);
 		progress.mods.set(0.0);
 		progress.mods.set_msg("Installing Mods");
@@ -123,16 +123,19 @@ impl super::Backend for Penumbra {
 		std::thread::spawn(move || {
 			if let Err(err) = (|| -> Result<(), crate::resource_loader::BacktraceError> {
 				let total_mods = files.len();
-				for (mod_index, file) in files.into_iter().enumerate() {
+				// for (mod_index, file) in files.into_iter().enumerate() {
+				for (mod_index, (mod_id, file)) in files.into_iter().enumerate() {
 					progress.mods.set(mod_index as f32 / total_mods as f32);
-					progress.mods.set_msg(&file.to_string_lossy());
-					let mut pack = zip::ZipArchive::new(std::io::BufReader::new(std::fs::File::open(file)?))?;
+					// progress.mods.set_msg(&file.to_string_lossy());
+					// let mut pack = zip::ZipArchive::new(std::io::BufReader::new(std::fs::File::open(file)?))?;
+					progress.mods.set_msg(&mod_id);
+					let mut pack = zip::ZipArchive::new(file)?;
 					
 					let mut meta_buf = Vec::new();
 					pack.by_name("meta.json")?.read_to_end(&mut meta_buf)?;
 					let meta = serde_json::from_slice::<meta::Meta>(&meta_buf)?;
 					
-					let mod_id = meta.name.clone();
+					// let mod_id = meta.name.clone();
 					let mod_dir = root_path().join(&mod_id);
 					_ = std::fs::create_dir(&mod_dir);
 					let aeth_dir = mod_dir.join("aetherment");
@@ -210,8 +213,16 @@ impl super::Backend for Penumbra {
 					
 					add_mod_entry(&mod_id);
 					
-					let settings = crate::modman::settings::Settings::from_meta(&meta);
-					apply_queue.lock().unwrap().insert((mod_id.to_owned(), current_collection().id), (super::SettingsType::Some(settings), None));
+					for c in get_collections() {
+						let s = get_mod_settings(&c.id, &mod_id, false);
+						if s.enabled && !s.inherit {
+							let settings = crate::modman::settings::Settings::open(&meta, &mod_id, &c.id);
+							apply_queue.lock().unwrap().insert((mod_id.to_owned(), c.id), (super::SettingsType::Some(settings), None));
+						}
+					}
+					// let settings = crate::modman::settings::Settings::from_meta(&meta);
+					// apply_queue.lock().unwrap().insert((mod_id.to_owned(), current_collection().id), (super::SettingsType::Some(settings), None));
+					
 					mods.lock().unwrap().push(mod_id.to_owned());
 				}
 				
@@ -280,7 +291,7 @@ impl super::Backend for Penumbra {
 		let Some(m) = self.mod_infos.get(mod_id) else {return None};
 		
 		if m.is_aeth {
-			Some(crate::modman::settings::Settings::open(&m.meta, collection_id))
+			Some(crate::modman::settings::Settings::open(&m.meta, mod_id, collection_id))
 		} else {
 			let mut settings = crate::modman::settings::Settings::from_meta(&m.meta);
 			for (option, sub_options) in get_mod_settings(collection_id, &mod_id, true).options {
@@ -447,7 +458,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			return Ok(changed_files);
 		}
 		
-		super::SettingsType::Keep => crate::modman::settings::Settings::open(&meta, collection_id),
+		super::SettingsType::Keep => crate::modman::settings::Settings::open(&meta, mod_id, collection_id),
 		super::SettingsType::Some(v) => v,
 	};
 	

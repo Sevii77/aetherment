@@ -1,11 +1,11 @@
 {
 	"Author": "Sevii",
 	"Name": "Aetherment",
-	"Punchline": "TODO",
-	"Description": "TODO",
+	"Punchline": "Auto-updating and more customizable mods",
+	"Description": "Auto updates mods and allows for more customization such as color and compositing onto other files",
 	"InternalName": "Aetherment",
 	"ApplicableVersion": "any",
 	"DalamudApiLevel": 10,
 	"LoadPriority": 1,
-	"Tags": []
+	"Tags": ["Ui", "Modding"]
 }

@@ -36,19 +36,19 @@ pub type BacktraceError = Box<dyn std::error::Error>;
 
 #[derive(Debug)]
 pub enum ExplorerError {
-	Path(String),
-	RealPath(String),
+	// Path(String),
+	// RealPath(String),
 	RealPath2(std::path::PathBuf),
-	Data,
+	// Data,
 }
 
 impl std::fmt::Display for ExplorerError {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		match self {
-			Self::Path(path) => write!(f, "Invalid game path: {:?}", path),
-			Self::RealPath(path) => write!(f, "Invalid real path: {:?}", path),
+			// Self::Path(path) => write!(f, "Invalid game path: {:?}", path),
+			// Self::RealPath(path) => write!(f, "Invalid real path: {:?}", path),
 			Self::RealPath2(path) => write!(f, "Invalid real path: {:?}", path),
-			Self::Data => write!(f, "File is invalid"),
+			// Self::Data => write!(f, "File is invalid"),
 		}
 	}
 }
@@ -71,15 +71,15 @@ T: noumenon::File {
 	Ok(noumenon::File::read(std::io::Cursor::new(buf))?)
 }
 
-// TODO: ability to load from active mod even if only given a game path (uld resources)
-pub fn load_file<T>(path: &str, real_path: Option<&str>) -> Result<T, BacktraceError> where
-T: noumenon::File {
-	if let Some(real_path) = real_path {
-		load_file_disk::<T>(std::path::Path::new(real_path))
-	} else {
-		Ok(crate::noumenon().as_ref().ok_or(ExplorerError::Path(path.to_string()))?.file::<T>(path)?)
-	}
-}
+// // TODO: ability to load from active mod even if only given a game path (uld resources)
+// pub fn load_file<T>(path: &str, real_path: Option<&str>) -> Result<T, BacktraceError> where
+// T: noumenon::File {
+// 	if let Some(real_path) = real_path {
+// 		load_file_disk::<T>(std::path::Path::new(real_path))
+// 	} else {
+// 		Ok(crate::noumenon().as_ref().ok_or(ExplorerError::Path(path.to_string()))?.file::<T>(path)?)
+// 	}
+// }
 
 // Load json file that can include the UTF-8 BOM
 pub fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T, crate::resource_loader::BacktraceError> {

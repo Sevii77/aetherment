@@ -109,6 +109,10 @@ impl<'a> Ui<'a> {
 		self.next_width = Some(width);
 	}
 	
+	pub fn add_space(&mut self, spacing: f32) {
+		todo!()
+	}
+	
 	pub fn tooltip(&mut self, contents: impl FnOnce(&mut Ui)) {
 		egui::show_tooltip_at_pointer(self.ui.ctx(), egui::Id::new("tooltip"), |ui| contents(&mut Ui::new(ui)));
 	}

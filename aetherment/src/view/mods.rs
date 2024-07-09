@@ -8,35 +8,31 @@ pub struct Mods {
 	import_picker: Option<renderer::FilePicker>,
 	new_preset_name: String,
 	
+	last_was_busy: bool,
 	mods: Vec<String>,
 	collections: HashMap<String, String>,
 	mod_settings: HashMap<String, HashMap<String, Settings>>,
-	
-	install_progress: crate::modman::backend::InstallProgress,
-	apply_progress: crate::modman::backend::ApplyProgress,
+	mod_settings_remote: HashMap<String, crate::remote::settings::Settings>,
 }
 
 impl Mods {
 	pub fn new() -> Self {
-		let mut v = Self {
+		let mut s = Self {
 			active_collection: String::new(),
 			selected_mod: String::new(),
 			
 			import_picker: None,
 			new_preset_name: String::new(),
 			
+			last_was_busy: false,
 			mods: Vec::new(),
 			collections: HashMap::new(),
 			mod_settings: HashMap::new(),
-			
-			install_progress: crate::modman::backend::InstallProgress::new(),
-			apply_progress: crate::modman::backend::ApplyProgress::new(),
+			mod_settings_remote: HashMap::new(),
 		};
 		
-		v.install_progress.apply = v.apply_progress.clone();
-		v.refresh();
-		
-		v
+		s.refresh();
+		s
 	}
 	
 	fn refresh(&mut self) {
@@ -48,6 +44,7 @@ impl Mods {
 		
 		self.collections = backend.get_collections().into_iter().map(|v| (v.id, v.name)).collect();
 		self.mod_settings = self.mods.iter().map(|m| (m.to_owned(), self.collections.iter().map(|(c, _)| (c.to_owned(), backend.get_mod_settings(m, c).unwrap())).collect())).collect();
+		self.mod_settings_remote = self.mods.iter().map(|m| (m.to_owned(), crate::remote::settings::Settings::open(m))).collect();
 		
 		if !self.collections.iter().any(|(c, _)| c == &self.active_collection) {
 			// self.active_collection = self.collections.iter().find(|_| true).map_or_else(|| String::new(), |(c, _)| c.clone());
@@ -55,22 +52,15 @@ impl Mods {
 		}
 	}
 	
-	pub fn draw(&mut self, ui: &mut renderer::Ui) {
+	pub fn draw(&mut self, ui: &mut renderer::Ui, install_progress: crate::modman::backend::InstallProgress, apply_progress: crate::modman::backend::ApplyProgress) {
 		let backend = crate::backend();
 		let config = crate::config();
 		config.mark_for_changes();
-		let is_busy = self.install_progress.is_busy() || self.apply_progress.is_busy();
-		
-		// TOOD: make fancy
-		if self.install_progress.is_busy() {
-			ui.label(format!("{:.0}% {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()));
-			ui.label(format!("{:.0}% {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()));
+		let is_busy = install_progress.is_busy() || apply_progress.is_busy();
+		if self.last_was_busy && !is_busy {
+			self.refresh();
 		}
-		
-		if self.apply_progress.is_busy() {
-			ui.label(format!("{:.0}% {}", self.apply_progress.mods.get() * 100.0, self.apply_progress.mods.get_msg()));
-			ui.label(format!("{:.0}% {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()));
-		}
+		self.last_was_busy = is_busy;
 		
 		ui.splitter("splitter", 0.3, |ui_left, ui_right| {
 			{
@@ -82,7 +72,7 @@ impl Mods {
 				if let Some(picker) = &mut self.import_picker {
 					match picker.show(ui) {
 						renderer::FilePickerStatus::Success(dir, paths) => {
-							backend.install_mods(self.install_progress.clone(), paths);
+							backend.install_mods_path(install_progress.clone(), paths);
 							config.config.file_dialog_path = dir;
 							self.import_picker = None;
 						}
@@ -96,7 +86,14 @@ impl Mods {
 					}
 				}
 				
-				if ui.button("Reload Mods").clicked {
+				if !is_busy && ui.button("Update Mods").clicked {
+					let progress = install_progress.clone();
+					std::thread::spawn(move || {
+						crate::remote::check_updates(progress);
+					});
+				}
+				
+				if !is_busy && ui.button("Reload Mods").clicked {
 					self.refresh();
 				}
 				
@@ -110,8 +107,10 @@ impl Mods {
 				});
 				
 				for m in &self.mods {
-					if ui.selectable(&m, self.selected_mod == *m).clicked {
-						self.selected_mod = m.clone();
+					if let Some(meta) = backend.get_mod_meta(m) {
+						if ui.selectable(&meta.name, self.selected_mod == *m).clicked {
+							self.selected_mod = m.clone();
+						}
 					}
 				}
 			}
@@ -123,14 +122,22 @@ impl Mods {
 				
 				let ui = ui_right;
 				
-				ui.label(&self.selected_mod);
-				
 				let Some(meta) = backend.get_mod_meta(&self.selected_mod) else {return};
 				let Some(mod_settings) = self.mod_settings.get_mut(&self.selected_mod) else {return};
 				let Some(settings) = mod_settings.get_mut(&self.active_collection) else {return};
+				let Some(remote_settings) = self.mod_settings_remote.get_mut(&self.selected_mod) else {return};
 				let mut changed = false;
 				
+				ui.horizontal(|ui| {
+					ui.label(&meta.name);
+					ui.label(format!("({})", meta.version))
+				});
+				
 				ui.label(&meta.description);
+				
+				if ui.checkbox("Auto Update", &mut remote_settings.auto_update).changed {
+					remote_settings.save(&self.selected_mod);
+				}
 				
 				let mut selected_preset = "Custom".to_string();
 				'default: {
@@ -164,6 +171,12 @@ impl Mods {
 						
 						changed = true;
 					};
+					
+					if meta.presets.len() == 0 {
+						if ui.selectable("Default", "Default" == selected_preset).clicked {
+							set_settings(&HashMap::new());
+						}
+					}
 					
 					for p in &meta.presets {
 						if ui.selectable(&p.name, p.name == selected_preset).clicked {
@@ -232,7 +245,7 @@ impl Mods {
 				});
 				
 				for option in meta.options.iter() {
-					let setting_id = &o.name;
+					let setting_id = &option.name;
 					let val = settings.get_mut(setting_id).unwrap();
 					
 					match val {
@@ -304,15 +317,15 @@ impl Mods {
 							});
 						}
 						
-						Grayscale(val) => {
+						Grayscale(_val) => {
 							ui.label("TODO: Grayscale");
 						}
 						
-						Opacity(val) => {
+						Opacity(_val) => {
 							ui.label("TODO: Opacity");
 						}
 						
-						Mask(val) => {
+						Mask(_val) => {
 							ui.label("TODO: Mask");
 						}
 						
@@ -336,7 +349,7 @@ impl Mods {
 				ui.enabled(!is_busy, |ui| {
 					if ui.button("Apply").clicked {
 						backend.apply_mod_settings(&self.selected_mod, &self.active_collection, SettingsType::Some(settings.clone()));
-						backend.finalize_apply(self.apply_progress.clone())
+						backend.finalize_apply(apply_progress.clone())
 					}
 				});
 				

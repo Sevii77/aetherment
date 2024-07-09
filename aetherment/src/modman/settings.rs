@@ -8,6 +8,12 @@ pub struct Settings {
 }
 
 impl Settings {
+	pub fn exists(mod_id: &str, collection: &str) -> bool {
+		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
+		let id_hash = crate::hash_str(blake3::hash(mod_id.as_bytes()));
+		dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash).join(id_hash).exists()
+	}
+	
 	pub fn from_meta(meta: &super::meta::Meta) -> Self {
 		Self {
 			settings: meta.options.iter().map(|option| (option.name.clone(), Value::from_meta_option(option))).collect(),
@@ -29,12 +35,12 @@ impl Settings {
 		settings
 	}
 	
-	pub fn open(meta: &super::meta::Meta, collection: &str) -> Self {
+	pub fn open(meta: &super::meta::Meta, mod_id: &str, collection: &str) -> Self {
 		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
-		let name_hash = crate::hash_str(blake3::hash(meta.name.as_bytes()));
+		let id_hash = crate::hash_str(blake3::hash(mod_id.as_bytes()));
 		
 		let dir = dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash);
-		Self::open_from(meta, &dir.join(name_hash))
+		Self::open_from(meta, &dir.join(id_hash))
 	}
 	
 	pub fn save_to(&self, path: &Path) {
@@ -42,14 +48,14 @@ impl Settings {
 		f.write_all(crate::json_pretty(&self).unwrap().as_bytes()).unwrap()
 	}
 	
-	pub fn save(&self, name: &str, collection: &str) {
+	pub fn save(&self, mod_id: &str, collection: &str) {
 		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
-		let name_hash = crate::hash_str(blake3::hash(name.as_bytes()));
+		let id_hash = crate::hash_str(blake3::hash(mod_id .as_bytes()));
 		
 		let dir = dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash);
 		_ = std::fs::create_dir_all(&dir);
 		
-		self.save_to(&dir.join(name_hash));
+		self.save_to(&dir.join(id_hash));
 	}
 }
 

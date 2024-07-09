@@ -121,19 +121,19 @@ impl<'a> Ui<'a> {
 	
 	pub fn push_id(&mut self, id: impl Hash, contents: impl FnOnce(&mut Ui)) {
 		unsafe{sys::igPushID_Int(id_u32(id) as i32)};
-		contents(self);
+		contents(&mut Self::new());
 		unsafe{sys::igPopID()};
 	}
 	
 	pub fn enabled(&mut self, enabled: bool, contents: impl FnOnce(&mut Ui)) {
 		unsafe{sys::igBeginDisabled(!enabled)};
-		contents(self);
+		contents(&mut Self::new());
 		unsafe{sys::igEndDisabled()};
 	}
 	
 	pub fn indent(&mut self, contents: impl FnOnce(&mut Ui)) {
 		unsafe{sys::igIndent(0.0)};
-		contents(self);
+		contents(&mut Self::new());
 		unsafe{sys::igUnindent(0.0)};
 	}
 	
@@ -141,9 +141,17 @@ impl<'a> Ui<'a> {
 		unsafe{sys::igSetNextItemWidth(width)};
 	}
 	
+	pub fn add_space(&mut self, spacing: f32) {
+		if self.horizontal {
+			unsafe{sys::igSetCursorPosX(sys::igGetCursorPosX() + spacing)}
+		} else {
+			unsafe{sys::igSetCursorPosY(sys::igGetCursorPosY() + spacing)}
+		}
+	}
+	
 	pub fn tooltip(&mut self, contents: impl FnOnce(&mut Ui)) {
 		unsafe{sys::igBeginTooltip()};
-		contents(self);
+		contents(&mut Self::new());
 		unsafe{sys::igEndTooltip()};
 	}
 	
@@ -179,14 +187,14 @@ impl<'a> Ui<'a> {
 			sys::igBegin(title.as_ptr(), if let Some(open) = args.open {open} else {0 as _}, flags as i32);
 		}
 		
-		contents(self);
+		contents(&mut Self::new());
 		
 		unsafe{sys::igEnd()}
 	}
 	
 	pub fn child(&mut self, id: impl Hash, size: [f32; 2], contents: impl FnOnce(&mut Ui)) {
 		if unsafe{sys::igBeginChild_ID(id_u32(id), sys::ImVec2{x: size[0], y: size[1]}, false, 0)} {
-			contents(self);
+			contents(&mut Self::new());
 			unsafe{sys::igEndChild()}
 		}
 	}
@@ -204,7 +212,7 @@ impl<'a> Ui<'a> {
 			sys::igBeginChild_ID(id_u32("left"), sys::ImVec2{x: 0.0, y: h}, false, 0);
 		}
 		
-		contents(self, &mut Self::new());
+		contents(&mut Self::new(), &mut Self::new());
 		
 		unsafe {
 			sys::igEndChild();
@@ -224,10 +232,10 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn horizontal<T>(&mut self, contents: impl FnOnce(&mut Ui) -> T) -> T {
-		self.horizontal = true;
-		self.horizontal_first = true;
-		let r = contents(self);
-		self.horizontal = false;
+		let mut ui = Self::new();
+		ui.horizontal = true;
+		ui.horizontal_first = true;
+		let r = contents(&mut ui);
 		r
 	}
 	
@@ -265,10 +273,11 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn combo<S: AsRef<str>, S2: AsRef<str>>(&mut self, label: S, preview: S2, contents: impl FnOnce(&mut Ui)) {
+		self.handle_horizontal();
 		let label = CString::new(label.as_ref()).unwrap();
 		let preview = CString::new(preview.as_ref()).unwrap();
 		if unsafe{sys::igBeginCombo(label.as_ptr(), preview.as_ptr(), 0)} {
-			contents(self);
+			contents(&mut Self::new());
 			unsafe{sys::igEndCombo()};
 		}
 	}

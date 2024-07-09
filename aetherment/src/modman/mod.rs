@@ -98,9 +98,8 @@ pub fn get_mod_files(meta: &meta::Meta, files_path: &std::path::Path) -> HashMap
 		if let meta::OptionSettings::Path(v) = &option.settings {
 			for (_, paths) in &v.options {
 				for (_id, path) in paths {
-					if let meta::ValuePathPath::Mod(path) = path {
-						insert(None, path);
-					}
+					let meta::ValuePathPath::Mod(path) = path;
+					insert(None, path);
 				}
 			}
 		}
@@ -272,7 +271,7 @@ pub fn check_diff<R: Read + Seek>(mod_data: R) -> Result<Vec<String>, crate::res
 				changes.push(path);
 			}
 		} else {
-			println!("{path} does not exist in the game files");
+			log!("{path} does not exist in the game files");
 		}
 	}
 	

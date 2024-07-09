@@ -4,6 +4,7 @@ use crate::render_helper::EnumTools;
 
 // TODO: add option_sync or smth so that a submod can sync its options with a master mod (having rounded corners mod for mui needed to be adjusted seperatly is dumb)
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(default)]
 pub struct Meta {
 	pub name: String,
 	pub description: String,

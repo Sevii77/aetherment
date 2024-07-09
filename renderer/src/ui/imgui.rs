@@ -254,6 +254,12 @@ impl<'a> Ui<'a> {
 	pub fn selectable<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
 		self.handle_horizontal();
 		let clabel = CString::new(label.as_ref()).unwrap();
+		unsafe{sys::igSelectable_Bool(clabel.as_ptr(), selected, 0, sys::ImVec2{x: 0.0, y: 0.0})}.into()
+	}
+	
+	pub fn selectable_min<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
+		self.handle_horizontal();
+		let clabel = CString::new(label.as_ref()).unwrap();
 		unsafe{sys::igSelectable_Bool(clabel.as_ptr(), selected, 0, sys::ImVec2{x: self.text_size(label.as_ref())[0], y: 0.0})}.into()
 	}
 	

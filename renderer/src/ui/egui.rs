@@ -173,6 +173,10 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn selectable<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
+		todo!()
+	}
+	
+	pub fn selectable_min<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
 		self.handle_add(egui::SelectableLabel::new(selected, label.as_ref())).into()
 	}
 	

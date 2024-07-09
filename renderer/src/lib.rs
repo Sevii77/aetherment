@@ -109,7 +109,7 @@ impl<'a> Ui<'a> {
 		let mut resp = Response::new();
 		self.horizontal(|ui| {
 			for tab in tabs {
-				let r = ui.selectable(tab.as_ref(), *current == *tab);
+				let r = ui.selectable_min(tab.as_ref(), *current == *tab);
 				if r.clicked {
 					*current = tab.clone();
 				}

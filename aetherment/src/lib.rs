@@ -55,6 +55,7 @@ pub fn json_pretty<T: serde::Serialize>(data: &T) -> Result<String, serde_json::
 pub struct Core {
 	mods_tab: view::mods::Mods,
 	browser_tab: view::browser::Browser,
+	settings_tab: view::settings::Settings,
 	tools_tab: view::tool::Tools,
 	
 	current_tab: &'static str,
@@ -76,6 +77,7 @@ impl Core {
 		let mut s = Self {
 			mods_tab: view::mods::Mods::new(),
 			browser_tab: view::browser::Browser::new(),
+			settings_tab: view::settings::Settings::new(),
 			tools_tab: view::tool::Tools::new(),
 			
 			current_tab: "Mods",
@@ -118,7 +120,7 @@ impl Core {
 			}
 			
 			"Settings" => {
-				
+				self.settings_tab.draw(ui);
 			}
 			
 			"Tools" => {

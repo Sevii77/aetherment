@@ -1,3 +1,4 @@
 pub mod mods;
-pub mod tool;
 pub mod browser;
+pub mod settings;
+pub mod tool;

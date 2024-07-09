@@ -1,5 +1,6 @@
-use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, io::{Read, Write}, sync::{Arc, Mutex}};
+use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, hash::Hash, io::{Read, Write}, sync::{Arc, Mutex}};
 use serde::{Deserialize, Serialize};
+use ureq::delete;
 use crate::{log, modman::meta, resource_loader::read_json};
 
 #[repr(packed)]
@@ -28,17 +29,17 @@ pub(crate) fn get_mod_settings(collection_id: &str, mod_id: &str, inherit: bool)
 fn current_collection() -> super::Collection {unsafe {(FUNCS.as_ref().unwrap().current_collection)()}}
 fn get_collections() -> Vec<super::Collection> {unsafe {(FUNCS.as_ref().unwrap().get_collections)()}}
 
-// TODO: this forces aetherment mods to be fully reapplied when we disable the mod, we shouldnt need to do this
 #[allow(improper_ctypes_definitions)]
 #[no_mangle]
 pub extern fn backend_penumbraipc_modchanged(typ: u8, collection_id: &str, mod_id: &str) {
-	// log!("{mod_id} {collection_id}");
+	// log!("{typ} {mod_id} {collection_id}");
 	// super fucking cheesy, idc
+	let is_aeth = root_path().join(mod_id).join("aetherment").exists();
 	if typ == 3 { // settings
-		if !root_path().join(mod_id).join("aetherment").exists() {
+		if !is_aeth {
 			crate::backend().apply_mod_settings(mod_id, collection_id, super::SettingsType::Keep);
 		}
-	} else {
+	} else if !is_aeth || typ != 7 { // edited
 		crate::backend().apply_mod_settings(mod_id, collection_id, super::SettingsType::Keep);
 	}
 }
@@ -360,15 +361,7 @@ impl super::Backend for Penumbra {
 	}
 }
 
-// TODO: currently it also adds mods that are disabled to the queue if a file they depend on is
-// changed, this might cause issues in cases where a lot of mods depend on a single file (tattoo mods)
-// possibly change this (not anymore)
-// TODO: currently this skips over applying mods with a higher priority that are disabled
-// we should apply it after enabling the mod, similar to the issue below, IMPORTANT!!!
-// TODO: this currently wont get called if non aetherment mods get changed, which can cause issues
-// (body mod texture > tattoo, tattoo wont get updated) FIX THIS!!!
 // TODO: support only updating files of options that just changed (composite_info has info about that)
-// TODO: cleanup unused files
 fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progress: super::ApplyProgress) {
 	// 1. sort the queue based on priority, lowest > highest
 	// 2. apply first mod
@@ -403,6 +396,7 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 		}
 	}
 	
+	let mut to_cleanup = HashSet::new();
 	for (collection_id, queue) in &mut queue {
 		sort_queue(queue);
 		
@@ -450,7 +444,13 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 			}
 			
 			mods_done += 1;
+			
+			to_cleanup.insert(mod_id);
 		}
+	}
+	
+	for mod_id in to_cleanup {
+		cleanup_mod(&mod_id);
 	}
 	
 	progress.set_busy(false);
@@ -485,7 +485,14 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	
 	// ----------
 	
-	let priority = get_mod_settings(&collection_id, mod_id, true).priority;
+	let penum_settings = get_mod_settings(&collection_id, mod_id, true);
+	if !penum_settings.enabled {
+		let Ok(group) = read_json::<PGroup>(&mod_dir.join("group_001__collection.json")) else {return Ok(changed_files)};
+		let Some(option) = group.Options.into_iter().find(|v| v.Name == collection_id) else {return Ok(changed_files)};
+		return Ok(option.Files.into_iter().map(|(v, _)| v).collect());
+	}
+	
+	let priority = penum_settings.priority;
 	
 	// TODO: store this and update it properly after every mod apply, this is increddibly inefficient
 	let mod_file_cache = get_mod_cache();
@@ -609,10 +616,10 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 				if let Some(comp) = comp {
 					match comp.composite(&settings, &file_resolver) {
 						Ok(data) => {
-							log!(log, "Succeeded to composite texture {game_path}");
+							log!(log, "Succeeded to composite file {game_path}");
 							
 							let hash = if game_path.starts_with("ui/") {
-								crate::hash_str(blake3::hash(game_path.as_bytes()))
+								crate::hash_str(blake3::hash(format!("{game_path}{collection_id}").as_bytes()))
 							} else {
 								crate::hash_str(blake3::hash(&data))
 							};
@@ -622,7 +629,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 						}
 						
 						Err(err) => {
-							log!(log, "Failed to composite texture {game_path} ({err:?})");
+							log!(log, "Failed to composite file {game_path} ({err:?})");
 							continue;
 						}
 					}
@@ -842,6 +849,31 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	set_mod_settings(&collection_id, &mod_id, "_collection", vec![&collection_id]);
 	
 	Ok(changed_files)
+}
+
+fn cleanup_mod(mod_id: &str) {
+	let root = root_path();
+	let mod_dir = root.join(mod_id);
+	let Ok(group) = read_json::<PGroup>(&mod_dir.join("group_001__collection.json")) else {return};
+	let Ok(read_dir) = std::fs::read_dir(mod_dir.join("files_comp")) else {return};
+	
+	let mut files = HashSet::new();
+	for o in &group.Options {
+		let s = get_mod_settings(&o.Name, mod_id, false);
+		if s.enabled {
+			for (_, path) in &o.Files {
+				files.insert(path.split("/").last().unwrap());
+			}
+		}
+	}
+	
+	for entry in read_dir {
+		if let Ok(entry) = entry {
+			if !files.contains(entry.file_name().to_string_lossy().as_ref()) {
+				_ = std::fs::remove_file(entry.path())
+			}
+		}
+	}
 }
 
 fn get_mod_cache() -> ModFileCache {

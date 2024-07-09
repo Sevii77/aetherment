@@ -29,11 +29,11 @@ pub struct Tex {
 }
 
 impl Tex {
-	pub fn composite_raw_hashmap(&self, settings: &crate::modman::settings::Settings, textures: std::collections::HashMap<&Path, &noumenon::format::game::Tex>) -> Result<Vec<u8>, CompositeError> {
+	pub fn composite_raw_hashmap(&self, settings: &crate::modman::settings::CollectionSettings, textures: std::collections::HashMap<&Path, &noumenon::format::game::Tex>) -> Result<Vec<u8>, CompositeError> {
 		self.composite_raw(settings, move |path| textures.get(path).map(|v| Cow::Borrowed(*v))).map(|v| v.2)
 	}
 	
-	pub fn composite_raw<'a>(&'a self, settings: &crate::modman::settings::Settings, textures_handler: impl Fn(&Path) -> Option<Cow<'a, noumenon::format::game::Tex>>) -> Result<(u32, u32, Vec<u8>), CompositeError> {
+	pub fn composite_raw<'a>(&'a self, settings: &crate::modman::settings::CollectionSettings, textures_handler: impl Fn(&Path) -> Option<Cow<'a, noumenon::format::game::Tex>>) -> Result<(u32, u32, Vec<u8>), CompositeError> {
 		let mut layers = self.layers.iter().rev();
 		
 		let layer = layers.next().ok_or(CompositeError::NoFirstLayer)?;
@@ -236,7 +236,7 @@ impl super::Composite for Tex {
 		options
 	}
 	
-	fn composite<'a>(&self, settings: &crate::modman::settings::Settings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, super::CompositeError> {
+	fn composite<'a>(&self, settings: &crate::modman::settings::CollectionSettings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, super::CompositeError> {
 		let textures_handler = |path: &crate::modman::Path| -> Option<Cow<noumenon::format::game::Tex>> {
 			Some(Cow::Owned(noumenon::format::game::Tex::read(&mut std::io::Cursor::new(file_resolver(path)?.as_ref())).ok()?))
 		};
@@ -377,7 +377,7 @@ pub enum OptionOrStatic<T: OptionSetting + Sized + Default> {
 }
 
 impl<T: OptionSetting + Sized + Default> OptionOrStatic<T> {
-	pub fn get_value(&self, settings: &crate::modman::settings::Settings) -> Option<T::Value> {
+	pub fn get_value(&self, settings: &crate::modman::settings::CollectionSettings) -> Option<T::Value> {
 		match self {
 			Self::Static(v) => Some(v.clone()),
 			Self::Option(t) => t.get_value(settings.get(t.option_id())?),

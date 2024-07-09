@@ -11,7 +11,8 @@ pub struct Mods {
 	last_was_busy: bool,
 	mods: Vec<String>,
 	collections: HashMap<String, String>,
-	mod_settings: HashMap<String, HashMap<String, Settings>>,
+	// mod_settings: HashMap<String, HashMap<String, Settings>>,
+	mod_settings: HashMap<String, Settings>,
 	mod_settings_remote: HashMap<String, crate::remote::settings::Settings>,
 }
 
@@ -43,7 +44,8 @@ impl Mods {
 		self.mods.sort_unstable();
 		
 		self.collections = backend.get_collections().into_iter().map(|v| (v.id, v.name)).collect();
-		self.mod_settings = self.mods.iter().map(|m| (m.to_owned(), self.collections.iter().map(|(c, _)| (c.to_owned(), backend.get_mod_settings(m, c).unwrap())).collect())).collect();
+		// self.mod_settings = self.mods.iter().map(|m| (m.to_owned(), self.collections.iter().map(|(c, _)| (c.to_owned(), backend.get_mod_settings(m, c).unwrap())).collect())).collect();
+		self.mod_settings = self.mods.iter().map(|m| (m.to_owned(), crate::modman::settings::Settings::open(backend.get_mod_meta(m).unwrap(), m))).collect();
 		self.mod_settings_remote = self.mods.iter().map(|m| (m.to_owned(), crate::remote::settings::Settings::open(m))).collect();
 		
 		if !self.collections.iter().any(|(c, _)| c == &self.active_collection) {
@@ -134,8 +136,12 @@ impl Mods {
 				
 				let Some(meta) = backend.get_mod_meta(&self.selected_mod) else {return};
 				let Some(mod_settings) = self.mod_settings.get_mut(&self.selected_mod) else {return};
-				let Some(settings) = mod_settings.get_mut(&self.active_collection) else {return};
+				// let Some(settings) = mod_settings.get_mut(&self.active_collection) else {return};
 				let Some(remote_settings) = self.mod_settings_remote.get_mut(&self.selected_mod) else {return};
+				
+				let mut presets = mod_settings.presets.clone();
+				let settings = mod_settings.get_collection(meta, &self.active_collection);
+				
 				let mut changed = false;
 				
 				ui.horizontal(|ui| {
@@ -171,11 +177,11 @@ impl Mods {
 					}
 				};
 				check_presets(&meta.presets);
-				check_presets(&settings.presets);
+				check_presets(&presets);
 				
 				ui.combo("Preset", &selected_preset, |ui| {
 					let mut set_settings = |values: &HashMap<String, crate::modman::settings::Value>| {
-						for (name, value) in settings.settings.iter_mut() {
+						for (name, value) in settings.iter_mut() {
 							*value = values.get(name).map_or_else(|| crate::modman::settings::Value::from_meta_option(meta.options.iter().find(|v| v.name == *name).unwrap()), |v| v.to_owned());
 						}
 						
@@ -195,7 +201,7 @@ impl Mods {
 					}
 					
 					let mut delete = None;
-					for (i, p) in settings.presets.iter().enumerate() {
+					for (i, p) in presets.iter().enumerate() {
 						ui.horizontal(|ui| {
 							let resp = ui.button("D");
 							if resp.clicked {
@@ -223,15 +229,15 @@ impl Mods {
 					}
 					
 					if let Some(delete) = delete {
-						settings.presets.remove(delete);
+						presets.remove(delete);
 						changed = true;
 					}
 					
 					ui.horizontal(|ui| {
 						if ui.button("+").clicked && self.new_preset_name.len() > 0 && self.new_preset_name != "Custom" && self.new_preset_name != "Default" && !meta.presets.iter().any(|v| v.name == self.new_preset_name) {
-							settings.presets.push(crate::modman::settings::Preset {
+							presets.push(crate::modman::settings::Preset {
 								name: self.new_preset_name.clone(),
-								settings: settings.settings.iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect()
+								settings: settings.iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect()
 							});
 							self.new_preset_name.clear();
 							changed = true;
@@ -243,10 +249,10 @@ impl Mods {
 						if let Ok(json) = base64::Engine::decode(&base64::prelude::BASE64_STANDARD_NO_PAD, ui.get_clipboard()) {
 							if let Ok(preset) = serde_json::from_slice::<crate::modman::settings::Preset>(&json) {
 								if preset.name.len() > 0 && preset.name != "Custom" && preset.name != "Default" && !meta.presets.iter().any(|v| v.name == preset.name) {
-									if let Some(existing) = settings.presets.iter_mut().find(|v| v.name == preset.name) {
+									if let Some(existing) = presets.iter_mut().find(|v| v.name == preset.name) {
 										*existing = preset;
 									} else {
-										settings.presets.push(preset);
+										presets.push(preset);
 									}
 								}
 							}
@@ -365,7 +371,8 @@ impl Mods {
 				
 				if changed {
 					backend.apply_mod_settings(&self.selected_mod, &self.active_collection, SettingsType::Some(settings.clone()));
-					settings.save(&self.selected_mod, &self.active_collection);
+					mod_settings.presets = presets;
+					mod_settings.save(&self.selected_mod);
 				}
 			}
 		});

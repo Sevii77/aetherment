@@ -26,7 +26,7 @@ impl Backend for Dummy {
 	
 	fn load_mods(&mut self) {}
 	fn get_mod_meta(&self, _mod_id: &str) -> Option<&crate::modman::meta::Meta> {None}
-	fn get_mod_settings(&self, _mod_id: &str, _collection_id: &str) -> Option<crate::modman::settings::Settings> {None}
+	// fn get_mod_settings(&self, _mod_id: &str, _collection_id: &str) -> Option<crate::modman::settings::Settings> {None}
 	
 	fn get_mod_enabled(&self, _mod_id: &str, _collection_id: &str) -> bool {false}
 	fn set_mod_enabled(&mut self, _mod_id: &str, _collection_id: &str, _enabled: bool) {}

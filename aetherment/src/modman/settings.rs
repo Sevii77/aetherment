@@ -1,45 +1,50 @@
 use std::{collections::HashMap, io::Write, ops::{Deref, DerefMut}, path::Path};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
+pub struct CollectionSettings(HashMap<String, Value>);
+impl Deref for CollectionSettings {
+	type Target = HashMap<String, Value>;
+	
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl DerefMut for CollectionSettings {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.0
+	}
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct Settings {
-	pub settings: HashMap<String, Value>,
+	pub collections: HashMap<String, CollectionSettings>,
 	pub presets: Vec<Preset>,
 }
 
 impl Settings {
-	pub fn exists(mod_id: &str, collection: &str) -> bool {
-		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
-		let id_hash = crate::hash_str(blake3::hash(mod_id.as_bytes()));
-		dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash).join(id_hash).exists()
-	}
-	
-	pub fn from_meta(meta: &super::meta::Meta) -> Self {
-		Self {
-			settings: meta.options.iter().map(|option| (option.name.clone(), Value::from_meta_option(option))).collect(),
-			presets: Vec::new(),
-		}
+	pub fn get_collection(&mut self, meta: &super::meta::Meta, collection_id: &str) -> &mut CollectionSettings {
+		let collection_hash = crate::hash_str(blake3::hash(collection_id.as_bytes()));
+		self.collections.entry(collection_hash).or_insert_with(|| CollectionSettings(meta.options.iter().map(|option| (option.name.clone(), Value::from_meta_option(option))).collect()))
 	}
 	
 	pub fn open_from(meta: &super::meta::Meta, path: &Path) -> Self {
-		let mut settings = Self::from_meta(meta);
-		if let Ok(s) = crate::resource_loader::read_json::<Self>(path) {
-			settings.presets = s.presets;
-			for (k, v) in s.settings {
-				if let Some(k) = settings.get_mut(&k) {
-					*k = v;
+		let mut s = crate::resource_loader::read_json::<Self>(path).unwrap_or_default();
+		for (_, c) in s.collections.iter_mut() {
+			for o in &meta.options {
+				if !c.contains_key(&o.name) {
+					c.insert(o.name.to_owned(), Value::from_meta_option(o));
 				}
 			}
 		}
-		
-		settings
+		s
 	}
 	
-	pub fn open(meta: &super::meta::Meta, mod_id: &str, collection: &str) -> Self {
-		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
+	pub fn open(meta: &super::meta::Meta, mod_id: &str) -> Self {
 		let id_hash = crate::hash_str(blake3::hash(mod_id.as_bytes()));
 		
-		let dir = dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash);
+		let dir = dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods");
 		Self::open_from(meta, &dir.join(id_hash))
 	}
 	
@@ -48,30 +53,87 @@ impl Settings {
 		f.write_all(crate::json_pretty(&self).unwrap().as_bytes()).unwrap()
 	}
 	
-	pub fn save(&self, mod_id: &str, collection: &str) {
-		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
+	pub fn save(&self, mod_id: &str) {
 		let id_hash = crate::hash_str(blake3::hash(mod_id .as_bytes()));
 		
-		let dir = dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash);
+		let dir = dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods");
 		_ = std::fs::create_dir_all(&dir);
 		
 		self.save_to(&dir.join(id_hash));
 	}
 }
 
-impl Deref for Settings {
-	type Target = HashMap<String, Value>;
-	
-	fn deref(&self) -> &Self::Target {
-		&self.settings
-	}
-}
-
-impl DerefMut for Settings {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		&mut self.settings
-	}
-}
+// #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+// pub struct Settings {
+// 	pub settings: HashMap<String, Value>,
+// 	pub presets: Vec<Preset>,
+// }
+// 
+// impl Settings {
+// 	pub fn exists(mod_id: &str, collection: &str) -> bool {
+// 		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
+// 		let id_hash = crate::hash_str(blake3::hash(mod_id.as_bytes()));
+// 		dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash).join(id_hash).exists()
+// 	}
+// 	
+// 	pub fn from_meta(meta: &super::meta::Meta) -> Self {
+// 		Self {
+// 			settings: meta.options.iter().map(|option| (option.name.clone(), Value::from_meta_option(option))).collect(),
+// 			presets: Vec::new(),
+// 		}
+// 	}
+// 	
+// 	pub fn open_from(v, path: &Path) -> Self {
+// 		let mut settings = Self::from_meta(meta);
+// 		if let Ok(s) = crate::resource_loader::read_json::<Self>(path) {
+// 			settings.presets = s.presets;
+// 			for (k, v) in s.settings {
+// 				if let Some(k) = settings.get_mut(&k) {
+// 					*k = v;
+// 				}
+// 			}
+// 		}
+// 		
+// 		settings
+// 	}
+// 	
+// 	pub fn open(meta: &super::meta::Meta, mod_id: &str, collection: &str) -> Self {
+// 		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
+// 		let id_hash = crate::hash_str(blake3::hash(mod_id.as_bytes()));
+// 		
+// 		let dir = dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash);
+// 		Self::open_from(meta, &dir.join(id_hash))
+// 	}
+// 	
+// 	pub fn save_to(&self, path: &Path) {
+// 		let mut f = std::fs::File::create(path).unwrap();
+// 		f.write_all(crate::json_pretty(&self).unwrap().as_bytes()).unwrap()
+// 	}
+// 	
+// 	pub fn save(&self, mod_id: &str, collection: &str) {
+// 		let collection_hash = crate::hash_str(blake3::hash(collection.as_bytes()));
+// 		let id_hash = crate::hash_str(blake3::hash(mod_id .as_bytes()));
+// 		
+// 		let dir = dirs::config_dir().ok_or("No Config Dir (???)").unwrap().join("Aetherment").join("mods").join(collection_hash);
+// 		_ = std::fs::create_dir_all(&dir);
+// 		
+// 		self.save_to(&dir.join(id_hash));
+// 	}
+// }
+// 
+// impl Deref for Settings {
+// 	type Target = HashMap<String, Value>;
+// 	
+// 	fn deref(&self) -> &Self::Target {
+// 		&self.settings
+// 	}
+// }
+// 
+// impl DerefMut for Settings {
+// 	fn deref_mut(&mut self) -> &mut Self::Target {
+// 		&mut self.settings
+// 	}
+// }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Preset {

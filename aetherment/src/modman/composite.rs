@@ -20,7 +20,7 @@ pub trait Composite {
 	fn get_files(&self) -> Vec<&str>;
 	fn get_files_game(&self) -> Vec<&str>;
 	fn get_options(&self) -> Vec<&str>;
-	fn composite<'a>(&self, settings: &crate::modman::settings::Settings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, CompositeError>;
+	fn composite<'a>(&self, settings: &crate::modman::settings::CollectionSettings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, CompositeError>;
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -12,7 +12,7 @@ pub enum Filter {
 
 #[derive(Debug, Clone)]
 pub enum SettingsType {
-	Some(crate::modman::settings::Settings),
+	Some(crate::modman::settings::CollectionSettings),
 	Clear,
 	Keep,
 }
@@ -127,7 +127,7 @@ pub trait Backend {
 	
 	fn load_mods(&mut self);
 	fn get_mod_meta(&self, mod_id: &str) -> Option<&crate::modman::meta::Meta>;
-	fn get_mod_settings(&self, mod_id: &str, collection_id: &str) -> Option<crate::modman::settings::Settings>;
+	// fn get_mod_settings(&self, mod_id: &str, collection_id: &str) -> Option<crate::modman::settings::Settings>;
 	
 	fn get_mod_enabled(&self, mod_id: &str, collection_id: &str) -> bool;
 	fn set_mod_enabled(&mut self, mod_id: &str, collection_id: &str, enabled: bool);

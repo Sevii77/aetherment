@@ -1,6 +1,5 @@
-use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, hash::Hash, io::{Read, Write}, sync::{Arc, Mutex}};
+use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, io::{Read, Write}, sync::{Arc, Mutex}};
 use serde::{Deserialize, Serialize};
-use ureq::delete;
 use crate::{log, modman::meta, resource_loader::read_json};
 
 #[repr(packed)]
@@ -232,7 +231,7 @@ impl super::Backend for Penumbra {
 					for c in get_collections() {
 						let s = get_mod_settings(&c.id, &mod_id, false);
 						if s.enabled && !s.inherit {
-							let settings = crate::modman::settings::Settings::open(&meta, &mod_id, &c.id);
+							let settings = crate::modman::settings::Settings::open(&meta, &mod_id).get_collection(&meta, &c.id).to_owned();
 							apply_queue.lock().unwrap().insert((mod_id.to_owned(), c.id), (super::SettingsType::Some(settings), None));
 						}
 					}
@@ -305,43 +304,6 @@ impl super::Backend for Penumbra {
 	
 	fn get_mod_meta(&self, mod_id: &str) -> Option<&meta::Meta> {
 		self.mod_infos.get(mod_id).map(|m| &m.meta)
-	}
-	
-	fn get_mod_settings(&self, mod_id: &str, collection_id: &str) -> Option<crate::modman::settings::Settings> {
-		let Some(m) = self.mod_infos.get(mod_id) else {return None};
-		
-		if m.is_aeth {
-			Some(crate::modman::settings::Settings::open(&m.meta, mod_id, collection_id))
-		} else {
-			let mut settings = crate::modman::settings::Settings::from_meta(&m.meta);
-			for (option, sub_options) in get_mod_settings(collection_id, &mod_id, true).options {
-				let Some(meta_option) = m.meta.options.iter().find(|v| v.name == option) else {log!("{mod_id} didnt have option {option} in its meta"); continue};
-				// let Some(setting) = settings.iter_mut().find(|(v, _)| v == &option) else {continue};
-				let Some(setting) = settings.get_mut(&option) else {continue};
-				
-				match &meta_option.settings {
-					meta::OptionSettings::SingleFiles(v) => {
-						if let Some(sub_option) = v.options.iter().enumerate().find_map(|(i, v)| if v.name == sub_options[0] {Some(i)} else {None}) {
-							*setting = crate::modman::settings::Value::SingleFiles(sub_option as u32);
-						}
-					}
-					
-					meta::OptionSettings::MultiFiles(v) => {
-						let mut sub_option = 0;
-						for (i, v) in v.options.iter().enumerate() {
-							if sub_options.contains(&v.name) {
-								sub_option |= 1 << i;
-							}
-						}
-						*setting = crate::modman::settings::Value::MultiFiles(sub_option);
-					}
-					
-					_ => {}
-				}
-			}
-			
-			Some(settings)
-		}
 	}
 	
 	fn get_mod_enabled(&self, mod_id: &str, collection_id: &str) -> bool {
@@ -479,7 +441,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			return Ok(changed_files);
 		}
 		
-		super::SettingsType::Keep => crate::modman::settings::Settings::open(&meta, mod_id, collection_id),
+		super::SettingsType::Keep => crate::modman::settings::Settings::open(&meta, mod_id).get_collection(&meta, collection_id).to_owned(),
 		super::SettingsType::Some(v) => v,
 	};
 	

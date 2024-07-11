@@ -77,6 +77,8 @@ public class Aetherment : IDalamudPlugin {
 		state = initialize(init);
 		
 		Interface.UiBuilder.Draw += Draw;
+		Interface.UiBuilder.OpenMainUi += OpenConf;
+		
 		Commands.AddHandler(maincommand, new CommandInfo(OnCommand) {
 			HelpMessage = "Open Aetherment menu"
 		});
@@ -102,11 +104,16 @@ public class Aetherment : IDalamudPlugin {
 	public void Dispose() {
 		destroy(state);
 		Interface.UiBuilder.Draw -= Draw;
+		Interface.UiBuilder.OpenMainUi -= OpenConf;
 		Commands.RemoveHandler(maincommand);
 		Commands.RemoveHandler(texfindercommand);
 		// if(watcher != null)
 		// 	watcher.Dispose();
 		state = IntPtr.Zero;
+	}
+	
+	private void OpenConf() {
+		OnCommand(maincommand, "");
 	}
 	
 	private void Draw() {

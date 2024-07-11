@@ -313,4 +313,21 @@ impl<'a> Ui<'a> {
 			sys::ImGuiColorEditFlags_AlphaBar |
 			sys::ImGuiColorEditFlags_AlphaPreviewHalf) as i32)}.into()
 	}
+	
+	pub fn slider<S: AsRef<str>, N: crate::Numeric>(&mut self, label: S, value: &mut N, range: std::ops::RangeInclusive<N>) -> Resp {
+		self.handle_horizontal();
+		let label = CString::new(label.as_ref()).unwrap();
+		if N::INT {
+			let mut v = value.to_i32();
+			let r = unsafe{sys::igSliderInt(label.as_ptr(), &mut v, range.start().to_i32(), range.end().to_i32(), 0 as _, 0)};
+			*value = N::from_i32(v);
+			r
+		} else {
+			let mut v = value.to_f32();
+			const FORMAT: &'static str = "%.3g\0";
+			let r = unsafe{sys::igSliderFloat(label.as_ptr(), &mut v, range.start().to_f32(), range.end().to_f32(), FORMAT.as_ptr() as _, 0)};
+			*value = N::from_f32(v);
+			r
+		}.into()
+	}
 }

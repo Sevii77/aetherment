@@ -55,6 +55,7 @@ impl ConfigManager {
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 #[serde(default)] 
 pub struct Config {
+	pub plugin_open_on_launch: bool,
 	pub game_install: Option<String>,
 	pub repos: Vec<String>,
 	
@@ -65,6 +66,7 @@ pub struct Config {
 impl Default for Config {
 	fn default() -> Self {
 		Self {
+			plugin_open_on_launch: false,
 			game_install: None,
 			repos: Vec::new(),
 			

@@ -58,7 +58,8 @@ pub struct Core {
 	settings_tab: view::settings::Settings,
 	tools_tab: view::tool::Tools,
 	
-	current_tab: &'static str,
+	// current_tab: &'static str,
+	current_tab: String,
 	
 	install_progress: crate::modman::backend::InstallProgress,
 	apply_progress: crate::modman::backend::ApplyProgress,
@@ -80,7 +81,8 @@ impl Core {
 			settings_tab: view::settings::Settings::new(),
 			tools_tab: view::tool::Tools::new(),
 			
-			current_tab: "Mods",
+			// current_tab: "Mods",
+			current_tab: "Mods".to_string(),
 			
 			install_progress: crate::modman::backend::InstallProgress::new(),
 			apply_progress: crate::modman::backend::ApplyProgress::new(),
@@ -110,7 +112,7 @@ impl Core {
 			ui.label(format!("{:.0}% {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()));
 		}
 		
-		match self.current_tab {
+		match self.current_tab.as_str() {
 			"Mods" => {
 				self.mods_tab.draw(ui, self.install_progress.clone(), self.apply_progress.clone());
 			}

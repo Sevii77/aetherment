@@ -26,13 +26,13 @@ pub struct Settings {
 impl Settings {
 	pub fn get_collection(&mut self, meta: &super::meta::Meta, collection_id: &str) -> &mut CollectionSettings {
 		let collection_hash = crate::hash_str(blake3::hash(collection_id.as_bytes()));
-		self.collections.entry(collection_hash).or_insert_with(|| CollectionSettings(meta.options.iter().map(|option| (option.name.clone(), Value::from_meta_option(option))).collect()))
+		self.collections.entry(collection_hash).or_insert_with(|| CollectionSettings(meta.options.options_iter().map(|option| (option.name.clone(), Value::from_meta_option(option))).collect()))
 	}
 	
 	pub fn open_from(meta: &super::meta::Meta, path: &Path) -> Self {
 		let mut s = crate::resource_loader::read_json::<Self>(path).unwrap_or_default();
 		for (_, c) in s.collections.iter_mut() {
-			for o in &meta.options {
+			for o in meta.options.options_iter() {
 				if !c.contains_key(&o.name) {
 					c.insert(o.name.to_owned(), Value::from_meta_option(o));
 				}

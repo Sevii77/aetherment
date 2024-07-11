@@ -84,7 +84,7 @@ pub fn get_mod_files(meta: &meta::Meta, files_path: &std::path::Path) -> HashMap
 		add_file(path, real_path);
 	}
 	
-	for option in &meta.options {
+	for option in meta.options.options_iter() {
 		if let meta::OptionSettings::SingleFiles(v) | meta::OptionSettings::MultiFiles(v) = &option.settings {
 			for sub in &v.options {
 				for (path, real_path) in &sub.files {
@@ -94,7 +94,7 @@ pub fn get_mod_files(meta: &meta::Meta, files_path: &std::path::Path) -> HashMap
 		}
 	}
 	
-	for option in &meta.options {
+	for option in meta.options.options_iter() {
 		if let meta::OptionSettings::Path(v) = &option.settings {
 			for (_, paths) in &v.options {
 				for (_id, path) in paths {

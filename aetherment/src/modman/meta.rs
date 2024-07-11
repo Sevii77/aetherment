@@ -13,7 +13,7 @@ pub struct Meta {
 	pub website: String,
 	pub tags: Vec<String>,
 	pub dependencies: Vec<String>,
-	pub options: Vec<Option>,
+	pub options: Options,
 	pub presets: Vec<super::settings::Preset>,
 	
 	pub files: HashMap<String, String>,
@@ -31,7 +31,7 @@ impl Default for Meta {
 			website: String::new(),
 			tags: Vec::new(),
 			dependencies: Vec::new(),
-			options: Vec::new(),
+			options: Options(Vec::new()),
 			presets: Vec::new(),
 			
 			files: HashMap::new(),
@@ -55,7 +55,7 @@ impl Meta {
 			paths.entry(real.as_str()).or_insert_with(|| Vec::new()).push(game.as_str())
 		}
 		
-		for option in &self.options {
+		for option in self.options.options_iter() {
 			if let OptionSettings::SingleFiles(v) | OptionSettings::MultiFiles(v) = &option.settings {
 				for sub in &v.options {
 					for (game, real) in &sub.files {
@@ -70,6 +70,25 @@ impl Meta {
 }
 
 // ----------
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct Options(pub Vec<OptionType>);
+impl Options {
+	pub fn options_iter(&self) -> impl Iterator<Item = &Option> + DoubleEndedIterator {
+		self.0.iter().filter_map(|v| if let OptionType::Option(v) = v {Some(v)} else {None})
+	}
+	
+	pub fn categories_iter(&self) -> impl Iterator<Item = &str> + DoubleEndedIterator {
+		self.0.iter().filter_map(|v| if let OptionType::Category(v) = v {Some(v.as_str())} else {None})
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum OptionType {
+	Category(String),
+	Option(Option),
+}
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct Option {

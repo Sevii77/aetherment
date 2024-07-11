@@ -491,7 +491,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			crate::modman::Path::Option(id, sub_id) => {
 				let Some(setting) = settings.get(id) else {return None};
 				let crate::modman::settings::Value::Path(i) = setting else {return None};
-				let Some(option) = meta.options.iter().find(|v| v.name == *id) else {return None};
+				let Some(option) = meta.options.options_iter().find(|v| v.name == *id) else {return None};
 				let meta::OptionSettings::Path(v) = &option.settings else {return None};
 				let Some((_, paths)) = v.options.get(*i as usize) else {return None};
 				let Some(path) = paths.iter().find(|v| v.0 == *sub_id) else {return None};
@@ -512,7 +512,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	
 	// count how much we got to do
 	total_files += meta.files.len();
-	for option in meta.options.iter() {
+	for option in meta.options.options_iter() {
 		let Some(value) = settings.get(&option.name) else {continue};
 		
 		match &option.settings {
@@ -732,7 +732,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 		} | map.contains_key(key);
 	}
 	
-	for option in meta.options.iter().rev() {
+	for option in meta.options.options_iter().rev() {
 		let Some(value) = settings.get(&option.name) else {continue};
 		
 		match &option.settings {

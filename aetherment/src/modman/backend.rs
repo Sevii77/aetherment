@@ -1,4 +1,4 @@
-use std::sync::{atomic::{AtomicBool, AtomicU32}, Arc, RwLock, RwLockReadGuard};
+use std::{io::{Read, Seek}, sync::{atomic::{AtomicBool, AtomicU32}, Arc, RwLock, RwLockReadGuard}};
 
 #[allow(non_snake_case)]
 pub mod penumbra_ipc;
@@ -115,7 +115,21 @@ pub trait Backend {
 	fn get_collections(&self) -> Vec<Collection>;
 	// fn install_mod(&mut self, file: &std::path::Path) -> Result<String, crate::resource_loader::BacktraceError>;
 	fn install_mods_path(&mut self, progress: InstallProgress, files: Vec<std::path::PathBuf>) {
-		self.install_mods(progress, files.into_iter().filter_map(|v| std::fs::File::open(&v).ok().map(|f| (v.file_name().map_or_else(|| String::new(), |v| v.to_string_lossy().to_string()), f))).collect())
+		self.install_mods(progress,files.into_iter()
+			// .filter_map(|v| std::fs::File::open(&v).ok().map(|f| (v.file_name().map_or_else(|| String::new(), |v| v.to_string_lossy().to_string()), f)))
+			.filter_map(|v| {
+				let f = std::fs::File::open(&v).ok()?;
+				let mut pack = zip::ZipArchive::new(f).ok()?;
+				
+				let mut meta_buf = Vec::new();
+				pack.by_name("meta.json").ok()?.read_to_end(&mut meta_buf).ok()?;
+				let meta = serde_json::from_slice::<super::meta::Meta>(&meta_buf).ok()?;
+				
+				let mut pack = pack.into_inner();
+				_ = pack.seek(std::io::SeekFrom::Start(0));
+				Some((meta.name, pack))
+			}).collect())
+		
 	}
 	fn install_mods(&mut self, progress: InstallProgress, files: Vec<(String, std::fs::File)>);
 	

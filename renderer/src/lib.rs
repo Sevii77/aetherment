@@ -54,6 +54,8 @@ pub struct Modifiers {
 	pub shift: bool,
 }
 
+// ----------
+
 pub enum Icon {
 	Dir,
 	DirOpen,
@@ -65,6 +67,8 @@ impl std::fmt::Display for Icon {
 		f.write_str(self.str())
 	}
 }
+
+// ----------
 
 pub struct WindowArgs<'a> {
 	pub title: &'a str,
@@ -95,6 +99,47 @@ pub enum Arg<T> {
 
 // ----------
 
+pub trait Numeric: Clone + Copy + PartialEq + PartialOrd + 'static {
+	const INT: bool;
+	const MIN: Self;
+	const MAX: Self;
+	
+	fn to_f32(self) -> f32;
+	fn from_f32(v: f32) -> Self;
+	fn to_i32(self) -> i32;
+	fn from_i32(v: i32) -> Self;
+}
+
+macro_rules! impl_numeric {
+	($i:expr, $t:ident) => {
+		impl Numeric for $t {
+			const INT: bool = $i;
+			const MIN: Self = std::$t::MIN;
+			const MAX: Self = std::$t::MAX;
+			
+			fn to_f32(self) -> f32 {self as f32}
+			fn from_f32(v: f32) -> Self {v as Self}
+			fn to_i32(self) -> i32 {self as i32}
+			fn from_i32(v: i32) -> Self {v as Self}
+		}
+	}
+}
+
+impl_numeric!(false, f32);
+impl_numeric!(false, f64);
+impl_numeric!(true, u8);
+impl_numeric!(true, u16);
+impl_numeric!(true, u32);
+impl_numeric!(true, u64);
+impl_numeric!(true, usize);
+impl_numeric!(true, i8);
+impl_numeric!(true, i16);
+impl_numeric!(true, i32);
+impl_numeric!(true, i64);
+impl_numeric!(true, isize);
+
+// ----------
+
 impl<'a> Ui<'a> {
 	pub fn selectable_value<S: AsRef<str>, V: PartialEq>(&mut self, label: S, current: &mut V, value: V) -> Response {
 		let resp = self.selectable(label, *current == value);
@@ -105,13 +150,13 @@ impl<'a> Ui<'a> {
 		resp
 	}
 	
-	pub fn tabs<S: AsRef<str> + PartialEq + Clone>(&mut self, tabs: &[S], current: &mut S) -> Response {
+	pub fn tabs<S: AsRef<str> + PartialEq + Clone>(&mut self, tabs: &[S], current: &mut String) -> Response {
 		let mut resp = Response::new();
 		self.horizontal(|ui| {
 			for tab in tabs {
-				let r = ui.selectable_min(tab.as_ref(), *current == *tab);
+				let r = ui.selectable_min(tab.as_ref(), current == tab.as_ref());
 				if r.clicked {
-					*current = tab.clone();
+					*current = tab.as_ref().to_owned();
 				}
 				resp = resp.union(&r);
 			}

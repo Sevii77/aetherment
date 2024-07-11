@@ -33,6 +33,9 @@ impl Settings {
 			ui.helptext("Path to the game, use this if you use a custom location where autodetection fails (requires a restart (for now))\nExample: Z:/SteamLibrary/steamapps/common/FINAL FANTASY XIV - A Realm Reborn")
 		});
 		
+		#[cfg(feature = "plugin")]
+		ui.checkbox("Open window on launch", &mut config.plugin_open_on_launch);
+		
 		_ = config_manager.save();
 	}
 }

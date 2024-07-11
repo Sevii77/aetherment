@@ -82,7 +82,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 		
 		let funcs = init.penumbra_functions;
 		Box::into_raw(Box::new(State {
-			visible: true,
+			visible: aetherment::config().config.plugin_open_on_launch,
 			core: aetherment::Core::new(log, backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
 				config_dir: std::path::PathBuf::from(funcs.config_dir.to_string()),
 				redraw: Box::new(funcs.redraw),

@@ -215,6 +215,10 @@ impl<'a> Ui<'a> {
 		// TODO: proper color edit
 		num_multi_edit_range(self.ui, color, label.as_ref(), &[0.0..=1.0, 0.0..=1.0, 0.0..=1.0, 0.0..=1.0]).into()
 	}
+	
+	pub fn slider<S: AsRef<str>, N: crate::Numeric>(&mut self, label: S, value: &mut N, range: std::ops::RangeInclusive<N>) -> Resp {
+		todo!()
+	}
 }
 
 fn num_multi_edit_range<Num: egui::emath::Numeric>(ui: &mut egui::Ui, values: &mut [Num], label: impl Into<egui::WidgetText>, range: &[std::ops::RangeInclusive<Num>]) -> egui::Response {

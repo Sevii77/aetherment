@@ -4,6 +4,7 @@ use crate::modman::settings::Settings;
 pub struct Mods {
 	active_collection: String,
 	selected_mod: String,
+	selected_category_tab: String,
 	
 	import_picker: Option<renderer::FilePicker>,
 	new_preset_name: String,
@@ -21,6 +22,7 @@ impl Mods {
 		let mut s = Self {
 			active_collection: String::new(),
 			selected_mod: String::new(),
+			selected_category_tab: String::new(),
 			
 			import_picker: None,
 			new_preset_name: String::new(),
@@ -88,35 +90,30 @@ impl Mods {
 					}
 				}
 				
-				if !is_busy && ui.button("Update Mods").clicked {
-					let progress = install_progress.clone();
-					std::thread::spawn(move || {
-						crate::remote::check_updates(progress);
-					});
-				}
+				// if !is_busy && ui.button("Update Mods").clicked {
+				// 	let progress = install_progress.clone();
+				// 	std::thread::spawn(move || {
+				// 		crate::remote::check_updates(progress);
+				// 	});
+				// }
 				
 				if !is_busy && ui.button("Reload Mods").clicked {
 					self.refresh();
 				}
 				
-				ui.enabled(!is_busy, |ui| {
-					let queue_size = backend.apply_queue_size();
-					if queue_size > 0 {
-						ui.label(format!("{queue_size} mods have changes that might require an apply"));
-						if ui.button("Apply").clicked {
-							backend.finalize_apply(apply_progress.clone());
-						}
+				ui.add_space(16.0);
+				
+				let queue_size = backend.apply_queue_size();
+				ui.enabled(!is_busy && queue_size > 0 , |ui| {
+					ui.label(format!("{queue_size} mods have changes that might require an apply"));
+					if ui.button("Apply").clicked {
+						backend.finalize_apply(apply_progress.clone());
 					}
 				});
 				
 				// ui.combo("Active Collection", &self.collections[&self.active_collection], |ui| {
-				ui.combo("Active Collection", self.collections.get(&self.active_collection).map_or("Invalid Collection", |v| v.as_str()), |ui| {
-					for (id, name) in &self.collections {
-						if ui.selectable(name, self.active_collection == *id).clicked {
-							self.active_collection = id.clone();
-						}
-					}
-				});
+				
+				ui.add_space(16.0);
 				
 				for m in &self.mods {
 					if let Some(meta) = backend.get_mod_meta(m) {
@@ -134,6 +131,19 @@ impl Mods {
 				
 				let ui = ui_right;
 				
+				ui.horizontal(|ui| {
+					let offset = ui.available_size()[0] - 150.0;
+					ui.add_space(offset);
+					ui.set_width(150.0);
+					ui.combo("", self.collections.get(&self.active_collection).map_or("Invalid Collection", |v| v.as_str()), |ui| {
+						for (id, name) in &self.collections {
+							if ui.selectable(name, self.active_collection == *id).clicked {
+								self.active_collection = id.clone();
+							}
+						}
+					});
+				});
+				
 				let Some(meta) = backend.get_mod_meta(&self.selected_mod) else {return};
 				let Some(mod_settings) = self.mod_settings.get_mut(&self.selected_mod) else {return};
 				// let Some(settings) = mod_settings.get_mut(&self.active_collection) else {return};
@@ -148,17 +158,21 @@ impl Mods {
 					ui.label(&meta.name);
 					ui.label(format!("({})", meta.version))
 				});
+				ui.add_space(16.0);
 				
-				ui.label(&meta.description);
+				if !meta.description.is_empty() {
+					ui.label(&meta.description);
+					ui.add_space(16.0);
+				}
 				
-				if ui.checkbox("Auto Update", &mut remote_settings.auto_update).changed {
+				if !remote_settings.origin.is_empty() && ui.checkbox("Auto Update", &mut remote_settings.auto_update).changed {
 					remote_settings.save(&self.selected_mod);
 				}
 				
 				let mut selected_preset = "Custom".to_string();
 				'default: {
 					for (name, value) in settings.iter() {
-						if crate::modman::settings::Value::from_meta_option(meta.options.iter().find(|v| v.name == *name).unwrap()) != *value {break 'default}
+						if crate::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()) != *value {break 'default}
 					}
 					
 					selected_preset = "Default".to_owned();
@@ -169,7 +183,7 @@ impl Mods {
 						for (name, value) in settings.iter() {
 							match v.settings.get(name) {
 								Some(v) => if v != value {continue 'preset},
-								None => if crate::modman::settings::Value::from_meta_option(meta.options.iter().find(|v| v.name == *name).unwrap()) != *value {continue 'preset}
+								None => if crate::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()) != *value {continue 'preset}
 							}
 						}
 						
@@ -182,7 +196,7 @@ impl Mods {
 				ui.combo("Preset", &selected_preset, |ui| {
 					let mut set_settings = |values: &HashMap<String, crate::modman::settings::Value>| {
 						for (name, value) in settings.iter_mut() {
-							*value = values.get(name).map_or_else(|| crate::modman::settings::Value::from_meta_option(meta.options.iter().find(|v| v.name == *name).unwrap()), |v| v.to_owned());
+							*value = values.get(name).map_or_else(|| crate::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()), |v| v.to_owned());
 						}
 						
 						changed = true;
@@ -260,7 +274,29 @@ impl Mods {
 					}
 				});
 				
-				for option in meta.options.iter() {
+				ui.add_space(16.0);
+				
+				let mut categories = meta.options.categories_iter().collect::<Vec<_>>();
+				if !matches!(meta.options.0.get(0), Some(crate::modman::meta::OptionType::Category(_))) {
+					categories.insert(0, "Main");
+				}
+				
+				if categories.len() > 1 {
+					ui.tabs(&categories, &mut self.selected_category_tab);
+					if !categories.contains(&self.selected_category_tab.as_str()) {
+						self.selected_category_tab = categories[0].to_string();
+					}
+				}
+				
+				let mut cur_category = "Main";
+				for option_type in meta.options.0.iter() {
+					let option = match option_type {
+						crate::modman::meta::OptionType::Option(v) => v,
+						crate::modman::meta::OptionType::Category(s) => {cur_category = s.as_ref(); continue},
+					};
+					
+					if categories.len() > 1 && cur_category != self.selected_category_tab {continue}
+					
 					let setting_id = &option.name;
 					let val = settings.get_mut(setting_id).unwrap();
 					
@@ -333,16 +369,31 @@ impl Mods {
 							});
 						}
 						
-						Grayscale(_val) => {
-							ui.label("TODO: Grayscale");
+						Grayscale(val) => {
+							let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
+							changed |= ui.slider(&option.name, val, o.min..=o.max).changed;
+							*val = val.clamp(o.min, o.max);
+							if !option.description.is_empty() {
+								ui.helptext(&option.description);
+							}
 						}
 						
-						Opacity(_val) => {
-							ui.label("TODO: Opacity");
+						Opacity(val) => {
+							let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
+							changed |= ui.slider(&option.name, val, o.min..=o.max).changed;
+							*val = val.clamp(o.min, o.max);
+							if !option.description.is_empty() {
+								ui.helptext(&option.description);
+							}
 						}
 						
-						Mask(_val) => {
-							ui.label("TODO: Mask");
+						Mask(val) => {
+							let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
+							changed |= ui.slider(&option.name, val, o.min..=o.max).changed;
+							*val = val.clamp(o.min, o.max);
+							if !option.description.is_empty() {
+								ui.helptext(&option.description);
+							}
 						}
 						
 						Path(val) => {

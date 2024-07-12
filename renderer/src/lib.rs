@@ -283,12 +283,14 @@ impl FilePicker {
 				}
 				
 				// let w = ui.available_size()[0];
-				ui.set_width(width);
-				if ui.input_text("", &mut path).changed {
-					let dir = std::path::Path::new(&*path);
-					self.dir = dir.to_owned();
-					self.set_dir(dir);
-				}
+				ui.push_id("path", |ui| {
+					ui.set_width(width);
+					if ui.input_text("", &mut path).changed {
+						let dir = std::path::Path::new(&*path);
+						self.dir = dir.to_owned();
+						self.set_dir(dir);
+					}
+				});
 			});
 			
 			// contents
@@ -360,11 +362,11 @@ impl FilePicker {
 					let entry = &mut self.selected[0];
 					
 					ui.label("File Name");
-					let w = ui.available_size()[0] - 100.0;
+					let w = ui.available_size()[0] - 200.0;
 					ui.set_width(w);
 					ui.input_text("", entry);
 				} else {
-					let w = ui.available_size()[0] - 100.0;
+					let w = ui.available_size()[0] - 200.0;
 					ui.set_width(w);
 					ui.label(self.selected.join("; "));
 				}

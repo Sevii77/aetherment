@@ -152,6 +152,10 @@ impl<'a> Ui<'a> {
 		// contents(&mut Ui::new(&mut child));
 	}
 	
+	pub fn collapsing_header<S: AsRef<str>>(&mut self, label: S, contents: impl FnOnce(&mut Ui)) {
+		todo!();
+	}
+	
 	pub fn splitter(&mut self, id: impl Hash, default: f32, contents: impl FnOnce(&mut Ui, &mut Ui)) {
 		splitter::Splitter::new(id, splitter::SplitterAxis::Horizontal).default_pos(default).show(self.ui, |left, right|
 			contents(&mut Ui::new(left), &mut Ui::new(right)));
@@ -193,6 +197,10 @@ impl<'a> Ui<'a> {
 			ui.label(label.as_ref());
 			r
 		}).inner.into()
+	}
+	
+	pub fn input_text_multiline<S: AsRef<str>>(&mut self, label: S, string: &mut String) -> Resp {
+		todo!()
 	}
 	
 	pub fn combo<S: AsRef<str>, S2: AsRef<str>>(&mut self, label: S, preview: S2, contents: impl FnOnce(&mut Ui)) {

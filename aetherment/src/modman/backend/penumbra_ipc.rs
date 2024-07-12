@@ -164,15 +164,15 @@ impl super::Backend for Penumbra {
 						FileVersion: 3,
 						Name: meta.name.clone(),
 						Author: meta.author.clone(),
-						Description: Some(meta.description.clone()),
+						Description: meta.description.clone(),
 						Version: meta.version.clone(),
 						Website: meta.website.clone(),
 						ModTags: meta.tags.iter().map(|v| v.to_owned()).collect(),
 					})?.as_bytes())?;
 					
 					File::create(mod_dir.join("default_mod.json"))?.write_all(crate::json_pretty(&PDefaultMod {
-						Name: Some(String::new()),
-						Description: Some(String::new()),
+						Name: String::new(),
+						Description: String::new(),
 						Files: HashMap::new(),
 						FileSwaps: HashMap::new(),
 						Manipulations: Vec::new(),
@@ -539,7 +539,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	// actually do the thing
 	let mut p_option = POption {
 		Name: collection_id.to_owned(),
-		Description: Some(String::new()),
+		Description: String::new(),
 		Priority: Some(1),
 		Files: HashMap::new(),
 		FileSwaps: HashMap::new(),
@@ -791,7 +791,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 		Ok(v) => v,
 		Err(_) => PGroup {
 			Name: "_collection".to_string(),
-			Description: Some("Aetherment managed\nDON'T TOUCH THIS".to_string()),
+			Description: "Aetherment managed\nDON'T TOUCH THIS".to_string(),
 			Priority: 1,
 			Type: "Single".to_string(),
 			DefaultSettings: Some(0),
@@ -985,31 +985,34 @@ fn clean_path(path: &str) -> String {
 	path.trim().chars().map(|v| if !INVALID_CHARS.contains(&(v as u8)) {v.to_ascii_lowercase()} else {'_'}).collect::<String>()
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(default)]
 struct PMeta {
 	FileVersion: i32,
 	Name: String,
 	Author: String,
-	Description: Option<String>,
+	Description: String,
 	Version: String,
 	Website: String,
 	ModTags: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(default)]
 struct PDefaultMod {
-	Name: Option<String>,
+	Name: String,
 	// Description: String,
-	Description: Option<String>,
+	Description: String,
 	Files: HashMap<String, String>,
 	FileSwaps: HashMap<String, String>,
 	Manipulations: Vec<PManipulation>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(default)]
 struct PGroup {
 	Name: String,
-	Description: Option<String>,
+	Description: String,
 	Priority: i32,
 	Type: String,
 	DefaultSettings: Option<u32>,
@@ -1019,7 +1022,7 @@ struct PGroup {
 #[derive(Debug, Deserialize, Serialize)]
 struct POption {
 	Name: String,
-	Description: Option<String>,
+	Description: String,
 	Priority: Option<u32>, // used for multi
 	Files: HashMap<String, String>,
 	FileSwaps: HashMap<String, String>,

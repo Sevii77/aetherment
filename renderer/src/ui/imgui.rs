@@ -121,7 +121,7 @@ impl<'a> Ui<'a> {
 	
 	pub fn push_id(&mut self, id: impl Hash, contents: impl FnOnce(&mut Ui)) {
 		unsafe{sys::igPushID_Int(id_u32(id) as i32)};
-		contents(&mut Self::new());
+		contents(self);
 		unsafe{sys::igPopID()};
 	}
 	
@@ -199,6 +199,16 @@ impl<'a> Ui<'a> {
 		}
 	}
 	
+	pub fn collapsing_header<S: AsRef<str>>(&mut self, label: S, contents: impl FnOnce(&mut Ui)) {
+		self.handle_horizontal();
+		let label = CString::new(label.as_ref()).unwrap();
+		if unsafe{sys::igCollapsingHeader_TreeNodeFlags(label.as_ptr(), 0)} {
+			unsafe{sys::igIndent(0.0)};
+			contents(&mut Self::new());
+			unsafe{sys::igUnindent(0.0)}
+		}
+	}
+	
 	pub fn splitter(&mut self, id: impl Hash, default: f32, contents: impl FnOnce(&mut Ui, &mut Ui)) {
 		unsafe {
 			sys::igBeginTable(id_str(id).as_ptr(), 2, 1, sys::ImVec2{x: 0.0, y: 0.0}, 0.0);
@@ -270,10 +280,25 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn input_text<S: AsRef<str>>(&mut self, label: S, string: &mut String) -> Resp {
-		self.handle_horizontal();
+		let grow = 256 - string.capacity() as isize;
+		if grow > 0 {string.reserve(grow as usize);}
 		string.push('\0');
+		
+		self.handle_horizontal();
 		let label = CString::new(label.as_ref()).unwrap();
 		let r = unsafe{sys::igInputText(label.as_ptr(), string.as_mut_ptr() as *mut _, 256, 0, None, std::ptr::null::<*mut i8>() as *mut _)};
+		if let Some(p) = string.find('\0') {string.truncate(p);}
+		r.into()
+	}
+	
+	pub fn input_text_multiline<S: AsRef<str>>(&mut self, label: S, string: &mut String) -> Resp {
+		let grow = 8096 - string.capacity() as isize;
+		if grow > 0 {string.reserve(grow as usize);}
+		string.push('\0');
+		
+		self.handle_horizontal();
+		let label = CString::new(label.as_ref()).unwrap();
+		let r = unsafe{sys::igInputTextMultiline(label.as_ptr(), string.as_mut_ptr() as *mut _, 8096, sys::ImVec2{x: 0.0, y: 0.0}, 0, None, std::ptr::null::<*mut i8>() as *mut _)};
 		if let Some(p) = string.find('\0') {string.truncate(p);}
 		r.into()
 	}

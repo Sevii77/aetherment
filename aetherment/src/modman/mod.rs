@@ -123,15 +123,7 @@ pub fn game_files_hashes(files: HashSet<&str>) -> HashMap<String, String> {
 	hashes
 }
 
-// pub fn cleanup(mod_path: &std::path::Path) -> Result<(), crate::resource_loader::BacktraceError> {
-// 	let meta: meta::Meta = serde_json::from_reader(std::io::BufReader::new(std::fs::File::open(mod_path.join("meta.json"))?))?;
-// 	let files = get_mod_files(&meta, &mod_path.join("files"));
-// 	
-// 	// TODO: cleanup here
-// 	
-// 	Ok(())
-// }
-
+// TODO: actually use this IN THE MODPACK CREATION STRUCT, HELLO PAST ME??
 #[derive(Debug, Clone, Copy)]
 pub struct ModCreationSettings {
 	/// Used to be able to check changes the game has made to files this mod overrides, useful for ui
@@ -141,7 +133,7 @@ pub struct ModCreationSettings {
 pub struct ModPack<W: Write + Seek> {
 	writer: zip::ZipWriter<W>,
 	options: zip::write::FileOptions,
-	#[allow(dead_code)] settings: ModCreationSettings,
+	settings: ModCreationSettings,
 	
 	done: HashSet<blake3::Hash>,
 	remap: HashMap<String, String>,

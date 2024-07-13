@@ -268,6 +268,8 @@ impl Mods {
 									} else {
 										presets.push(preset);
 									}
+									
+									changed = true;
 								}
 							}
 						}

@@ -275,8 +275,9 @@ fn create_mod(path: &std::path::Path, meta: &meta::Meta, layers: &[Layer]) -> Re
 		current_game_files_hash: true,
 	});
 	
+	let mut file_layers = HashMap::new();
 	let mut color_option_counts = HashMap::new();
-	for layer in layers {
+	for (i, layer) in layers.iter().enumerate() {
 		let color = if let Some((color, name)) = &layer.color_option {
 			let counts = color_option_counts.entry(name.to_owned()).or_insert(0);
 			let name = if *counts == 0 {name.to_owned()} else {format!("{name} {counts}")};
@@ -299,31 +300,30 @@ fn create_mod(path: &std::path::Path, meta: &meta::Meta, layers: &[Layer]) -> Re
 			modpack.add_file(&hash, data)?;
 			
 			for path in &file.paths {
-				let comp = comp::Tex {
-					layers: vec![
-						comp::Layer {
-							name: "Overlay".to_string(),
-							path: crate::modman::Path::Mod(hash.clone()),
-							modifiers: if let Some(color) = &color {vec![comp::Modifier::Color{value: comp::OptionOrStatic::Option(comp::ColorOption(color.to_owned()))}]} else {Vec::new()},
-							blend: layer.blend_mode.clone(),
-						},
-						
-						comp::Layer {
-							name: "Base".to_string(),
-							path: crate::modman::Path::Game(path.to_owned()),
-							modifiers: Vec::new(),
-							blend: comp::Blend::Normal,
-						},
-					],
-				};
-				
-				let comp_data = serde_json::to_vec(&comp)?;
-				let comp_hash = crate::hash_str(blake3::hash(&comp_data));
-				
-				modpack.add_file(&comp_hash, &comp_data)?;
-				meta.files.insert(format!("{path}.comp"), comp_hash);
+				file_layers.entry(path).or_insert_with(|| vec![comp::Layer {
+					name: "Base".to_string(),
+					path: crate::modman::Path::Game(path.to_owned()),
+					modifiers: Vec::new(),
+					blend: comp::Blend::Normal,
+				}]).push(comp::Layer {
+					name: format!("Layer {i}"),
+					path: crate::modman::Path::Mod(hash.clone()),
+					modifiers: if let Some(color) = &color {vec![comp::Modifier::Color{value: comp::OptionOrStatic::Option(comp::ColorOption(color.to_owned()))}]} else {Vec::new()},
+					blend: layer.blend_mode.clone(),
+				});
 			}
 		}
+	}
+	
+	for (path, mut layers) in file_layers {
+		layers.reverse();
+		let comp = comp::Tex{layers};
+		
+		let comp_data = serde_json::to_vec(&comp)?;
+		let comp_hash = crate::hash_str(blake3::hash(&comp_data));
+		
+		modpack.add_file(&comp_hash, &comp_data)?;
+		meta.files.insert(format!("{path}.comp"), comp_hash);
 	}
 	
 	modpack.add_meta(&meta)?;

@@ -22,12 +22,14 @@ public class Aetherment : IDalamudPlugin {
 	private static IntPtr state;
 	
 	private Penumbra penumbra;
+	private DalamudStyle dalamud;
 	private TexFinder texfinder;
 	
 	[StructLayout(LayoutKind.Sequential)]
 	private unsafe struct Initializers {
 		public IntPtr log;
 		public PenumbraFunctions penumbra;
+		public IntPtr dalamud_add_style;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
@@ -51,6 +53,7 @@ public class Aetherment : IDalamudPlugin {
 	public unsafe Aetherment() {
 		log = Log;
 		penumbra = new();
+		dalamud = new();
 		texfinder = new();
 		
 		var init = new Initializers {
@@ -72,6 +75,7 @@ public class Aetherment : IDalamudPlugin {
 				current_collection = Marshal.GetFunctionPointerForDelegate(penumbra.currentCollection),
 				get_collections = Marshal.GetFunctionPointerForDelegate(penumbra.getCollections),
 			},
+			dalamud_add_style = Marshal.GetFunctionPointerForDelegate(dalamud.addStyle),
 		};
 		
 		state = initialize(init);

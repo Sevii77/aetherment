@@ -28,6 +28,11 @@ fn log(typ: aetherment::LogType, msg: String) {
 	drop(msg);
 }
 
+static mut ADDSTYLE: fn(FfiStr) = |_| {};
+fn dalamud_add_style(s: &str) {
+	unsafe{ADDSTYLE(FfiStr(s.as_ptr(), s.len()))}
+}
+
 pub struct State {
 	visible: bool,
 	core: aetherment::Core,
@@ -37,6 +42,7 @@ pub struct State {
 pub struct Initializers {
 	log: fn(u8, FfiStr),
 	penumbra_functions: PenumbraFunctions,
+	dalamud_add_style: fn(FfiStr),
 }
 
 #[repr(packed)]
@@ -78,6 +84,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 	match std::panic::catch_unwind(move || {
 		unsafe {
 			LOG = init.log;
+			ADDSTYLE = init.dalamud_add_style;
 		};
 		
 		let funcs = init.penumbra_functions;
@@ -142,7 +149,9 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 				
 				// default_collection: Box::new(move || (funcs.default_collection)().to_string()),
 				// get_collections: Box::new(move || (funcs.get_collections)().to_string_vec()),
-			})),
+			}), aetherment::modman::meta::OptionalInitializers {
+				dalamud: Some(dalamud_add_style)
+			}),
 		}))
 	}) {
 		Ok(v) => v,

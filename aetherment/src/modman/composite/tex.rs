@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-
 use serde::{Deserialize, Serialize};
 use crate::{modman::{settings::Value as SettingsValue, meta::OptionSettings, Path}, render_helper::EnumTools};
 

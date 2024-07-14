@@ -66,11 +66,15 @@ pub struct Core {
 }
 
 impl Core {
-	pub fn new(log: fn(log::LogType, String), backend_initializers: modman::backend::BackendInitializers) -> Self {
+	pub fn new(log: fn(log::LogType, String), backend_initializers: modman::backend::BackendInitializers, optional_initializers: modman::meta::OptionalInitializers) -> Self {
 		unsafe {
 			log::LOG = log;
 			// BACKEND = Some(std::sync::Mutex::new(modman::backend::new_backend(backend_initializers)));
 			BACKEND = Some(modman::backend::new_backend(backend_initializers));
+			
+			if let Some(dalamud) = optional_initializers.dalamud {
+				modman::meta::dalamud::SETSTYLE = dalamud;
+			}
 		}
 		
 		// backend().load_mods();

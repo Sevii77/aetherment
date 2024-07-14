@@ -2,8 +2,10 @@ use std::{collections::HashMap, fs::File, io::Write, path::Path};
 use serde::{Deserialize, Serialize};
 use crate::render_helper::EnumTools;
 
+pub mod dalamud;
+
 // TODO: add option_sync or smth so that a submod can sync its options with a master mod (having rounded corners mod for mui needed to be adjusted seperatly is dumb)
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Meta {
 	pub name: String,
@@ -19,6 +21,8 @@ pub struct Meta {
 	pub files: HashMap<String, String>,
 	pub file_swaps: HashMap<String, String>,
 	pub manipulations: Vec<Manipulation>,
+	
+	pub plugin_settings: PluginSettings,
 }
 
 impl Default for Meta {
@@ -37,6 +41,8 @@ impl Default for Meta {
 			files: HashMap::new(),
 			file_swaps: HashMap::new(),
 			manipulations: Vec::new(),
+			
+			plugin_settings: PluginSettings::default(),
 		}
 	}
 }
@@ -67,6 +73,19 @@ impl Meta {
 		
 		paths
 	}
+}
+
+// ----------
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub struct PluginSettings {
+	pub dalamud: std::option::Option<dalamud::Style>,
+}
+
+#[derive(Default)]
+pub struct OptionalInitializers {
+	pub dalamud: std::option::Option<fn(&str)>,
 }
 
 // ----------

@@ -43,6 +43,6 @@ fn main() {
 	
 	eframe::run_native("Aetherment", options, Box::new(|cc| {
 		let _backend = cc.wgpu_render_state.as_ref().unwrap().adapter.get_info().backend;
-		Box::new(CoreWrapper(aetherment::Core::new(log, aetherment::modman::backend::BackendInitializers::None)))
+		Box::new(CoreWrapper(aetherment::Core::new(log, aetherment::modman::backend::BackendInitializers::None, Default::default())))
 	})).unwrap();
 }

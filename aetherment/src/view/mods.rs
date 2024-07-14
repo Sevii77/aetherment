@@ -422,6 +422,13 @@ impl Mods {
 				// 	}
 				// });
 				
+				ui.add_space(32.0);
+				if let Some(style) = &meta.plugin_settings.dalamud {
+					if ui.button("Set Dalamud Style").clicked {
+						style.apply(&meta.name, meta, settings)
+					}
+				}
+				
 				if changed {
 					backend.apply_mod_settings(&self.selected_mod, &self.active_collection, SettingsType::Some(settings.clone()));
 					mod_settings.presets = presets;

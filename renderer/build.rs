@@ -12,7 +12,7 @@ fn main() {
 	println!("cargo:rerun-if-changed=build.rs");
 	println!("cargo:rerun-if-changed=./lib/cimgui.lib");
 	
-	generate_bindings();
+	// generate_bindings();
 }
 
 #[cfg(feature = "imgui")]

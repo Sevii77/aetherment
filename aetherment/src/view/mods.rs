@@ -217,28 +217,30 @@ impl Mods {
 					let mut delete = None;
 					for (i, p) in presets.iter().enumerate() {
 						ui.horizontal(|ui| {
-							let resp = ui.button("D");
-							if resp.clicked {
-								delete = Some(i);
-							}
-							if resp.hovered {
-								ui.tooltip_text("Delete");
-							}
-							
-							let resp = ui.button("S");
-							if resp.clicked {
-								if let Ok(json) = serde_json::to_vec(p) {
-									log!("copied {}", base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, &json));
-									ui.set_clipboard(base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, json));
+							ui.push_id(i, |ui| {
+								let resp = ui.button("D");
+								if resp.clicked {
+									delete = Some(i);
 								}
-							}
-							if resp.hovered {
-								ui.tooltip_text("Copy to clipboard");
-							}
-							
-							if ui.selectable(&p.name, p.name == selected_preset).clicked {
-								set_settings(&p.settings);
-							}
+								if resp.hovered {
+									ui.tooltip_text("Delete");
+								}
+								
+								let resp = ui.button("C");
+								if resp.clicked {
+									if let Ok(json) = serde_json::to_vec(p) {
+										log!("copied {}", base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, &json));
+										ui.set_clipboard(base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, json));
+									}
+								}
+								if resp.hovered {
+									ui.tooltip_text("Copy to clipboard");
+								}
+								
+								if ui.selectable(&p.name, p.name == selected_preset).clicked {
+									set_settings(&p.settings);
+								}
+							});
 						});
 					}
 					
@@ -259,21 +261,30 @@ impl Mods {
 						ui.input_text("", &mut self.new_preset_name);
 					});
 					
-					if ui.button("Import").clicked {
-						if let Ok(json) = base64::Engine::decode(&base64::prelude::BASE64_STANDARD_NO_PAD, ui.get_clipboard()) {
-							if let Ok(preset) = serde_json::from_slice::<crate::modman::settings::Preset>(&json) {
-								if preset.name.len() > 0 && preset.name != "Custom" && preset.name != "Default" && !meta.presets.iter().any(|v| v.name == preset.name) {
-									if let Some(existing) = presets.iter_mut().find(|v| v.name == preset.name) {
-										*existing = preset;
-									} else {
-										presets.push(preset);
-									}
-									
-									changed = true;
-								}
-							}
+					if ui.button("Import preset from clipboard").clicked {'import: {
+						let json = match base64::Engine::decode(&base64::prelude::BASE64_STANDARD_NO_PAD, ui.get_clipboard().trim().trim_end_matches(|v| v == '=')) {
+							Ok(v) => v,
+							Err(err) => {log!(err, "Error importing preset ({err:?})"); break 'import}
+						};
+						
+						let preset = match serde_json::from_slice::<crate::modman::settings::Preset>(&json) {
+							Ok(v) => v,
+							Err(err) => {log!(err, "Error importing preset ({err:?})"); break 'import}
+						};
+						
+						if preset.name.len() == 0 || preset.name == "Custom" || preset.name == "Default" {
+							log!(err, "Error importing preset (Invalid name)");
+							break 'import;
 						}
-					}
+						
+						if let Some(existing) = presets.iter_mut().find(|v| v.name == preset.name) {
+							*existing = preset;
+						} else {
+							presets.push(preset);
+						}
+						
+						changed = true;
+					}}
 				});
 				
 				ui.add_space(16.0);

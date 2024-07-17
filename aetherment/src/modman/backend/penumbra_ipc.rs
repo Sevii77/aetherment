@@ -461,18 +461,22 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	let get_file = |path: &str, collection: &str, priority: i32| -> Option<Vec<u8>> {
 		let mut real_path = None;
 		let mut real_path_prio = i32::MIN;
-		let files = mod_file_cache.get(collection)?.get(path)?;
-		for (rpath, mod_id, prio) in files {
-			if *prio >= priority {continue}
-			if *prio < real_path_prio {continue}
-			real_path = Some((mod_id, rpath));
-			real_path_prio = *prio;
+		if let Some(collection) = mod_file_cache.get(collection) {
+			if let Some(files) = collection.get(path) {
+				for (rpath, mod_id, prio) in files {
+					if *prio >= priority {continue}
+					if *prio < real_path_prio {continue}
+					real_path = Some((mod_id, rpath));
+					real_path_prio = *prio;
+				}
+			}
 		}
 		
 		if let Some((mod_id, path)) = real_path {
-			log!("Loading file {path} from mod {mod_id} to overlay onto");
+			// log!("Loading file {path} from mod {mod_id} to overlay onto");
 			crate::resource_loader::load_file_disk(&root.join(&mod_id).join(path)).ok()
 		} else {
+			// log!("Loading file {path} from game to overlay onto");
 			crate::noumenon()?.file(path).ok()
 		}
 	};
@@ -578,7 +582,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 				if let Some(comp) = comp {
 					match comp.composite(&settings, &file_resolver) {
 						Ok(data) => {
-							log!(log, "Succeeded to composite file {game_path}");
+							// log!(log, "Succeeded to composite file {game_path}");
 							
 							let hash = if game_path.starts_with("ui/") {
 								crate::hash_str(blake3::hash(format!("{game_path}{collection_id}").as_bytes()))

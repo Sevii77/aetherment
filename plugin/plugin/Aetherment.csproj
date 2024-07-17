@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<AssemblyName>Aetherment</AssemblyName>
 		<Authors>Sevii</Authors>
-		<Version>0.1.4</Version>
+		<Version>0.1.5</Version>
 	</PropertyGroup>
 	
 	<PropertyGroup>

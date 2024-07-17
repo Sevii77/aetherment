@@ -19,7 +19,8 @@ impl Browser {
 	pub fn draw(&mut self, ui: &mut renderer::Ui, install_progress: crate::modman::backend::InstallProgress) {
 		let is_busy = *self.busy.read().unwrap();
 		for (selected_version, m) in self.mods.write().unwrap().iter_mut() {
-			ui.child(&m.id, [0.0, 0.0], |ui| {
+			// ui.child(&m.id, [0.0, 0.0], |ui| {
+			ui.push_id(&m.id, |ui| {
 				ui.horizontal(|ui| {
 					ui.label(&m.name);
 					ui.label(format!("(by {})", m.author))
@@ -38,7 +39,7 @@ impl Browser {
 				});
 			});
 			
-			ui.add_space(16.0);
+			ui.add_space(32.0);
 		}
 	}
 	

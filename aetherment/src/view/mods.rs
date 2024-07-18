@@ -445,6 +445,7 @@ impl Mods {
 						
 						ui.set_width(150.0);
 						ui.slider("Gamma", &mut self.gamma, 0..=100);
+						ui.helptext("Set this to your game gamma setting");
 					});
 				}
 				

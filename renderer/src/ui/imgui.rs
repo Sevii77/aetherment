@@ -1,4 +1,4 @@
-use std::{ffi::{CStr, CString}, hash::{Hash, Hasher}};
+use std::{borrow::Cow, ffi::{CStr, CString}, hash::{Hash, Hasher}};
 use crate::Response as Resp;
 
 #[path = "imgui/bindings.rs"]
@@ -44,6 +44,7 @@ pub struct Ui<'a> {
 	a: std::marker::PhantomData<&'a mut i32>,
 	horizontal: bool,
 	horizontal_first: bool,
+	is_tooltip: bool,
 }
 
 impl<'a> Ui<'a> {
@@ -52,6 +53,7 @@ impl<'a> Ui<'a> {
 			a: std::marker::PhantomData,
 			horizontal: false,
 			horizontal_first: false,
+			is_tooltip: false,
 		}
 	}
 	
@@ -151,7 +153,9 @@ impl<'a> Ui<'a> {
 	
 	pub fn tooltip(&mut self, contents: impl FnOnce(&mut Ui)) {
 		unsafe{sys::igBeginTooltip()};
-		contents(&mut Self::new());
+		let mut ui = Self::new();
+		ui.is_tooltip = true;
+		contents(&mut ui);
 		unsafe{sys::igEndTooltip()};
 	}
 	
@@ -201,8 +205,8 @@ impl<'a> Ui<'a> {
 	
 	pub fn collapsing_header<S: AsRef<str>>(&mut self, label: S, contents: impl FnOnce(&mut Ui)) {
 		self.handle_horizontal();
-		let label = CString::new(label.as_ref()).unwrap();
-		if unsafe{sys::igCollapsingHeader_TreeNodeFlags(label.as_ptr(), 0)} {
+		let label = fix_text(label);
+		if unsafe{sys::igCollapsingHeader_TreeNodeFlags(label.as_ptr() as _, 0)} {
 			unsafe{sys::igIndent(0.0)};
 			contents(&mut Self::new());
 			unsafe{sys::igUnindent(0.0)}
@@ -251,8 +255,12 @@ impl<'a> Ui<'a> {
 	
 	pub fn label<S: AsRef<str>>(&mut self, label: S) {
 		self.handle_horizontal();
-		let label = CString::new(label.as_ref()).unwrap();
-		unsafe{sys::igTextWrapped(label.as_ptr())};
+		let label = fix_text(label);
+		if self.is_tooltip {
+			unsafe{sys::igText(label.as_ptr() as _)};
+		} else {
+			unsafe{sys::igTextWrapped(label.as_ptr() as _)};
+		}
 	}
 	
 	pub fn button<S: AsRef<str>>(&mut self, label: S) -> Resp {
@@ -314,10 +322,10 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn helptext<S: AsRef<str>>(&mut self, text: S) {
-		self.label("❓");
+		self.label("(?)");
 		if unsafe{sys::igIsItemHovered(0)} {
-			let text = CString::new(text.as_ref()).unwrap();
-			unsafe{sys::igSetTooltip(text.as_ptr())}
+			let text = fix_text(text);
+			unsafe{sys::igSetTooltip(text.as_ptr() as _)}
 		}
 	}
 	
@@ -355,4 +363,10 @@ impl<'a> Ui<'a> {
 			r
 		}.into()
 	}
+}
+
+fn fix_text<S: AsRef<str>>(label: S) -> String {
+	let mut l = label.as_ref().replace("%", "%%");
+	l.push('\0');
+	l
 }

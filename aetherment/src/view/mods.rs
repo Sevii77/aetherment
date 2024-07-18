@@ -252,11 +252,18 @@ impl Mods {
 					}
 					
 					ui.horizontal(|ui| {
-						if ui.button("+").clicked && self.new_preset_name.len() > 0 && self.new_preset_name != "Custom" && self.new_preset_name != "Default" && !meta.presets.iter().any(|v| v.name == self.new_preset_name) {
-							presets.push(crate::modman::settings::Preset {
+						if ui.button("+").clicked && self.new_preset_name.len() > 0 && self.new_preset_name != "Custom" && self.new_preset_name != "Default" {
+							let preset = crate::modman::settings::Preset {
 								name: self.new_preset_name.clone(),
 								settings: settings.iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect()
-							});
+							};
+							
+							if let Some(existing) = presets.iter_mut().find(|v| v.name == preset.name) {
+								*existing = preset;
+							} else {
+								presets.push(preset);
+							}
+							
 							self.new_preset_name.clear();
 							changed = true;
 						}

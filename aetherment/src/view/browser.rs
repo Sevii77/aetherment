@@ -51,7 +51,10 @@ impl Browser {
 		*busy.write().unwrap() = true;
 		std::thread::spawn(move || {
 			if let Ok(m) = crate::remote::get_mods() {
-				*mods.write().unwrap() = m.into_iter().map(|v| (0, v)).collect();
+				let mut new = m.into_iter().map(|v| (0, v)).collect::<Vec<_>>();
+				new.sort_by(|(_, ma), (_, mb)| ma.name.cmp(&mb.name));
+				
+				*mods.write().unwrap() = new;
 			}
 			
 			*busy.write().unwrap() = false;

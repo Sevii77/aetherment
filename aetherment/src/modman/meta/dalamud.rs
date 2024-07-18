@@ -203,7 +203,7 @@ impl Default for Style {
 }
 
 impl Style {
-	pub fn apply(&self, name: &str, meta: &crate::modman::meta::Meta, settings: &settings::CollectionSettings) {
+	pub fn apply(&self, name: &str, meta: &crate::modman::meta::Meta, settings: &settings::CollectionSettings, gamma: f32) {
 		let model = StyleModel {
 			name: name.to_owned(),
 			built_in_colors: HashMap::new(),
@@ -236,7 +236,7 @@ impl Style {
 			button_text_align: self.button_text_align.resolve(meta, settings).unwrap_or_default().into(),
 			selectable_text_align: self.selectable_text_align.resolve(meta, settings).unwrap_or_default().into(),
 			display_safe_area_padding: self.display_safe_area_padding.resolve(meta, settings).unwrap_or_default().into(),
-			colors: self.colors.iter().map(|(k, v)| (k.to_owned(), v.resolve(meta, settings).unwrap_or([1.0; 4]).into())).collect()
+			colors: self.colors.iter().map(|(k, v)| (k.to_owned(), {let c = v.resolve(meta, settings).unwrap_or([1.0; 4]); [c[0].powf(gamma).clamp(0.0, 1.0), c[1].powf(gamma).clamp(0.0, 1.0), c[2].powf(gamma).clamp(0.0, 1.0), c[3]]}.into())).collect()
 		};
 		
 		if let Ok(json) = serde_json::to_string(&model) {

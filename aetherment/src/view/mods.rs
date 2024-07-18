@@ -5,6 +5,7 @@ pub struct Mods {
 	active_collection: String,
 	selected_mod: String,
 	selected_category_tab: String,
+	gamma: u8,
 	
 	import_picker: Option<renderer::FilePicker>,
 	new_preset_name: String,
@@ -23,6 +24,7 @@ impl Mods {
 			active_collection: String::new(),
 			selected_mod: String::new(),
 			selected_category_tab: String::new(),
+			gamma: 50,
 			
 			import_picker: None,
 			new_preset_name: String::new(),
@@ -435,9 +437,15 @@ impl Mods {
 				
 				ui.add_space(32.0);
 				if let Some(style) = &meta.plugin_settings.dalamud {
-					if ui.button("Set Dalamud Style").clicked {
-						style.apply(&meta.name, meta, settings)
-					}
+					ui.horizontal(|ui| {
+						if ui.button("Set Dalamud Style").clicked {
+							let gamma = 1.2 - (self.gamma as f32 / 250.0);
+							style.apply(&meta.name, meta, settings, gamma);
+						}
+						
+						ui.set_width(150.0);
+						ui.slider("Gamma", &mut self.gamma, 0..=100);
+					});
 				}
 				
 				if changed {

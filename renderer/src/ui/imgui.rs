@@ -251,8 +251,8 @@ impl<'a> Ui<'a> {
 	
 	pub fn label<S: AsRef<str>>(&mut self, label: S) {
 		self.handle_horizontal();
-		let label = label.as_ref();
-		unsafe{sys::igTextUnformatted(label.as_ptr() as _, (label.as_ptr() as usize + label.len()) as _)};
+		let label = CString::new(label.as_ref()).unwrap();
+		unsafe{sys::igTextWrapped(label.as_ptr())};
 	}
 	
 	pub fn button<S: AsRef<str>>(&mut self, label: S) -> Resp {
@@ -263,8 +263,8 @@ impl<'a> Ui<'a> {
 	
 	pub fn selectable<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
 		self.handle_horizontal();
-		let clabel = CString::new(label.as_ref()).unwrap();
-		unsafe{sys::igSelectable_Bool(clabel.as_ptr(), selected, 0, sys::ImVec2{x: 0.0, y: 0.0})}.into()
+		let label = CString::new(label.as_ref()).unwrap();
+		unsafe{sys::igSelectable_Bool(label.as_ptr(), selected, 0, sys::ImVec2{x: 0.0, y: 0.0})}.into()
 	}
 	
 	pub fn selectable_min<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {

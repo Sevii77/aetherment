@@ -1,50 +1,53 @@
-using System;
 using System.Text;
 using System.Runtime.InteropServices;
+using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace Aetherment.FFI;
 
-// TODO: just alloc some for every string and make the rust side call back to drop it
 [StructLayout(LayoutKind.Explicit)]
 public struct Str {
-	[FieldOffset(0x0)] private IntPtr ptr;
+	[FieldOffset(0x0)] private nint ptr;
 	[FieldOffset(0x8)] private ulong length;
 	
-	private const int bufLen = 65536;
-	private static IntPtr buf;
-	private static int bufIndex;
+	// if we dropped things every frame it might cause issues due to multi-threading bs, thats why time
+	private static Queue<((nint, ulong), Stopwatch)> strings;
 	
 	static Str() {
-		buf = Marshal.AllocHGlobal(bufLen);
-		bufIndex = 0;
+		strings = new();
+	}
+	
+	public static void HandleResources() {
+		while(strings.TryPeek(out var s)) {
+			if(s.Item2.ElapsedMilliseconds < 100)
+				break;
+			
+			var str = strings.Dequeue();
+			Marshal.FreeHGlobal(str.Item1.Item1);
+			// Aetherment.Logger.Debug($"destroyed string of {str.Item1.Item2} bytes");
+		}
 	}
 	
 	public static void Drop() {
-		Marshal.FreeHGlobal(buf);
+		while(strings.TryDequeue(out var str))
+			Marshal.FreeHGlobal(str.Item1.Item1);
 	}
 	
 	public Str(string str) {
-		var length = Encoding.UTF8.GetByteCount(str);
-		if(length > bufLen) {
-			Aetherment.Logger.Error("String was longer than buffer, sending empty ffi string");
-			this.ptr = buf;
-			this.length = 0;
-			return;
-		}
+		var len = Encoding.UTF8.GetByteCount(str);
 		
-		if(bufIndex + length > bufLen)
-			bufIndex = 0;
-		
-		this.ptr = buf + bufIndex;
-		this.length = (ulong)length;
-		bufIndex += length;
+		ptr = Marshal.AllocHGlobal(len);;
+		length = (ulong)len;
 		
 		unsafe {
 			var p = (byte*)ptr;
 			fixed(char* chars = str) {
-				Encoding.UTF8.GetBytes(chars, str.Length, p, length);
+				Encoding.UTF8.GetBytes(chars, str.Length, p, len);
 			}
 		}
+		
+		strings.Enqueue(((ptr, length), Stopwatch.StartNew()));
+		// Aetherment.Logger.Debug($"created string of {len} bytes");
 	}
 	
 	public static implicit operator Str(string str) => new Str(str);
@@ -54,12 +57,4 @@ public struct Str {
 	}
 	
 	public override string ToString() => (string)this;
-	
-	// public static unsafe string StrToString(byte* ptr, ulong len) {
-	// 	var str = Encoding.UTF8.GetString(ptr, (int)len);
-	// 	destroy_string(ptr);
-	// 	return str;
-	// }
-	
-	// [DllImport("aetherment_core.dll")] private static extern unsafe void destroy_string(byte* ptr);
 }

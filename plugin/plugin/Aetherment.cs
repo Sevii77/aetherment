@@ -107,6 +107,7 @@ public class Aetherment : IDalamudPlugin {
 	
 	public void Dispose() {
 		destroy(state);
+		FFI.Str.Drop();
 		Interface.UiBuilder.Draw -= Draw;
 		Interface.UiBuilder.OpenMainUi -= OpenConf;
 		Commands.RemoveHandler(maincommand);
@@ -121,6 +122,8 @@ public class Aetherment : IDalamudPlugin {
 	}
 	
 	private void Draw() {
+		FFI.Str.HandleResources();
+		
 		try {
 			draw(state);
 		} catch {

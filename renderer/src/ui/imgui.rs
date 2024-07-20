@@ -1,4 +1,4 @@
-use std::{borrow::Cow, ffi::{CStr, CString}, hash::{Hash, Hasher}};
+use std::{ffi::{CStr, CString}, hash::{Hash, Hasher}};
 use crate::Response as Resp;
 
 #[path = "imgui/bindings.rs"]

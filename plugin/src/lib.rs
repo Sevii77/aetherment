@@ -131,19 +131,19 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 					let mut split = collection.split("\0");
 					aetherment::modman::backend::Collection {
 						id: split.next().unwrap().to_owned(),
-						name: split.next().unwrap().to_owned(),
+						name: split.next().unwrap_or("Failed getting collection").to_owned(),
 					}
 				}),
 				get_collections: Box::new(move || {
 					let collections = (funcs.get_collections)().to_string();
 					if collections.is_empty() {return Vec::new()};
 					
-					collections.split("\0\0").map(|v| {
+					collections.split("\0\0").filter_map(|v| {
 						let mut split = v.split("\0");
-						aetherment::modman::backend::Collection {
-							id: split.next().unwrap().to_owned(),
-							name: split.next().unwrap().to_owned(),
-						}
+						Some(aetherment::modman::backend::Collection {
+							id: split.next()?.to_owned(),
+							name: split.next()?.to_owned(),
+						})
 					}).collect()
 				}),
 				

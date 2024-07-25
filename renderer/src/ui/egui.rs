@@ -73,11 +73,11 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn set_clipboard<S: AsRef<str>>(&mut self, text: S) {
-		todo!()
+		self.ui.output_mut(|v| v.copied_text = text.as_ref().to_string());
 	}
 	
 	pub fn get_clipboard(&mut self) -> String {
-		todo!()
+		self.ui.output(|v| v.copied_text.clone())
 	}
 	
 	pub fn modifiers(&mut self) -> crate::Modifiers {
@@ -110,7 +110,7 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn add_space(&mut self, spacing: f32) {
-		todo!()
+		self.ui.add_space(spacing);
 	}
 	
 	pub fn tooltip(&mut self, contents: impl FnOnce(&mut Ui)) {
@@ -153,7 +153,7 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn collapsing_header<S: AsRef<str>>(&mut self, label: S, contents: impl FnOnce(&mut Ui)) {
-		todo!();
+		self.ui.collapsing(label.as_ref(), |ui| contents(&mut Ui::new(ui)));
 	}
 	
 	pub fn splitter(&mut self, id: impl Hash, default: f32, contents: impl FnOnce(&mut Ui, &mut Ui)) {
@@ -177,7 +177,8 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn selectable<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
-		todo!()
+		// TODO: full width size
+		self.handle_add(egui::SelectableLabel::new(selected, label.as_ref())).into()
 	}
 	
 	pub fn selectable_min<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
@@ -193,14 +194,19 @@ impl<'a> Ui<'a> {
 			let mut widget = egui::TextEdit::singleline(string);
 			widget = if let Some(w) = self.next_width.take() {widget.desired_width(w)} else {widget};
 			let r = widget.show(ui).response;
-			// let r = ui.text_edit_singleline(string);
 			ui.label(label.as_ref());
 			r
 		}).inner.into()
 	}
 	
 	pub fn input_text_multiline<S: AsRef<str>>(&mut self, label: S, string: &mut String) -> Resp {
-		todo!()
+		self.ui.horizontal(|ui| {
+			let mut widget = egui::TextEdit::multiline(string);
+			widget = if let Some(w) = self.next_width.take() {widget.desired_width(w)} else {widget};
+			let r = widget.show(ui).response;
+			ui.label(label.as_ref());
+			r
+		}).inner.into()
 	}
 	
 	pub fn combo<S: AsRef<str>, S2: AsRef<str>>(&mut self, label: S, preview: S2, contents: impl FnOnce(&mut Ui)) {
@@ -224,8 +230,8 @@ impl<'a> Ui<'a> {
 		num_multi_edit_range(self.ui, color, label.as_ref(), &[0.0..=1.0, 0.0..=1.0, 0.0..=1.0, 0.0..=1.0]).into()
 	}
 	
-	pub fn slider<S: AsRef<str>, N: crate::Numeric>(&mut self, label: S, value: &mut N, range: std::ops::RangeInclusive<N>) -> Resp {
-		todo!()
+	pub fn slider<S: AsRef<str>, N: egui::emath::Numeric>(&mut self, label: S, value: &mut N, range: std::ops::RangeInclusive<N>) -> Resp {
+		self.handle_add(egui::widgets::Slider::new(value, range).text(label.as_ref())).into()
 	}
 }
 

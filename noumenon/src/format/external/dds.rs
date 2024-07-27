@@ -16,7 +16,7 @@ pub trait Dds {
 // we map everything to be r g b a
 // ---------------------------------------- //
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum Format {
 	Unknown,
 	L8,
@@ -236,10 +236,16 @@ fn convert_from_a1r5g5b5(data: &[u8]) -> Vec<u8> {
 				// ((v & 0x7C00) >> 7) as u8,
 				// ((v & 0x8000) >> 8) as u8,
 				
+				// ((v & 0x7C00) >> 7) as u8,
+				// ((v & 0x8000) >> 8) as u8,
+				// ((v & 0x001F) << 3) as u8,
+				// ((v & 0x03E0) >> 2) as u8,
+				
 				((v & 0x7C00) >> 7) as u8,
 				((v & 0x03E0) >> 2) as u8,
 				((v & 0x001F) << 3) as u8,
-				((v & 0x8000) >> 8) as u8,
+				// ((v & 0x8000) >> 8) as u8,
+				((v & 0x8000) >> 15) as u8 * 255,
 			]
 		}).collect::<Vec<u8>>()
 }
@@ -248,13 +254,18 @@ fn convert_to_a1r5g5b5(data: &[u8]) -> Vec<u8> {
 	data
 		.chunks_exact(4)
 		.flat_map(|p| {
-			[
-				// (p[0] >> 3) + ((p[1] << 2) & 0xE0),
-				// (p[1] >> 6) + ((p[2] >> 1) & 0x7C) + p[3] & 0x80,
-				
-				(p[2] >> 3) + ((p[1] << 2) & 0xE0),
-				(p[1] >> 6) + ((p[0] >> 1) & 0x7C) + p[3] & 0x80,
-			]
+			(((p[3] as u16 >> 7) << 15) +
+			((p[0] as u16 >> 3) << 10) +
+			((p[1] as u16 >> 3) << 5) +
+			(p[2] as u16 >> 3)).to_le_bytes()
+			
+			// [
+			// 	// (p[0] >> 3) + ((p[1] << 2) & 0xE0),
+			// 	// (p[1] >> 6) + ((p[2] >> 1) & 0x7C) + p[3] & 0x80,
+			// 	
+			// 	(p[2] >> 3) + ((p[1] << 2) & 0xE0),
+			// 	(p[1] >> 6) + ((p[0] >> 1) & 0x7C) + p[3] & 0x80,
+			// ]
 		}).collect::<Vec<u8>>()
 }
 

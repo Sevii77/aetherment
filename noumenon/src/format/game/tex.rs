@@ -228,6 +228,7 @@ impl Dds for Tex {
 		let mip_levels = reader.read_le::<u32>()? as u16;
 		
 		let format = DFormat::get(reader);
+		// println!("{format:?}");
 		
 		// im sure theres some fancier way but w/e
 		let mut mip_offsets = [0u32; 13];

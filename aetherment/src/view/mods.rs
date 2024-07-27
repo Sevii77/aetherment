@@ -119,9 +119,11 @@ impl Mods {
 				
 				for m in &self.mods {
 					if let Some(meta) = backend.get_mod_meta(m) {
-						if ui.selectable(&meta.name, self.selected_mod == *m).clicked {
-							self.selected_mod = m.clone();
-						}
+						ui.push_id(m, |ui| {
+							if ui.selectable(&meta.name, self.selected_mod == *m).clicked {
+								self.selected_mod = m.clone();
+							}
+						});
 					}
 				}
 			}
@@ -174,7 +176,9 @@ impl Mods {
 				let mut selected_preset = "Custom".to_string();
 				'default: {
 					for (name, value) in settings.iter() {
-						if crate::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()) != *value {break 'default}
+						if let Some(opt) = meta.options.options_iter().find(|v| v.name == *name) {
+							if crate::modman::settings::Value::from_meta_option(opt) != *value {break 'default}
+						}
 					}
 					
 					selected_preset = "Default".to_owned();

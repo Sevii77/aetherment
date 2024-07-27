@@ -573,9 +573,10 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			let mut true_real_path = format!("files/{real_path_remapped}");
 			
 			if game_path.ends_with(".comp") {
+				// log!(log, "compositing file {game_path}");
 				let ext = game_path.trim_end_matches(".comp").split(".").last().unwrap();
 				let comp: Option<Box<dyn Composite>> = match ext {
-					"tex" | "atex" => Some(Box::new(serde_json::from_reader::<_, tex::Tex>(std::io::BufReader::new(File::open(files_dir.join(real_path_remapped))?))?)),
+					"tex" | "atex" => Some(Box::new(read_json::<tex::Tex>(&files_dir.join(real_path_remapped))?)),
 					_ => None
 				};
 				

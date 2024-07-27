@@ -4,6 +4,11 @@ use std::{io::{Read, Seek}, sync::{atomic::{AtomicBool, AtomicU32}, Arc, RwLock,
 pub mod penumbra_ipc;
 pub mod dummy;
 
+pub enum Status {
+	Ok,
+	Error(String),
+}
+
 pub enum Filter {
 	None,
 	Options(Vec<String>),
@@ -108,7 +113,8 @@ pub struct Collection {
 pub trait Backend {
 	fn name(&self) -> &'static str;
 	fn description(&self) -> &'static str;
-	fn is_functional(&self) -> bool {true}
+	// fn is_functional(&self) -> bool {true}
+	fn get_status(&self) -> Status;
 	fn get_mods(&self) -> Vec<String>;
 	// fn get_mods(&mut self) -> HashMap<String, Mod>;
 	fn get_active_collection(&self) -> String;

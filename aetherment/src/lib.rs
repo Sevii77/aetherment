@@ -60,6 +60,7 @@ pub struct Core {
 	
 	// current_tab: &'static str,
 	current_tab: String,
+	backend_last_error: bool,
 	
 	install_progress: crate::modman::backend::InstallProgress,
 	apply_progress: crate::modman::backend::ApplyProgress,
@@ -87,6 +88,7 @@ impl Core {
 			
 			// current_tab: "Mods",
 			current_tab: "Mods".to_string(),
+			backend_last_error: matches!(backend().get_status(), modman::backend::Status::Error(_)),
 			
 			install_progress: crate::modman::backend::InstallProgress::new(),
 			apply_progress: crate::modman::backend::ApplyProgress::new(),
@@ -103,9 +105,22 @@ impl Core {
 	}
 	
 	pub fn draw(&mut self, ui: &mut renderer::Ui) {
+		let status = backend().get_status();
+		match status {
+			modman::backend::Status::Ok => {
+				if self.backend_last_error {
+					self.mods_tab.refresh();
+				}
+				
+				self.backend_last_error = false;
+			}
+			
+			modman::backend::Status::Error(_) => self.backend_last_error = true,
+		}
+		
 		ui.tabs(&["Mods", "Browser", "Settings", "Tools", "Debug"], &mut self.current_tab);
 		
-		// TOOD: make fancy
+		// TODO: make fancy
 		if self.install_progress.is_busy() {
 			ui.label(format!("{:.0}% {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()));
 			ui.label(format!("{:.0}% {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()));
@@ -118,11 +133,17 @@ impl Core {
 		
 		match self.current_tab.as_str() {
 			"Mods" => {
-				self.mods_tab.draw(ui, self.install_progress.clone(), self.apply_progress.clone());
+				match status {
+					modman::backend::Status::Ok => self.mods_tab.draw(ui, self.install_progress.clone(), self.apply_progress.clone()),
+					modman::backend::Status::Error(err) => ui.label(err),
+				}
 			}
 			
 			"Browser" => {
-				self.browser_tab.draw(ui, self.install_progress.clone());
+				match status {
+					modman::backend::Status::Ok => self.browser_tab.draw(ui, self.install_progress.clone()),
+					modman::backend::Status::Error(err) => ui.label(err),
+				}
 			}
 			
 			"Settings" => {

@@ -37,6 +37,7 @@ public class Aetherment : IDalamudPlugin {
 		public FFI.Str config_dir;
 		public IntPtr redraw;
 		public IntPtr redraw_self;
+		public IntPtr is_enabled;
 		public IntPtr root_path;
 		public IntPtr mod_list;
 		public IntPtr add_mod_entry;
@@ -62,6 +63,7 @@ public class Aetherment : IDalamudPlugin {
 				config_dir = Interface.ConfigDirectory.Parent! + "/Penumbra/",
 				redraw = Marshal.GetFunctionPointerForDelegate(penumbra.redraw),
 				redraw_self = Marshal.GetFunctionPointerForDelegate(penumbra.redrawSelf),
+				is_enabled = Marshal.GetFunctionPointerForDelegate(penumbra.isEnabled),
 				root_path = Marshal.GetFunctionPointerForDelegate(penumbra.rootPath),
 				mod_list = Marshal.GetFunctionPointerForDelegate(penumbra.modList),
 				add_mod_entry = Marshal.GetFunctionPointerForDelegate(penumbra.addModEntry),

@@ -40,7 +40,7 @@ impl Mods {
 		s
 	}
 	
-	fn refresh(&mut self) {
+	pub fn refresh(&mut self) {
 		let backend = crate::backend();
 		backend.load_mods();
 		

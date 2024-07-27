@@ -16,6 +16,7 @@ public unsafe class Penumbra: IDisposable {
 	public Penumbra() {
 		redraw = Redraw;
 		redrawSelf = RedrawSelf;
+		isEnabled = IsEnabled;
 		rootPath = RootPath;
 		modList = ModList;
 		addModEntry = AddModEntry;
@@ -76,6 +77,16 @@ public unsafe class Penumbra: IDisposable {
 			Aetherment.Interface.GetIpcSubscriber<IGameObject, byte, object>("Penumbra.RedrawObject").InvokeAction(Aetherment.Objects[0]!, 0);
 		} catch(Exception e) {
 			Aetherment.Logger.Error(e, "Penumbra IPC RedrawSelf");
+		}
+	}
+	
+	public IsEnabledDelegate isEnabled;
+	public delegate byte IsEnabledDelegate();
+	public byte IsEnabled() {
+		try {
+			return Aetherment.Interface.GetIpcSubscriber<bool>("Penumbra.GetEnabledState").InvokeFunc() ? (byte)1 : (byte)0;
+		} catch {
+			return 0;
 		}
 	}
 	

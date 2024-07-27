@@ -37,6 +37,8 @@ impl Settings {
 					c.insert(o.name.to_owned(), Value::from_meta_option(o));
 				}
 			}
+			
+			c.0.retain(|name, _| meta.options.options_iter().any(|v| v.name == *name))
 		}
 		s
 	}

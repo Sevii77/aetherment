@@ -1,4 +1,4 @@
-use super::{ApplyProgress, Backend, Collection, InstallProgress, SettingsType};
+use super::{ApplyProgress, Backend, Collection, InstallProgress, SettingsType, Status};
 
 pub struct Dummy;
 impl Backend for Dummy {
@@ -13,7 +13,8 @@ impl Backend for Dummy {
 		return "No valid backend found for standalone";
 	}
 	
-	fn is_functional(&self) -> bool {false}
+	// fn is_functional(&self) -> bool {false}
+	fn get_status(&self) -> Status {Status::Error("Dummy backend does not support mod installation".to_string())}
 	
 	fn get_mods(&self) -> Vec<String> {Vec::new()}
 	fn get_active_collection(&self) -> String {String::new()}

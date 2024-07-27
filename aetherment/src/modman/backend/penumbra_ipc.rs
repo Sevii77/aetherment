@@ -16,6 +16,7 @@ static mut FUNCS: Option<PenumbraFunctions> = None;
 #[allow(unused)] pub(crate) fn config_dir() -> Option<std::path::PathBuf> {unsafe {FUNCS.as_ref().map(|v| Some(v.config_dir.clone())).unwrap_or(None)}}
 #[allow(unused)] fn redraw() {unsafe {(FUNCS.as_ref().unwrap().redraw)()}}
 #[allow(unused)] fn redraw_self() {unsafe {(FUNCS.as_ref().unwrap().redraw_self)()}}
+fn is_enabled() -> bool {unsafe {(FUNCS.as_ref().unwrap().is_enabled)()}}
 fn root_path() -> std::path::PathBuf {unsafe {(FUNCS.as_ref().unwrap().root_path)()}}
 fn mod_list() -> Vec<String> {unsafe {(FUNCS.as_ref().unwrap().mod_list)()}}
 fn add_mod_entry(mod_id: &str) -> u8 {unsafe {(FUNCS.as_ref().unwrap().add_mod_entry)(mod_id)}}
@@ -47,6 +48,7 @@ pub struct PenumbraFunctions {
 	pub config_dir: std::path::PathBuf,
 	pub redraw: Box<dyn Fn()>,
 	pub redraw_self: Box<dyn Fn()>,
+	pub is_enabled: Box<dyn Fn() -> bool>,
 	pub root_path: Box<dyn Fn() -> std::path::PathBuf>,
 	pub mod_list: Box<dyn Fn() -> Vec<String>>,
 	pub add_mod_entry: Box<dyn Fn(&str) -> u8>,
@@ -109,6 +111,14 @@ impl super::Backend for Penumbra {
 	
 	fn description(&self) -> &'static str {
 		"Penumbra mod loader using IPC"
+	}
+	
+	fn get_status(&self) -> super::Status {
+		if is_enabled() {
+			super::Status::Ok
+		} else {
+			super::Status::Error("Penumbra is not installed or mods are disabled".to_string())
+		}
 	}
 	
 	fn get_mods(&self) -> Vec<String> {

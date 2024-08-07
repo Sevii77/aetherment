@@ -26,7 +26,7 @@ public class DalamudStyle {
 			var dalamudConfig = ass.GetType("Dalamud.Service`1")!
 				.MakeGenericType(t)!
 				.GetMethod("Get")!
-				.Invoke(null, BindingFlags.Default, null, [], null);
+				.Invoke(null, BindingFlags.Default, null, new object[0], null);
 			
 			PropertyInfo savedStylesInfo = t.GetProperty("SavedStyles")!;
 			List<StyleModel> savedStyles = (List<StyleModel>)savedStylesInfo.GetValue(dalamudConfig)!;
@@ -44,7 +44,7 @@ public class DalamudStyle {
 			PropertyInfo chosenStyleInfo = t.GetProperty("ChosenStyle")!;
 			chosenStyleInfo.SetValue(dalamudConfig, style.Name);
 			
-			t.GetMethod("QueueSave")!.Invoke(dalamudConfig, []);
+			t.GetMethod("QueueSave")!.Invoke(dalamudConfig, new object[0]);
 		} catch(Exception e) {
 			Aetherment.Logger.Error($"Failed adding style , {e}");
 		}

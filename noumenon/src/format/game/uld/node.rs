@@ -192,6 +192,7 @@ impl BinWrite for NodeData {
 	type Args<'a> = ();
 	
 	fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<()> {
+		let start = writer.stream_position()?;
 		self.node_id.write_options(writer, endian, ())?;
 		self.parent_id.write_options(writer, endian, ())?;
 		self.next_sibling_id.write_options(writer, endian, ())?;
@@ -233,7 +234,7 @@ impl BinWrite for NodeData {
 		
 		let end = writer.stream_position()?;
 		writer.seek(SeekFrom::Start(pos))?;
-		((end - pos) as u16).write_options(writer, endian, ())?;
+		((end - start) as u16).write_options(writer, endian, ())?;
 		writer.seek(SeekFrom::Start(end))?;
 		
 		Ok(())

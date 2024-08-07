@@ -125,7 +125,7 @@ impl BinWrite for Uld {
 	type Args<'a> = ();
 	
 	fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<()> {
-		let pos = writer.stream_position()?;
+		// let pos = writer.stream_position()?;
 		self.main_header.write_options(writer, endian, ())?;
 		let primary_pos = writer.stream_position()?;
 		self.primary_header.write_options(writer, endian, ())?;
@@ -164,7 +164,8 @@ impl BinWrite for Uld {
 		}
 		
 		let secondary_pos = writer.stream_position()?;
-		primary_header.widget_offset = (secondary_pos - pos) as u32;
+		// primary_header.widget_offset = (secondary_pos - pos) as u32;
+		primary_header.widget_offset = 0u32;
 		self.second_header.write_options(writer, endian, ())?;
 		let mut second_header = self.second_header.clone();
 		
@@ -252,8 +253,8 @@ pub struct UldPartsList {
 	#[bw(calc = parts.len() as u32)]
 	part_count: u32,
 	#[br(temp)]
-	#[bw(calc = 0)]
-	_offset: u32,
+	#[bw(calc = 12 + parts.len() as u32 * 12)]
+	_size: u32,
 	#[br(count = part_count)]
 	pub parts: Vec<UldPart>,
 }
@@ -346,8 +347,8 @@ impl BinWrite for UldComponent {
 		
 		let end = writer.stream_position()?;
 		writer.seek(SeekFrom::Start(pos))?;
-		((end - pos) as u16).write_options(writer, endian, ())?;
-		((node_pos - pos) as u16).write_options(writer, endian, ())?;
+		((end - pos + 12) as u16).write_options(writer, endian, ())?;
+		((node_pos - pos + 12) as u16).write_options(writer, endian, ())?;
 		writer.seek(SeekFrom::Start(end))?;
 		
 		Ok(())
@@ -417,9 +418,10 @@ impl BinWrite for UldTimeline {
 			frame.write_options(writer, endian, ())?;
 		}
 		
-		let size = writer.stream_position()? - pos;
+		let end = writer.stream_position()?;
 		writer.seek(SeekFrom::Start(pos + 4))?;
-		size.write_options(writer, endian, ())?;
+		((end - pos) as u32).write_options(writer, endian, ())?;
+		writer.seek(SeekFrom::Start(end))?;
 		
 		Ok(())
 	}
@@ -459,18 +461,22 @@ impl BinRead for WidgetData {
 	type Args<'a> = &'a [UldComponent];
 	
 	fn read_options<R: Read + Seek>(reader: &mut R, endian: binrw::Endian, components: Self::Args<'_>,) -> binrw::BinResult<Self> {
+		let pos = reader.stream_position()?;
+		
 		let id = u32::read_options(reader, endian, ())?;
 		// let alignment_type = AlignmentType::read_options(reader, endian, ())?;
 		let alighment_type = u32::read_options(reader, endian, ())?;
 		let x = i16::read_options(reader, endian, ())?;
 		let y = i16::read_options(reader, endian, ())?;
 		let node_count = u16::read_options(reader, endian, ())?;
-		let _size = u16::read_options(reader, endian, ())?;
+		let size = u16::read_options(reader, endian, ())?;
 		
 		let mut nodes = Vec::with_capacity(node_count as usize);
 		for _ in 0..node_count {
 			nodes.push(NodeData::read_options(reader, endian, components)?);
 		}
+		
+		reader.seek(SeekFrom::Start(pos + size as u64))?;
 		
 		Ok(Self {
 			id,
@@ -499,7 +505,7 @@ impl BinWrite for WidgetData {
 	type Args<'a> = ();
 	
 	fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<()> {
-		let pos = writer.stream_position()?;
+		let start = writer.stream_position()?;
 		
 		self.id.write_options(writer, endian, ())?;
 		// self.alignment_type.write_options(writer, endian, ())?;
@@ -523,9 +529,10 @@ impl BinWrite for WidgetData {
 			node.write_options(writer, endian, ())?;
 		}
 		
-		let size = writer.stream_position()? - pos;
-		writer.seek(SeekFrom::Start(pos + 14))?;
-		size.write_options(writer, endian, ())?;
+		let end = writer.stream_position()?;
+		writer.seek(SeekFrom::Start(start + 14))?;
+		((end - start) as u16).write_options(writer, endian, ())?;
+		writer.seek(SeekFrom::Start(end))?;
 		
 		Ok(())
 	}

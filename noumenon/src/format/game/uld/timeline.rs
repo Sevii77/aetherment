@@ -52,7 +52,7 @@ impl BinWrite for FrameData {
 		
 		let end = writer.stream_position()?;
 		writer.seek(SeekFrom::Start(pos))?;
-		((end - pos) as u32).write_options(writer, endian, ())?;
+		((end - pos + 8) as u32).write_options(writer, endian, ())?;
 		writer.seek(SeekFrom::Start(end))?;
 		
 		Ok(())
@@ -113,7 +113,7 @@ impl BinWrite for KeyGroup {
 		
 		let end = writer.stream_position()?;
 		writer.seek(SeekFrom::Start(pos))?;
-		((end - pos) as u16).write_options(writer, endian, ())?;
+		((end - pos + 4) as u16).write_options(writer, endian, ())?;
 		writer.seek(SeekFrom::Start(end))?;
 		
 		Ok(())
@@ -200,6 +200,7 @@ pub enum Keyframes {
 	Bool3(Vec<Bool3Keyframe>),
 	Color(Vec<ColorKeyframe>),
 	Label(Vec<LabelKeyframe>),
+	// Number(Vec<NumberKeyframe>),
 }
 
 impl Keyframes {
@@ -231,6 +232,7 @@ impl Keyframes {
 			Self::Bool3(_) => KeyGroupType::Bool3,
 			Self::Color(_) => KeyGroupType::Color,
 			Self::Label(_) => KeyGroupType::Label,
+			// Self::Number(_) => KeyGroupType::Number,
 		}
 	}
 }
@@ -272,6 +274,7 @@ impl BinRead for Keyframes {
 			KeyGroupType::Bool3 => Self::Bool3((0..count).map(|_| Bool3Keyframe::read_options(reader, endian, ())).collect::<binrw::BinResult<_>>()?),
 			KeyGroupType::Color => Self::Color((0..count).map(|_| ColorKeyframe::read_options(reader, endian, ())).collect::<binrw::BinResult<_>>()?),
 			KeyGroupType::Label => Self::Label((0..count).map(|_| LabelKeyframe::read_options(reader, endian, ())).collect::<binrw::BinResult<_>>()?),
+			// KeyGroupType::Number => Self::Number((0..count).map(|_| NumberKeyframe::read_options(reader, endian, ())).collect::<binrw::BinResult<_>>()?),
 		})
 	}
 }
@@ -281,32 +284,33 @@ impl BinWrite for Keyframes {
 	
 	fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<()> {
 		match self {
-			Self::Float1(v) => v.write_options(writer, endian, ())?,
-			Self::Float2(v) => v.write_options(writer, endian, ())?,
-			Self::Float3(v) => v.write_options(writer, endian, ())?,
-			Self::SByte1(v) => v.write_options(writer, endian, ())?,
-			Self::SByte2(v) => v.write_options(writer, endian, ())?,
-			Self::SByte3(v) => v.write_options(writer, endian, ())?,
-			Self::Byte1(v) => v.write_options(writer, endian, ())?,
-			Self::Byte2(v) => v.write_options(writer, endian, ())?,
-			Self::Byte3(v) => v.write_options(writer, endian, ())?,
-			Self::Short1(v) => v.write_options(writer, endian, ())?,
-			Self::Short2(v) => v.write_options(writer, endian, ())?,
-			Self::Short3(v) => v.write_options(writer, endian, ())?,
-			Self::UShort1(v) => v.write_options(writer, endian, ())?,
-			Self::UShort2(v) => v.write_options(writer, endian, ())?,
-			Self::UShort3(v) => v.write_options(writer, endian, ())?,
-			Self::Int1(v) => v.write_options(writer, endian, ())?,
-			Self::Int2(v) => v.write_options(writer, endian, ())?,
-			Self::Int3(v) => v.write_options(writer, endian, ())?,
-			Self::UInt1(v) => v.write_options(writer, endian, ())?,
-			Self::UInt2(v) => v.write_options(writer, endian, ())?,
-			Self::UInt3(v) => v.write_options(writer, endian, ())?,
-			Self::Bool1(v) => v.write_options(writer, endian, ())?,
-			Self::Bool2(v) => v.write_options(writer, endian, ())?,
-			Self::Bool3(v) => v.write_options(writer, endian, ())?,
-			Self::Color(v) => v.write_options(writer, endian, ())?,
-			Self::Label(v) => v.write_options(writer, endian, ())?,
+			Self::Float1(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Float2(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Float3(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::SByte1(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::SByte2(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::SByte3(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Byte1(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Byte2(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Byte3(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Short1(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Short2(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Short3(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::UShort1(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::UShort2(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::UShort3(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Int1(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Int2(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Int3(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::UInt1(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::UInt2(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::UInt3(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Bool1(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Bool2(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Bool3(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Color(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			Self::Label(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
+			// Self::Number(v) => {(v.len() as u16).write_options(writer, endian, ())?; v.write_options(writer, endian, ())?},
 		}
 		
 		Ok(())
@@ -559,3 +563,10 @@ pub struct LabelKeyframe {
 	pub label_command: u8,
 	pub jump_id: u8,
 }
+
+// #[binrw]
+// #[brw(little)]
+// #[derive(Debug, Clone, Default, PartialEq)]
+// pub struct NumberKeyframe {
+// 	
+// }

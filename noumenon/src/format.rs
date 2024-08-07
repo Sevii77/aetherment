@@ -26,4 +26,6 @@ pub mod game {
 	pub use mtrl::Mtrl;
 	pub mod uld;
 	pub use uld::Uld;
+	pub mod exd;
+	pub use exd::Exd;
 }

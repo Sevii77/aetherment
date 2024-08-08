@@ -28,4 +28,6 @@ pub mod game {
 	pub use uld::Uld;
 	pub mod exd;
 	pub use exd::Exd;
+	pub mod exh;
+	pub use exh::Exh;
 }

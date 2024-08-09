@@ -13,6 +13,154 @@ pub mod composite;
 
 // ----------
 
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub enum OptionOrStatic<T: OptionValue> {
+	OptionSub(String, HashMap<String, T::Value>),
+	Option(String),
+	OptionMul(String, T::Value),
+	OptionGradiant(String, String, T::Value),
+	Static(T::Value),
+}
+
+impl<T: OptionValue> OptionOrStatic<T> {
+	fn resolve(&self, meta: &crate::modman::meta::Meta, settings: &settings::CollectionSettings) -> Option<T::Value> {
+		match self {
+			OptionOrStatic::OptionSub(opt, options) => settings.get(opt).and_then(|v| {
+				match v {
+					settings::Value::SingleFiles(v) => {
+						let o = meta.options.options_iter().find_map(|v| {
+							if v.name == *opt {
+								if let crate::modman::meta::OptionSettings::SingleFiles(o) = &v.settings {
+									return Some(o)
+								}
+							}
+							
+							None
+						})?;
+						
+						let mut o2 = o.options.get(*v as usize)?;
+						let mut val;
+						loop {
+							val = options.iter().find_map(|(n, v)| if n == &o2.name {Some(v.clone())} else {None});
+							if val.is_some() {break}
+							let Some(inherit) = &o2.inherit else {break};
+							let Some(o3) = o.options.iter().find_map(|v| if v.name == *inherit {Some(v)} else {None}) else {break};
+							o2 = o3;
+						}
+						
+						val
+					},
+					
+					settings::Value::MultiFiles(v) => {
+						let o = meta.options.options_iter().find_map(|v| {
+							if v.name == *opt {
+								if let crate::modman::meta::OptionSettings::MultiFiles(o) = &v.settings {
+									return Some(o)
+								}
+							}
+							
+							None
+						})?;
+						
+						for (i, o) in o.options.iter().enumerate() {
+							if *v & (1 << i) != 0 {
+								for (n, v) in options.iter() {
+									if *n == o.name {
+										return Some(v.clone())
+									}
+								}
+							}
+						}
+						
+						None
+					},
+					
+					_ => None
+				}
+			}),
+			OptionOrStatic::Option(opt) => settings.get(opt).and_then(|a| T::get_value(a)),
+			OptionOrStatic::OptionMul(opt, v) => settings.get(opt).and_then(|a| T::get_value(a).map(|a| T::multiplied(a, v.clone()))),
+			OptionOrStatic::OptionGradiant(opt, opt2, v) => Some(T::gradiant(
+				T::get_value(settings.get(opt)?)?,
+				T::get_value(settings.get(opt2)?)?,
+				v.clone()
+			)),
+			OptionOrStatic::Static(v) => Some(v.clone()),
+		}
+	}
+}
+
+pub trait OptionValue {
+	type Value: Clone;
+	
+	fn get_value(value: &settings::Value) -> Option<Self::Value>;
+	fn multiplied(a: Self::Value, b: Self::Value) -> Self::Value;
+	fn gradiant(a: Self::Value, b: Self::Value, scale: Self::Value) -> Self::Value;
+}
+
+impl OptionValue for i32 {
+	type Value = Self;
+	
+	fn get_value(_value: &settings::Value) -> Option<Self::Value> {None}
+	fn multiplied(a: Self::Value, b: Self::Value) -> Self::Value {a * b}
+	fn gradiant(a: Self::Value, b: Self::Value, scale: Self::Value) -> Self::Value {a * (1 - scale) + b * scale}
+}
+
+impl OptionValue for f32 {
+	type Value = Self;
+	
+	fn get_value(_value: &settings::Value) -> Option<Self::Value> {None}
+	fn multiplied(a: Self::Value, b: Self::Value) -> Self::Value {a * b}
+	fn gradiant(a: Self::Value, b: Self::Value, scale: Self::Value) -> Self::Value {a * (1.0 - scale) + b * scale}
+}
+
+impl OptionValue for [f32; 2] {
+	type Value = Self;
+	
+	fn get_value(_value: &settings::Value) -> Option<Self::Value> {None}
+	fn multiplied(a: Self::Value, b: Self::Value) -> Self::Value {[a[0] * b[0], a[1] * b[1]]}
+	fn gradiant(a: Self::Value, b: Self::Value, scale: Self::Value) -> Self::Value {
+		[
+			a[0] * (1.0 - scale[0]) + b[0] * scale[0],
+			a[1] * (1.0 - scale[1]) + b[1] * scale[1],
+		]
+	}
+}
+
+impl OptionValue for [f32; 4] {
+	type Value = Self;
+	
+	fn get_value(value: &settings::Value) -> Option<Self::Value> {
+		match value {
+			settings::Value::Rgba(v) => Some(*v),
+			settings::Value::Rgb(v) => Some([v[0], v[1], v[2], 1.0]),
+			settings::Value::Grayscale(v) => Some([*v, *v, *v, 1.0]),
+			settings::Value::Opacity(v) => Some([1.0, 1.0, 1.0, *v]),
+			_ => None,
+		}
+	}
+	
+	fn multiplied(a: Self::Value, b: Self::Value) -> Self::Value {
+		[
+			(a[0] * b[0]).clamp(0.0, 1.0),
+			(a[1] * b[1]).clamp(0.0, 1.0),
+			(a[2] * b[2]).clamp(0.0, 1.0),
+			(a[3] * b[3]).clamp(0.0, 1.0),
+		]
+	}
+	
+	fn gradiant(a: Self::Value, b: Self::Value, scale: Self::Value) -> Self::Value {
+		[
+			a[0] * (1.0 - scale[0]) + b[0] * scale[0],
+			a[1] * (1.0 - scale[1]) + b[1] * scale[1],
+			a[2] * (1.0 - scale[2]) + b[2] * scale[2],
+			a[3] * (1.0 - scale[3]) + b[3] * scale[3],
+		]
+	}
+}
+
+// ----------
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Path {
 	Mod(String),
@@ -56,27 +204,35 @@ pub fn get_mod_files(meta: &meta::Meta, files_path: &std::path::Path) -> HashMap
 		insert(Some(path), real_path);
 		
 		if path.ends_with(".comp") {
-			match path.trim_end_matches(".comp").split(".").last().unwrap() {
-				"tex" | "atex" => {
-					let Ok(mut f) = std::fs::File::open(files_path.join(real_path)) else {return};
-					let mut buf = Vec::new();
-					f.read_to_end(&mut buf).unwrap();
-					let comp: composite::tex::Tex = match serde_json::from_slice(&buf) {
-						Ok(v) => v,
-						Err(e) => {
-							log!(err, "Failed to parse tex comp file: {e}\ndata: {}", String::from_utf8_lossy(&buf));
-							return;
-						}
-					};
-					
-					for file in comp.get_files() {
-						// files.insert(file.to_owned());
-						insert(None, file);
-					}
-				}
-				
-				_ => {return}
+			let ext = path.trim_end_matches(".comp").split(".").last().unwrap();
+			
+			let Ok(data) = crate::resource_loader::read_utf8(&files_path.join(real_path)) else {return};
+			let Some(comp) = composite::open_composite(ext, &data) else {return};
+			for file in comp.get_files() {
+				insert(None, file);
 			}
+			
+			// match path.trim_end_matches(".comp").split(".").last().unwrap() {
+			// 	"tex" | "atex" => {
+			// 		let Ok(mut f) = std::fs::File::open(files_path.join(real_path)) else {return};
+			// 		let mut buf = Vec::new();
+			// 		f.read_to_end(&mut buf).unwrap();
+			// 		let comp: composite::tex::Tex = match serde_json::from_slice(&buf) {
+			// 			Ok(v) => v,
+			// 			Err(e) => {
+			// 				log!(err, "Failed to parse tex comp file: {e}\ndata: {}", String::from_utf8_lossy(&buf));
+			// 				return;
+			// 			}
+			// 		};
+			// 		
+			// 		for file in comp.get_files() {
+			// 			// files.insert(file.to_owned());
+			// 			insert(None, file);
+			// 		}
+			// 	}
+			// 	
+			// 	_ => {return}
+			// }
 		}
 	};
 	

@@ -89,10 +89,10 @@ impl Tex {
 					Modifier::Color{value} => {
 						let color = value.get_value(settings).ok_or(ModifierError::Color)?;
 						for pixel in data.chunks_exact_mut(4) {
-							pixel[0] = (pixel[0] as f32 * color[0]).min(255.0) as u8;
-							pixel[1] = (pixel[1] as f32 * color[1]).min(255.0) as u8;
-							pixel[2] = (pixel[2] as f32 * color[2]).min(255.0) as u8;
-							pixel[3] = (pixel[3] as f32 * color[3]).min(255.0) as u8;
+							pixel[0] = (pixel[0] as f32 * color[0]).clamp(0.0, 255.0) as u8;
+							pixel[1] = (pixel[1] as f32 * color[1]).clamp(0.0, 255.0) as u8;
+							pixel[2] = (pixel[2] as f32 * color[2]).clamp(0.0, 255.0) as u8;
+							pixel[3] = (pixel[3] as f32 * color[3]).clamp(0.0, 255.0) as u8;
 						}
 					}
 				}
@@ -235,7 +235,7 @@ impl super::Composite for Tex {
 		options
 	}
 	
-	fn composite<'a>(&self, settings: &crate::modman::settings::CollectionSettings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, super::CompositeError> {
+	fn composite<'a>(&self, _meta: &crate::modman::meta::Meta, settings: &crate::modman::settings::CollectionSettings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, super::CompositeError> {
 		let textures_handler = |path: &crate::modman::Path| -> Option<Cow<noumenon::format::game::Tex>> {
 			Some(Cow::Owned(noumenon::format::game::Tex::read(&mut std::io::Cursor::new(file_resolver(path)?.as_ref())).ok()?))
 		};

@@ -53,7 +53,7 @@ impl Exh {
 #[derive(Debug, Clone)]
 pub struct Column {
 	pub(crate) kind: ColumnKind,
-	offset: u16,
+	pub(crate) offset: u16,
 }
 
 #[binrw]
@@ -82,6 +82,32 @@ pub enum ColumnKind {
 	PackedBool5 = 0x1E,
 	PackedBool6 = 0x1F,
 	PackedBool7 = 0x20,
+}
+
+impl ColumnKind {
+	pub fn len(&self) -> usize {
+		match self {
+			ColumnKind::String => 4,
+			ColumnKind::Bool => 1,
+			ColumnKind::I8 => 1,
+			ColumnKind::U8 => 1,
+			ColumnKind::I16 => 2,
+			ColumnKind::U16 => 2,
+			ColumnKind::I32 => 4,
+			ColumnKind::U32 => 4,
+			ColumnKind::F32 => 4,
+			ColumnKind::I64 => 8,
+			ColumnKind::U64 => 8,
+			ColumnKind::PackedBool0 => 1,
+			ColumnKind::PackedBool1 => 1,
+			ColumnKind::PackedBool2 => 1,
+			ColumnKind::PackedBool3 => 1,
+			ColumnKind::PackedBool4 => 1,
+			ColumnKind::PackedBool5 => 1,
+			ColumnKind::PackedBool6 => 1,
+			ColumnKind::PackedBool7 => 1,
+		}
+	}
 }
 
 #[binrw]

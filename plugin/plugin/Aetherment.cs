@@ -34,7 +34,7 @@ public class Aetherment : IDalamudPlugin {
 	
 	[StructLayout(LayoutKind.Sequential)]
 	private unsafe struct PenumbraFunctions {
-		public FFI.Str config_dir;
+		// public FFI.Str config_dir;
 		public IntPtr redraw;
 		public IntPtr redraw_self;
 		public IntPtr is_enabled;
@@ -60,7 +60,7 @@ public class Aetherment : IDalamudPlugin {
 		var init = new Initializers {
 			log = Marshal.GetFunctionPointerForDelegate(log),
 			penumbra = new PenumbraFunctions {
-				config_dir = Interface.ConfigDirectory.Parent! + "/Penumbra/",
+				// config_dir = Interface.ConfigDirectory.Parent! + "/Penumbra/",
 				redraw = Marshal.GetFunctionPointerForDelegate(penumbra.redraw),
 				redraw_self = Marshal.GetFunctionPointerForDelegate(penumbra.redrawSelf),
 				is_enabled = Marshal.GetFunctionPointerForDelegate(penumbra.isEnabled),

@@ -1,4 +1,3 @@
-# USERNAME="$(id -u -n)"
 if [ "$1" = "client" ] && [ "$2" = "release" ]; then
 	echo "client release"
 	RUSTFLAGS="--remap-path-prefix $CARGO_HOME=" cargo build --release --target x86_64-unknown-linux-gnu --manifest-path=./client/Cargo.toml

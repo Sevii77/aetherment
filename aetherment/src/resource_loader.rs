@@ -92,3 +92,15 @@ pub fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Resu
 	
 	Ok(serde_json::from_slice::<T>(&buf)?)
 }
+
+// Load json file that can include the UTF-8 BOM
+pub fn read_utf8(path: &std::path::Path) -> Result<Vec<u8>, crate::resource_loader::BacktraceError> {
+	let mut file = File::open(path)?;
+	let mut buf = Vec::new();
+	file.read_to_end(&mut buf)?;
+	if buf.starts_with(&[0xEF, 0xBB, 0xBF]) {
+		buf.drain(0..3);
+	}
+	
+	Ok(buf)
+}

@@ -55,23 +55,39 @@ impl Exd {
 		use super::exh::ColumnKind;
 		
 		let row = self.get_row_mut(row, sub_row)?;
+		let fields_length = header.columns.iter().map(|v| v.kind.len()).sum::<usize>();
 		let mut fields = Vec::new();
-		let mut offset = 0;
+		
 		for c in &header.columns {
+			let l = c.kind.len();
+			let o = c.offset as usize;
+			
 			fields.push(match c.kind {
-				ColumnKind::Bool => {offset += 1; Field::Bool(FieldBool::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 1) as *mut u8, 1)}))}
-				ColumnKind::I8 => {offset += 1; Field::I8(FieldI8::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 1) as *mut u8, 1)}))}
-				ColumnKind::U8 => {offset += 1; Field::U8(FieldU8::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 1) as *mut u8, 1)}))}
-				ColumnKind::I16 => {offset += 2; Field::I16(FieldI16::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 2) as *mut u8, 2)}))}
-				ColumnKind::U16 => {offset += 2; Field::U16(FieldU16::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 2) as *mut u8, 2)}))}
-				ColumnKind::I32 => {offset += 4; Field::I32(FieldI32::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 4) as *mut u8, 4)}))}
-				ColumnKind::U32 => {offset += 4; Field::U32(FieldU32::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 4) as *mut u8, 4)}))}
-				ColumnKind::F32 => {offset += 4; Field::F32(FieldF32::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 4) as *mut u8, 4)}))}
-				ColumnKind::I64 => {offset += 8; Field::I64(FieldI64::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 8) as *mut u8, 8)}))}
-				ColumnKind::U64 => {offset += 8; Field::U64(FieldU64::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + offset - 8) as *mut u8, 8)}))}
-				// TODO: support the rest
-				_ => return None
-			})
+				ColumnKind::String => {
+					let o = u32::from_be_bytes(row[o..o + 4].try_into().unwrap()) as usize;
+					Field::String(FieldString::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + fields_length + 1 + o) as *mut u8, row.len() - fields_length - o - 1)}))
+				},
+				
+				ColumnKind::Bool => Field::Bool(FieldBool::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::I8 => Field::I8(FieldI8::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::U8 => Field::U8(FieldU8::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::I16 => Field::I16(FieldI16::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::U16 => Field::U16(FieldU16::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::I32 => Field::I32(FieldI32::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::U32 => Field::U32(FieldU32::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::F32 => Field::F32(FieldF32::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::I64 => Field::I64(FieldI64::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::U64 => Field::U64(FieldU64::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				
+				ColumnKind::PackedBool0 => Field::PackedBool0(FieldPacked::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::PackedBool1 => Field::PackedBool1(FieldPacked::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::PackedBool2 => Field::PackedBool2(FieldPacked::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::PackedBool3 => Field::PackedBool3(FieldPacked::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::PackedBool4 => Field::PackedBool4(FieldPacked::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::PackedBool5 => Field::PackedBool5(FieldPacked::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::PackedBool6 => Field::PackedBool6(FieldPacked::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+				ColumnKind::PackedBool7 => Field::PackedBool7(FieldPacked::new(unsafe{std::slice::from_raw_parts_mut((row.as_mut_ptr() as usize + o) as *mut u8, l)})),
+			});
 		}
 		
 		Some(fields)
@@ -80,7 +96,7 @@ impl Exd {
 
 #[derive(Debug)]
 pub enum Field<'a> {
-	// String = 0x0,
+	String(FieldString),
 	Bool(FieldBool<'a>),
 	I8(FieldI8<'a>),
 	U8(FieldU8<'a>),
@@ -91,14 +107,14 @@ pub enum Field<'a> {
 	F32(FieldF32<'a>),
 	I64(FieldI64<'a>),
 	U64(FieldU64<'a>),
-	// PackedBool0 = 0x19,
-	// PackedBool1 = 0x1A,
-	// PackedBool2 = 0x1B,
-	// PackedBool3 = 0x1C,
-	// PackedBool4 = 0x1D,
-	// PackedBool5 = 0x1E,
-	// PackedBool6 = 0x1F,
-	// PackedBool7 = 0x20,
+	PackedBool0(FieldPacked<'a, 0>),
+	PackedBool1(FieldPacked<'a, 1>),
+	PackedBool2(FieldPacked<'a, 2>),
+	PackedBool3(FieldPacked<'a, 3>),
+	PackedBool4(FieldPacked<'a, 4>),
+	PackedBool5(FieldPacked<'a, 5>),
+	PackedBool6(FieldPacked<'a, 6>),
+	PackedBool7(FieldPacked<'a, 7>),
 }
 
 macro_rules! create_field {
@@ -174,5 +190,68 @@ impl<'a> FieldBool<'a> {
 impl<'a> Drop for FieldBool<'a> {
 	fn drop(&mut self) {
 		self.inner[0] = if self.val {1} else {0}
+	}
+}
+
+/// Does not support modifying
+#[derive(Debug)]
+pub struct FieldString {
+	val: String,
+}
+
+impl Deref for FieldString {
+	type Target = String;
+
+	fn deref(&self) -> &Self::Target {
+		&self.val
+	}
+}
+
+impl DerefMut for FieldString {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.val
+	}
+}
+
+impl FieldString {
+	pub(crate) fn new(val: &mut [u8]) -> Self {
+		Self {
+			val: crate::NullReader::null_terminated(val).unwrap(),
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct FieldPacked<'a, const B: u8> {
+	inner: &'a mut [u8],
+	val: bool,
+}
+
+impl<'a, const B: u8> Deref for FieldPacked<'a, B> {
+	type Target = bool;
+
+	fn deref(&self) -> &Self::Target {
+		&self.val
+	}
+}
+
+impl<'a, const B: u8> DerefMut for FieldPacked<'a, B> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.val
+	}
+}
+
+impl<'a, const B: u8> FieldPacked<'a, B> {
+	pub(crate) fn new(val: &'a mut [u8]) -> Self {
+		Self {
+			val: val[0] & (1 << B) == 1 << B,
+			inner: val,
+		}
+	}
+}
+
+impl<'a, const B: u8> Drop for FieldPacked<'a, B> {
+	fn drop(&mut self) {
+		self.inner[0] = self.inner[0] & !(1 << B) | (if self.val {1} else {0} << B)
 	}
 }

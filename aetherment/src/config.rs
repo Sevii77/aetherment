@@ -53,7 +53,7 @@ impl ConfigManager {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
-#[serde(default)] 
+#[serde(default)]
 pub struct Config {
 	pub plugin_open_on_launch: bool,
 	pub game_install: Option<String>,

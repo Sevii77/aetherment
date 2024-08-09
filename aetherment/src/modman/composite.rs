@@ -2,10 +2,12 @@ use std::{borrow::Cow, collections::HashMap, fs::File, path::Path};
 use serde::{Deserialize, Serialize};
 
 pub mod tex;
+pub mod exd;
 
 #[derive(Debug)]
 pub enum CompositeError {
 	Tex(tex::CompositeError),
+	Exd(exd::CompositeError),
 	
 	BinaryWriter(noumenon::Error),
 }
@@ -20,7 +22,7 @@ pub trait Composite {
 	fn get_files(&self) -> Vec<&str>;
 	fn get_files_game(&self) -> Vec<&str>;
 	fn get_options(&self) -> Vec<&str>;
-	fn composite<'a>(&self, settings: &crate::modman::settings::CollectionSettings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, CompositeError>;
+	fn composite<'a>(&self, meta: &crate::modman::meta::Meta, settings: &crate::modman::settings::CollectionSettings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, CompositeError>;
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -67,4 +69,12 @@ pub fn build_cache(mod_dir: &Path) -> Result<CompositeCache, crate::resource_loa
 	std::fs::write(aeth_dir.join("compcache"), serde_json::to_vec(&cache)?)?;
 	
 	Ok(cache)
+}
+
+pub fn open_composite(ext: &str, data: &[u8]) -> Option<Box<dyn Composite>> {
+	match ext {
+		"tex" | "atex" => Some(Box::new(serde_json::from_slice::<tex::Tex>(data).ok()?)),
+		"exd" => Some(Box::new(serde_json::from_slice::<exd::Exd>(data).ok()?)),
+		_ => None
+	}
 }

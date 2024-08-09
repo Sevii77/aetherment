@@ -1,4 +1,4 @@
-// #![allow(improper_ctypes_definitions)]
+#![allow(improper_ctypes_definitions)]
 
 use std::collections::HashMap;
 
@@ -57,7 +57,7 @@ struct PenumbraGetModSettings {
 #[derive(Clone, Copy)]
 #[repr(packed)]
 pub struct PenumbraFunctions {
-	config_dir: FfiStr,
+	// config_dir: FfiStr,
 	redraw: fn(),
 	redraw_self: fn(),
 	is_enabled: fn() -> bool,
@@ -92,7 +92,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 		Box::into_raw(Box::new(State {
 			visible: aetherment::config().config.plugin_open_on_launch,
 			core: aetherment::Core::new(log, backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
-				config_dir: std::path::PathBuf::from(funcs.config_dir.to_string()),
+				// config_dir: std::path::PathBuf::from(funcs.config_dir.to_string()),
 				redraw: Box::new(funcs.redraw),
 				redraw_self: Box::new(funcs.redraw_self),
 				is_enabled: Box::new(funcs.is_enabled),

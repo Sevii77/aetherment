@@ -13,7 +13,7 @@ pub struct GetModSettings {
 
 static mut FUNCS: Option<PenumbraFunctions> = None;
 
-#[allow(unused)] pub(crate) fn config_dir() -> Option<std::path::PathBuf> {unsafe {FUNCS.as_ref().map(|v| Some(v.config_dir.clone())).unwrap_or(None)}}
+// #[allow(unused)] pub(crate) fn config_dir() -> Option<std::path::PathBuf> {unsafe {FUNCS.as_ref().map(|v| Some(v.config_dir.clone())).unwrap_or(None)}}
 #[allow(unused)] fn redraw() {unsafe {(FUNCS.as_ref().unwrap().redraw)()}}
 #[allow(unused)] fn redraw_self() {unsafe {(FUNCS.as_ref().unwrap().redraw_self)()}}
 fn is_enabled() -> bool {unsafe {(FUNCS.as_ref().unwrap().is_enabled)()}}
@@ -45,7 +45,7 @@ pub extern fn backend_penumbraipc_modchanged(typ: u8, collection_id: &str, mod_i
 }
 
 pub struct PenumbraFunctions {
-	pub config_dir: std::path::PathBuf,
+	// pub config_dir: std::path::PathBuf,
 	pub redraw: Box<dyn Fn()>,
 	pub redraw_self: Box<dyn Fn()>,
 	pub is_enabled: Box<dyn Fn() -> bool>,
@@ -181,8 +181,8 @@ impl super::Backend for Penumbra {
 					})?.as_bytes())?;
 					
 					File::create(mod_dir.join("default_mod.json"))?.write_all(crate::json_pretty(&PDefaultMod {
-						Name: String::new(),
-						Description: String::new(),
+						// Name: String::new(),
+						// Description: String::new(),
 						Files: HashMap::new(),
 						FileSwaps: HashMap::new(),
 						Manipulations: Vec::new(),
@@ -562,7 +562,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	
 	// let mut add_datas = |files: &HashMap<String, String>, swaps: &HashMap<String, String>, manips: &Vec<meta::Manipulation>| -> Result<(), crate::resource_loader::BacktraceError> {
 	let mut add_datas = |files: &HashMap<&str, &str>, swaps: &HashMap<&str, &str>, manips: &Vec<&meta::Manipulation>| -> Result<(), crate::resource_loader::BacktraceError> {
-		use crate::modman::composite::*;
+		// use crate::modman::composite::*;
 		
 		for (game_path, real_path) in files {
 			progress.set(files_done as f32 / total_files as f32);
@@ -585,13 +585,14 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			if game_path.ends_with(".comp") {
 				// log!(log, "compositing file {game_path}");
 				let ext = game_path.trim_end_matches(".comp").split(".").last().unwrap();
-				let comp: Option<Box<dyn Composite>> = match ext {
-					"tex" | "atex" => Some(Box::new(read_json::<tex::Tex>(&files_dir.join(real_path_remapped))?)),
-					_ => None
-				};
+				let comp = crate::modman::composite::open_composite(ext, &crate::resource_loader::read_utf8(&files_dir.join(real_path_remapped))?);
+				// let comp: Option<Box<dyn Composite>> = match ext {
+				// 	"tex" | "atex" => Some(Box::new(read_json::<tex::Tex>(&files_dir.join(real_path_remapped))?)),
+				// 	_ => None
+				// };
 				
 				if let Some(comp) = comp {
-					match comp.composite(&settings, &file_resolver) {
+					match comp.composite(&meta, &settings, &file_resolver) {
 						Ok(data) => {
 							// log!(log, "Succeeded to composite file {game_path}");
 							
@@ -806,7 +807,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 		Ok(v) => v,
 		Err(_) => PGroup {
 			Name: "_collection".to_string(),
-			Description: "Aetherment managed\nDON'T TOUCH THIS".to_string(),
+			Description: Some("Aetherment managed\nDON'T TOUCH THIS".to_string()),
 			Priority: 1,
 			Type: "Single".to_string(),
 			DefaultSettings: Some(0),
@@ -1015,9 +1016,8 @@ struct PMeta {
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 struct PDefaultMod {
-	Name: String,
+	// Name: String,
 	// Description: String,
-	Description: String,
 	Files: HashMap<String, String>,
 	FileSwaps: HashMap<String, String>,
 	Manipulations: Vec<PManipulation>,
@@ -1027,7 +1027,7 @@ struct PDefaultMod {
 #[serde(default)]
 struct PGroup {
 	Name: String,
-	Description: String,
+	Description: Option<String>,
 	Priority: i32,
 	Type: String,
 	DefaultSettings: Option<u32>,

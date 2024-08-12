@@ -2,8 +2,6 @@ use std::{collections::{HashSet, HashMap}, io::{Read, Write, Seek}};
 use serde::{Deserialize, Serialize};
 use crate::render_helper::EnumTools;
 
-use self::composite::Composite;
-
 pub mod backend;
 pub mod meta;
 pub mod settings;
@@ -200,7 +198,6 @@ pub fn get_mod_files(meta: &meta::Meta, files_path: &std::path::Path) -> HashMap
 	};
 	
 	let mut add_file = |path: &str, real_path: &str| {
-		// files.insert(real_path.to_owned());
 		insert(Some(path), real_path);
 		
 		if path.ends_with(".comp") {
@@ -211,28 +208,6 @@ pub fn get_mod_files(meta: &meta::Meta, files_path: &std::path::Path) -> HashMap
 			for file in comp.get_files() {
 				insert(None, file);
 			}
-			
-			// match path.trim_end_matches(".comp").split(".").last().unwrap() {
-			// 	"tex" | "atex" => {
-			// 		let Ok(mut f) = std::fs::File::open(files_path.join(real_path)) else {return};
-			// 		let mut buf = Vec::new();
-			// 		f.read_to_end(&mut buf).unwrap();
-			// 		let comp: composite::tex::Tex = match serde_json::from_slice(&buf) {
-			// 			Ok(v) => v,
-			// 			Err(e) => {
-			// 				log!(err, "Failed to parse tex comp file: {e}\ndata: {}", String::from_utf8_lossy(&buf));
-			// 				return;
-			// 			}
-			// 		};
-			// 		
-			// 		for file in comp.get_files() {
-			// 			// files.insert(file.to_owned());
-			// 			insert(None, file);
-			// 		}
-			// 	}
-			// 	
-			// 	_ => {return}
-			// }
 		}
 	};
 	

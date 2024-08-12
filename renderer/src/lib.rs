@@ -5,14 +5,14 @@
 use std::hash::Hash;
 
 mod ui {
-	#[cfg(feature = "egui")]
+	#[cfg(all(feature = "egui", not(feature = "imgui")))]
 	pub mod egui;
 
 	#[cfg(feature = "imgui")]
 	pub mod imgui;
 }
 
-#[cfg(feature = "egui")]
+#[cfg(all(feature = "egui", not(feature = "imgui")))]
 pub use ui::egui::*;
 
 #[cfg(feature = "imgui")]

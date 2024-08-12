@@ -553,7 +553,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	// actually do the thing
 	let mut p_option = POption {
 		Name: collection_id.to_owned(),
-		Description: String::new(),
+		Description: Some(String::new()),
 		Priority: Some(1),
 		Files: HashMap::new(),
 		FileSwaps: HashMap::new(),
@@ -867,17 +867,13 @@ fn get_mod_cache() -> ModFileCache {
 	
 	let root = root_path();
 	for mod_id in mod_list() {
-		let Ok(dir_entries) = std::fs::read_dir(root.join(&mod_id)) else {continue};
-		let dir_entries = dir_entries.filter_map(|v| v.ok())
-			.map(|v| v.file_name().to_string_lossy().into_owned())
-			.collect::<Vec<_>>();
+		let Some(groups) = get_mod_groups(&root.join(&mod_id)) else {continue};
 		
 		let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
 			Ok(v) => v,
 			Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); continue},
 		};
 		
-		let mut group_cache = HashMap::new();
 		for col in &collections {
 			let settings = get_mod_settings(&col.id, &mod_id, false);
 			if !settings.exists || !settings.enabled {continue}
@@ -890,15 +886,7 @@ fn get_mod_cache() -> ModFileCache {
 			let options = settings.options;
 			for (option, enabled_sub_options) in &options {
 				if enabled_sub_options.len() == 0 {continue}
-				
-				let group_name = format!("{}.json", clean_path(&option));
-				let Some(group) = group_cache.entry(group_name.clone()).or_insert_with(|| {
-					let Some(group_name) = dir_entries.iter().find(|v| v.ends_with(&group_name)) else {log!(err, "Failed to find group file ({group_name}) for mod ({mod_id})"); return None};
-					match read_json::<PGroup>(&root.join(&mod_id).join(&group_name)) {
-						Ok(v) => Some(v),
-						Err(e) => {log!(err, "Failed to load or parse group file {group_name} for mod {mod_id}\n{e:?}"); None},
-					}
-				}) else {continue};
+				let Some(group) = groups.get(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
 				
 				for o in &group.Options {
 					if enabled_sub_options.contains(&o.Name) {
@@ -917,10 +905,7 @@ fn get_mod_cache() -> ModFileCache {
 fn get_mod_files(collection_id: &str, mod_id: &str) -> Option<HashMap<String, String>> {
 	let mut files = HashMap::new();
 	let root = root_path();
-	let Ok(dir_entries) = std::fs::read_dir(root.join(&mod_id)) else {return None};
-	let dir_entries = dir_entries.filter_map(|v| v.ok())
-		.map(|v| v.file_name().to_string_lossy().into_owned())
-		.collect::<Vec<_>>();
+	let mut groups = get_mod_groups(&root.join(&mod_id))?;
 	
 	let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
 		Ok(v) => v,
@@ -937,27 +922,12 @@ fn get_mod_files(collection_id: &str, mod_id: &str) -> Option<HashMap<String, St
 	let options = settings.options;
 	for (option, enabled_sub_options) in &options {
 		if enabled_sub_options.len() == 0 {continue}
-		
-		let group_name = format!("{}.json", clean_path(&option));
-		// let Some(group) = group_cache.entry(group_name.clone()).or_insert_with(|| {
-		// 	let Some(group_name) = dir_entries.iter().find(|v| v.ends_with(&group_name)) else {log!(err, "Failed to find group file ({group_name}) for mod ({mod_id})"); return None};
-		// 	match read_json::<PGroup>(&root.join(&mod_id).join(&group_name)) {
-		// 		Ok(v) => Some(v),
-		// 		Err(e) => {log!(err, "Failed to load or parse group file {group_name} for mod {mod_id}\n{e:?}"); None},
-		// 	}
-		// }) else {continue};
-		
-		let Some(group_name) = dir_entries.iter().find(|v| v.ends_with(&group_name)) else {log!(err, "Failed to find group file ({group_name}) for mod ({mod_id})"); return None};
-		let group = match read_json::<PGroup>(&root.join(&mod_id).join(&group_name)) {
-			Ok(v) => v,
-			Err(e) => {log!(err, "Failed to load or parse group file {group_name} for mod {mod_id}\n{e:?}"); return None},
-		};
+		let Some(group) = groups.remove(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
 		
 		for o in group.Options {
 			if enabled_sub_options.contains(&o.Name) {
 				for (game_path, real_path) in o.Files {
 					files.insert(game_path, real_path);
-					// insert(&col.id, &mod_id, priority, game_path, real_path);
 				}
 			}
 		}
@@ -994,12 +964,28 @@ fn get_composite_info(mods: Vec<&str>) -> CompositeInfo {
 	comp_info
 }
 
-// output of c# Path.GetInvalidFileNameChars()
-static INVALID_CHARS: [u8; 41] = [34, 60, 62, 124, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 58, 42, 63, 92, 47];
-fn clean_path(path: &str) -> String {
-	// path.chars().filter_map(|v| if !INVALID_CHARS.contains(&(v as u8)) {Some(v.to_ascii_lowercase())} else {None}).collect::<String>()
-	path.trim().chars().map(|v| if !INVALID_CHARS.contains(&(v as u8)) {v.to_ascii_lowercase()} else {'_'}).collect::<String>()
+fn get_mod_groups(path: &std::path::Path) -> Option<HashMap<String, PGroup>> {
+	let mod_id = path.file_name()?.to_string_lossy().to_owned();
+	Some(std::fs::read_dir(path).ok()?
+		.into_iter()
+		.filter_map(|v| v.ok())
+		.filter_map(|v| {
+			let file_name = v.file_name().to_string_lossy().into_owned();
+			if file_name.starts_with("group_") {
+				match read_json::<PGroup>(&v.path()) {
+					Ok(v) => Some((v.Name.clone(), v)),
+					Err(e) => {log!(err, "Failed to load or parse group file {file_name} for mod {mod_id}\n{e:?}"); None},
+				}
+			} else {None}
+		}).collect::<HashMap<_, _>>())
 }
+
+// output of c# Path.GetInvalidFileNameChars()
+// static INVALID_CHARS: [u8; 41] = [34, 60, 62, 124, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 58, 42, 63, 92, 47];
+// fn clean_path(path: &str) -> String {
+// 	// path.chars().filter_map(|v| if !INVALID_CHARS.contains(&(v as u8)) {Some(v.to_ascii_lowercase())} else {None}).collect::<String>()
+// 	path.trim().chars().map(|v| if !INVALID_CHARS.contains(&(v as u8)) {v.to_ascii_lowercase()} else {'_'}).collect::<String>()
+// }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
@@ -1037,13 +1023,14 @@ struct PGroup {
 #[derive(Debug, Deserialize, Serialize)]
 struct POption {
 	Name: String,
-	Description: String,
+	Description: Option<String>,
 	Priority: Option<u32>, // used for multi
 	Files: HashMap<String, String>,
 	FileSwaps: HashMap<String, String>,
 	Manipulations: Vec<PManipulation>,
 }
 
+#[allow(non_snake_case)]
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(tag = "Type", content = "Manipulation")]
 pub(crate) enum PManipulation {

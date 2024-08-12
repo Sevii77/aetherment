@@ -14,12 +14,14 @@ public class Aetherment : IDalamudPlugin {
 	[PluginService] public static ICommandManager         Commands  {get; private set;} = null!;
 	[PluginService] public static IPluginLog              Logger    {get; private set;} = null!;
 	[PluginService] public static IObjectTable            Objects   {get; private set;} = null!;
-	// [PluginService][RequiredVersion("1.0")] public static TitleScreenMenu        TitleMenu  {get; private set;} = null!;
+	[PluginService] public static ITitleScreenMenu        TitleMenu {get; private set;} = null!;
+	[PluginService] public static ITextureProvider        Textures  {get; private set;} = null!;
 	
 	private const string maincommand = "/aetherment";
 	private const string texfindercommand = "/texfinder";
 	
 	private static IntPtr state;
+	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? titleEntry;
 	
 	private Penumbra penumbra;
 	private DalamudStyle dalamud;
@@ -85,6 +87,11 @@ public class Aetherment : IDalamudPlugin {
 		Interface.UiBuilder.Draw += Draw;
 		Interface.UiBuilder.OpenMainUi += OpenConf;
 		
+		// TODO: proper icon
+		var icon_data = new byte[64 * 64 * 4];
+		var icon = Textures.CreateFromRaw(new Dalamud.Interface.Textures.RawImageSpecification(64, 64, 28), icon_data, "Aetherment Icon");
+		titleEntry ??= TitleMenu.AddEntry(1, "Manage Aetherment", icon, OpenConf);
+		
 		Commands.AddHandler(maincommand, new CommandInfo(OnCommand) {
 			HelpMessage = "Open Aetherment menu"
 		});
@@ -110,10 +117,18 @@ public class Aetherment : IDalamudPlugin {
 	public void Dispose() {
 		destroy(state);
 		FFI.Str.Drop();
+		
 		Interface.UiBuilder.Draw -= Draw;
 		Interface.UiBuilder.OpenMainUi -= OpenConf;
+		
+		if(titleEntry != null) {
+			TitleMenu.RemoveEntry(titleEntry);
+			titleEntry = null;
+		}
+		
 		Commands.RemoveHandler(maincommand);
 		Commands.RemoveHandler(texfindercommand);
+		
 		// if(watcher != null)
 		// 	watcher.Dispose();
 		state = IntPtr.Zero;

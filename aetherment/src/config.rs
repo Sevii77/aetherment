@@ -71,7 +71,7 @@ impl Default for Config {
 			repos: Vec::new(),
 			
 			mod_paths: Vec::new(),
-			file_dialog_path: dirs::document_dir().unwrap(),
+			file_dialog_path: dirs::document_dir().unwrap_or(PathBuf::new()),
 		}
 	}
 }

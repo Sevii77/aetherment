@@ -43,6 +43,14 @@ fn main() {
 	
 	eframe::run_native("Aetherment", options, Box::new(|cc| {
 		let _backend = cc.wgpu_render_state.as_ref().unwrap().adapter.get_info().backend;
-		Box::new(CoreWrapper(aetherment::Core::new(log, aetherment::modman::backend::BackendInitializers::None, Default::default())))
+		Box::new(CoreWrapper(aetherment::Core::new(log,
+			aetherment::modman::backend::BackendInitializers::None,
+			aetherment::modman::issue::IssueInitializers {
+				ui_resolution: Box::new(|| 255),
+				ui_theme: Box::new(|| 255),
+				collection: Box::new(|_| aetherment::modman::backend::Collection{name: "None".to_string(), id: "00000000-0000-0000-0000-000000000000".to_string()}),
+			},
+			Default::default()
+		)))
 	})).unwrap();
 }

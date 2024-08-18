@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Ipc;
@@ -250,19 +249,23 @@ public unsafe class Penumbra: IDisposable {
 		};
 	}
 	
-	public CurrentCollectionDelegate currentCollection;
-	public delegate FFI.Str CurrentCollectionDelegate();
-	public FFI.Str CurrentCollection() {
+	public static FFI.Str Collection(byte type) {
 		try {
-			var collection = Aetherment.Interface.GetIpcSubscriber<byte, (Guid, string)?>("Penumbra.GetCollection").InvokeFunc(0xE2);
+			var collection = Aetherment.Interface.GetIpcSubscriber<byte, (Guid, string)?>("Penumbra.GetCollection").InvokeFunc(type);
 			if(collection.HasValue) {
 				return collection.Value.Item1.ToString() + "\0" + collection.Value.Item2;
 			}
 		} catch(Exception e) {
-			Aetherment.Logger.Error(e, "Penumbra IPC CurrentCollection");
+			Aetherment.Logger.Error(e, "Penumbra IPC Collection");
 		}
 		
 		return "";
+	}
+	
+	public CurrentCollectionDelegate currentCollection;
+	public delegate FFI.Str CurrentCollectionDelegate();
+	public FFI.Str CurrentCollection() {
+		return Collection(0xE2);
 	}
 	
 	public GetCollectionsDelegate getCollections;

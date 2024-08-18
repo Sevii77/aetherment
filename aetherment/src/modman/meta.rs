@@ -23,6 +23,8 @@ pub struct Meta {
 	pub manipulations: Vec<Manipulation>,
 	
 	pub plugin_settings: PluginSettings,
+	
+	pub issues: Vec<super::issue::Issue>,
 }
 
 impl Default for Meta {
@@ -43,6 +45,8 @@ impl Default for Meta {
 			manipulations: Vec::new(),
 			
 			plugin_settings: PluginSettings::default(),
+			
+			issues: Vec::new(),
 		}
 	}
 }

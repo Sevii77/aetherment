@@ -8,6 +8,7 @@ pub mod settings;
 // pub mod priority;
 // pub mod enabled;
 pub mod composite;
+pub mod issue;
 
 // ----------
 

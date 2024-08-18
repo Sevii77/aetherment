@@ -263,6 +263,32 @@ impl<'a> Ui<'a> {
 		}
 	}
 	
+	pub fn label_frame<S: AsRef<str>>(&mut self, label: S, bg: [f32; 4]) {
+		unsafe {
+			let avail = self.available_size()[0] - 8.0;
+			let draw = sys::igGetWindowDrawList();
+			let rounding = (&mut *sys::igGetStyle()).FrameRounding;
+			let mut pos = sys::ImVec2{x: 0.0, y: 0.0};
+			sys::igGetCursorScreenPos(&mut pos);
+			let mut size = sys::ImVec2{x: 0.0, y: 0.0};
+			sys::igCalcTextSize(&mut size, label.as_ref().as_ptr() as _, (label.as_ref().as_ptr() as usize + label.as_ref().len()) as _, false, avail);
+			let o = (avail - size.x) / 2.0;
+			let clr = (((bg[3] * 255.0).clamp(0.0, 255.0) as u32) << 24) +
+			          (((bg[2] * 255.0).clamp(0.0, 255.0) as u32) << 16) +
+			          (((bg[1] * 255.0).clamp(0.0, 255.0) as u32) << 8) +
+			           ((bg[0] * 255.0).clamp(0.0, 255.0) as u32);
+			
+			sys::ImDrawList_AddRectFilled(draw, sys::ImVec2{x: pos.x + o, y: pos.y}, sys::ImVec2{x: pos.x + o + size.x + 8.0, y: pos.y + size.y + 8.0}, clr, rounding, 0 as _);
+			sys::igSetCursorPosX(sys::igGetCursorPosX() + o + 4.0);
+			sys::igSetCursorPosY(sys::igGetCursorPosY() + 4.0);
+		}
+		
+		self.handle_horizontal();
+		let label = fix_text(label);
+		unsafe{sys::igTextWrapped(label.as_ptr() as _)};
+		unsafe{sys::igSetCursorPosY(sys::igGetCursorPosY() + 4.0)};
+	}
+	
 	pub fn button<S: AsRef<str>>(&mut self, label: S) -> Resp {
 		self.handle_horizontal();
 		let label = CString::new(label.as_ref()).unwrap();

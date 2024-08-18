@@ -7,7 +7,7 @@ using Dalamud.Plugin.Services;
 
 namespace Aetherment;
 
-public class Aetherment : IDalamudPlugin {
+public class Aetherment: IDalamudPlugin {
 	public string Name => "Aetherment";
 	
 	[PluginService] public static IDalamudPluginInterface Interface {get; private set;} = null!;
@@ -23,6 +23,7 @@ public class Aetherment : IDalamudPlugin {
 	private static IntPtr state;
 	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? titleEntry;
 	
+	private Issue issue;
 	private Penumbra penumbra;
 	private DalamudStyle dalamud;
 	private TexFinder texfinder;
@@ -30,10 +31,18 @@ public class Aetherment : IDalamudPlugin {
 	[StructLayout(LayoutKind.Sequential)]
 	private unsafe struct Initializers {
 		public IntPtr log;
+		public IssueFunctions issue;
 		public PenumbraFunctions penumbra;
 		public IntPtr dalamud_add_style;
 	}
 	
+	[StructLayout(LayoutKind.Sequential)]
+	private unsafe struct IssueFunctions {
+		public IntPtr ui_resolution;
+		public IntPtr ui_theme;
+		public IntPtr collection;
+	}
+
 	[StructLayout(LayoutKind.Sequential)]
 	private unsafe struct PenumbraFunctions {
 		// public FFI.Str config_dir;
@@ -54,13 +63,27 @@ public class Aetherment : IDalamudPlugin {
 	}
 	
 	public unsafe Aetherment() {
+		// var c = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance()->SystemConfig.SystemConfigBase.ConfigBase;
+		// for(var i = 0; i < c.ConfigCount; ++i) {
+		// 	var s = (nint)c.ConfigEntry[i].Name == 0 ? "Invalid Name\0" : System.Text.Encoding.UTF8.GetString(c.ConfigEntry[i].Name, 128);
+		// 	s = s.Substring(0, s.IndexOf('\0'));
+		// 	if(s.ToLowerInvariant().Contains("resolution") || s.ToLowerInvariant().Contains("ui") || s.ToLowerInvariant().Contains("theme"))
+		// 		Logger.Debug($"[{i}] {s}: {c.ConfigEntry[i].Value.UInt}");
+		// }
+		
 		log = Log;
+		issue = new();
 		penumbra = new();
 		dalamud = new();
 		texfinder = new();
 		
 		var init = new Initializers {
 			log = Marshal.GetFunctionPointerForDelegate(log),
+			issue = new IssueFunctions {
+				ui_resolution = Marshal.GetFunctionPointerForDelegate(issue.getUiResolution),
+				ui_theme = Marshal.GetFunctionPointerForDelegate(issue.getUiTheme),
+				collection = Marshal.GetFunctionPointerForDelegate(issue.getCollection),
+			},
 			penumbra = new PenumbraFunctions {
 				// config_dir = Interface.ConfigDirectory.Parent! + "/Penumbra/",
 				redraw = Marshal.GetFunctionPointerForDelegate(penumbra.redraw),

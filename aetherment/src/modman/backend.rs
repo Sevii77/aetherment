@@ -105,6 +105,7 @@ impl Progress {
 	}
 }
 
+#[derive(Debug)]
 pub struct Collection {
 	pub name: String,
 	pub id: String,
@@ -171,5 +172,37 @@ pub fn new_backend(backend: BackendInitializers) -> Box<dyn Backend> {
 		}
 		
 		_ => Box::new(dummy::Dummy),
+	}
+}
+
+// trimmed https://github.com/Ottermandias/Penumbra.Api/blob/552246e595ffab2aaba2c75f578d564f8938fc9a/Enums/ApiCollectionType.cs
+#[derive(Debug, Clone)]
+#[repr(u8)]
+pub enum CollectionType {
+	Yourself  = 0,
+	Default   = 0xE0,
+	Interface = 0xE1,
+	Current   = 0xE2,
+}
+
+impl crate::render_helper::EnumTools for CollectionType {
+	type Iterator = std::array::IntoIter<Self, 4>;
+	
+	fn to_str(&self) -> &'static str {
+		match self {
+			CollectionType::Yourself => "Yourself",
+			CollectionType::Default => "Base",
+			CollectionType::Interface => "Interface",
+			CollectionType::Current => "Current",
+		}
+	}
+	
+	fn iter() -> Self::Iterator {
+		[
+			Self::Yourself,
+			Self::Default,
+			Self::Interface,
+			Self::Current,
+		].into_iter()
 	}
 }

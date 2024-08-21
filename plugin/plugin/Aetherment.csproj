@@ -3,7 +3,7 @@
 	<PropertyGroup>
 		<AssemblyName>Aetherment</AssemblyName>
 		<Authors>Sevii</Authors>
-		<Version>0.1.12</Version>
+		<Version>0.1.13</Version>
 	</PropertyGroup>
 	
 	<PropertyGroup>
@@ -16,18 +16,36 @@
 		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
 		<AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 		
-		<DalamudLibPath Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+		<!-- <DalamudLibPath Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
 		<DalamudLibPath Condition="$([MSBuild]::IsOSPlatform('Linux'))">$(HOME)/.xlcore/dalamud/Hooks/dev/</DalamudLibPath>
 		<DalamudLibPath Condition="$([MSBuild]::IsOSPlatform('OSX'))">$(HOME)/Library/Application Support/XIV on Mac/dalamud/Hooks/dev/</DalamudLibPath>
-		<DalamudLibPath Condition="$(DALAMUD_HOME) != ''">$(DALAMUD_HOME)/</DalamudLibPath>
+		<DalamudLibPath Condition="$(DALAMUD_HOME) != ''">$(DALAMUD_HOME)/</DalamudLibPath> -->
 	</PropertyGroup>
 	
-	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+	<!-- <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
 		<OutputPath>../../target/x86_64-pc-windows-gnu/debug</OutputPath>
 	</PropertyGroup>
 	
 	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
 		<OutputPath>../../target/x86_64-pc-windows-gnu/release</OutputPath>
+	</PropertyGroup> -->
+	
+	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+		<OutputPath Condition="'$(Configuration)' == 'Debug'">../../target/x86_64-pc-windows-msvc/debug</OutputPath>
+		<OutputPath Condition="'$(Configuration)' == 'Release'">../../target/x86_64-pc-windows-msvc/release</OutputPath>
+		<DalamudLibPath>$(appdata)\XIVLauncher\addon\Hooks\dev\</DalamudLibPath>
+	</PropertyGroup>
+	
+	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
+		<OutputPath Condition="'$(Configuration)' == 'Debug'">../../target/x86_64-pc-windows-gnu/debug</OutputPath>
+		<OutputPath Condition="'$(Configuration)' == 'Release'">../../target/x86_64-pc-windows-gnu/release</OutputPath>
+		<DalamudLibPath>$(HOME)/.xlcore/dalamud/Hooks/dev/</DalamudLibPath>
+	</PropertyGroup>
+	
+	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+		<OutputPath Condition="'$(Configuration)' == 'Debug'">../../target/x86_64-pc-windows-gnu/debug</OutputPath>
+		<OutputPath Condition="'$(Configuration)' == 'Release'">../../target/x86_64-pc-windows-gnu/release</OutputPath>
+		<DalamudLibPath>$(HOME)/Library/Application Support/XIV on Mac/dalamud/Hooks/dev/</DalamudLibPath>
 	</PropertyGroup>
 	
 	<Target Name="PackagePlugin" AfterTargets="Build">

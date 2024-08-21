@@ -156,6 +156,10 @@ impl Core {
 			}
 			
 			"Debug" => {
+				if ui.button("kill").clicked {
+					panic!("the kill switch was pressed");
+				}
+				
 				ui.debug();
 			}
 			

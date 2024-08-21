@@ -1,4 +1,5 @@
-using System;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
@@ -20,7 +21,8 @@ public class Aetherment: IDalamudPlugin {
 	private const string maincommand = "/aetherment";
 	private const string texfindercommand = "/texfinder";
 	
-	private static IntPtr state;
+	internal static nint state;
+	private static string? error;
 	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? titleEntry;
 	
 	private Issue issue;
@@ -30,36 +32,36 @@ public class Aetherment: IDalamudPlugin {
 	
 	[StructLayout(LayoutKind.Sequential)]
 	private unsafe struct Initializers {
-		public IntPtr log;
+		public nint log;
 		public IssueFunctions issue;
 		public PenumbraFunctions penumbra;
-		public IntPtr dalamud_add_style;
+		public nint dalamud_add_style;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
 	private unsafe struct IssueFunctions {
-		public IntPtr ui_resolution;
-		public IntPtr ui_theme;
-		public IntPtr collection;
+		public nint ui_resolution;
+		public nint ui_theme;
+		public nint collection;
 	}
 
 	[StructLayout(LayoutKind.Sequential)]
 	private unsafe struct PenumbraFunctions {
 		// public FFI.Str config_dir;
-		public IntPtr redraw;
-		public IntPtr redraw_self;
-		public IntPtr is_enabled;
-		public IntPtr root_path;
-		public IntPtr mod_list;
-		public IntPtr add_mod_entry;
-		public IntPtr reload_mod;
-		public IntPtr set_mod_enabled;
-		public IntPtr set_mod_priority;
-		public IntPtr set_mod_inherit;
-		public IntPtr set_mod_settings;
-		public IntPtr get_mod_settings;
-		public IntPtr current_collection;
-		public IntPtr get_collections;
+		public nint redraw;
+		public nint redraw_self;
+		public nint is_enabled;
+		public nint root_path;
+		public nint mod_list;
+		public nint add_mod_entry;
+		public nint reload_mod;
+		public nint set_mod_enabled;
+		public nint set_mod_priority;
+		public nint set_mod_inherit;
+		public nint set_mod_settings;
+		public nint get_mod_settings;
+		public nint current_collection;
+		public nint get_collections;
 	}
 	
 	public unsafe Aetherment() {
@@ -105,7 +107,11 @@ public class Aetherment: IDalamudPlugin {
 			dalamud_add_style = Marshal.GetFunctionPointerForDelegate(dalamud.addStyle),
 		};
 		
-		state = initialize(init);
+		try {
+			state = initialize(init);
+		} catch {
+			Kill("Fatal error in initialize", 1);
+		}
 		
 		Interface.UiBuilder.Draw += Draw;
 		Interface.UiBuilder.OpenMainUi += OpenConf;
@@ -138,7 +144,9 @@ public class Aetherment: IDalamudPlugin {
 	}
 	
 	public void Dispose() {
-		destroy(state);
+		if(state != 0)
+			destroy(state);
+		
 		FFI.Str.Drop();
 		
 		Interface.UiBuilder.Draw -= Draw;
@@ -154,7 +162,7 @@ public class Aetherment: IDalamudPlugin {
 		
 		// if(watcher != null)
 		// 	watcher.Dispose();
-		state = IntPtr.Zero;
+		state = 0;
 	}
 	
 	private void OpenConf() {
@@ -164,10 +172,17 @@ public class Aetherment: IDalamudPlugin {
 	private void Draw() {
 		FFI.Str.HandleResources();
 		
-		try {
-			draw(state);
-		} catch {
-			// Kill("Fatal error in rendering", 0);
+		if(state != 0) {
+			try {
+				draw(state);
+			} catch {
+				Kill("Fatal error in draw", 1);
+			}
+		} else {
+			ImGuiNET.ImGui.Begin("Aetherment");
+			ImGuiNET.ImGui.Text("Aetherment has encountered an unrecoverable error");
+			ImGuiNET.ImGui.Text(error ?? "No Error");
+			ImGuiNET.ImGui.End();
 		}
 		
 		texfinder.Draw();
@@ -176,7 +191,11 @@ public class Aetherment: IDalamudPlugin {
 	private void OnCommand(string cmd, string args) {
 		if(cmd == texfindercommand) {
 			texfinder.shouldDraw = !texfinder.shouldDraw;
+			return;
 		}
+		
+		if(state == 0)
+			return;
 		
 		if(cmd != maincommand)
 			return;
@@ -184,21 +203,41 @@ public class Aetherment: IDalamudPlugin {
 		command(state, args);
 	}
 	
+	private void Kill(string msg, byte strip) {
+		if(error != null)
+			return;
+		
+		var frames = new StackTrace(true).GetFrames();
+		var stack = new List<string>();
+		stack.Add($"{msg.Replace("\n", "\n\t")}");
+		
+		for(int i = strip; i < frames.Length; i++)
+			// we dont care about the stack produced by ffi functions themselves
+			// or by functions outside our own assembly
+			if(frames[i].GetFileLineNumber() > 0 && frames[i].GetMethod()?.Module == typeof(Aetherment).Module)
+				stack.Add($"at {frames[i].GetMethod()}, {frames[i].GetFileName()}:{frames[i].GetFileLineNumber()}:{frames[i].GetFileColumnNumber()}");
+		
+		error = string.Join("\n", stack);
+		state = 0;
+		
+		Logger.Fatal(error);
+	}
+	
 	private LogDelegate log;
 	private unsafe delegate void LogDelegate(byte mode, FFI.Str str);
 	private unsafe void Log(byte mode, FFI.Str str) {
 		if(mode == 255) {
-			// Kill(str, 2);
-			Logger.Debug("TODO: kill plugin");
-			Logger.Error(str);
+			// Logger.Debug("TODO: kill plugin");
+			// Logger.Error(str);
+			Kill(str, 2);
 		} else if(mode == 1)
 			Logger.Error(str);
 		else
 			Logger.Debug(str);
 	}
 	
-	[DllImport("aetherment_core.dll")] private static extern unsafe IntPtr initialize(Initializers data);
-	[DllImport("aetherment_core.dll")] private static extern unsafe void destroy(IntPtr state);
-	[DllImport("aetherment_core.dll")] private static extern unsafe void command(IntPtr state, FFI.Str args);
-	[DllImport("aetherment_core.dll")] private static extern unsafe void draw(IntPtr state);
+	[DllImport("aetherment_core.dll")] private static extern unsafe nint initialize(Initializers data);
+	[DllImport("aetherment_core.dll")] private static extern unsafe void destroy(nint state);
+	[DllImport("aetherment_core.dll")] private static extern unsafe void command(nint state, FFI.Str args);
+	[DllImport("aetherment_core.dll")] private static extern unsafe void draw(nint state);
 }

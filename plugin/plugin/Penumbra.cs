@@ -54,9 +54,8 @@ public unsafe class Penumbra: IDisposable {
 	private ICallGateSubscriber<int, Guid, string, bool, object> modSettingChanged;
 	private static void ModSettingChanged(int type, Guid collection_id, string mod_id, bool inherited) {
 		// Aetherment.Logger.Debug($"{type} - {collection_id} - {mod_id} - {inherited}");
-		if(!inherited) {
+		if(!inherited && Aetherment.state != 0)
 			backend_penumbraipc_modchanged((byte)type, collection_id.ToString(), mod_id);
-		}
 	}
 	
 	public RedrawDelegate redraw;

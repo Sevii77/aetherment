@@ -2,12 +2,12 @@ use std::{borrow::Cow, collections::HashMap, fs::File, path::Path};
 use serde::{Deserialize, Serialize};
 
 pub mod tex;
-pub mod exd;
+// pub mod exd;
 
 #[derive(Debug)]
 pub enum CompositeError {
 	Tex(tex::CompositeError),
-	Exd(exd::CompositeError),
+	// Exd(exd::CompositeError),
 	
 	BinaryWriter(noumenon::Error),
 }
@@ -74,7 +74,7 @@ pub fn build_cache(mod_dir: &Path) -> Result<CompositeCache, crate::resource_loa
 pub fn open_composite(ext: &str, data: &[u8]) -> Option<Box<dyn Composite>> {
 	match ext {
 		"tex" | "atex" => Some(Box::new(serde_json::from_slice::<tex::Tex>(data).ok()?)),
-		"exd" => Some(Box::new(serde_json::from_slice::<exd::Exd>(data).ok()?)),
+		// "exd" => Some(Box::new(serde_json::from_slice::<exd::Exd>(data).ok()?)),
 		_ => None
 	}
 }

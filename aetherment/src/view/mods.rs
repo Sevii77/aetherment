@@ -164,7 +164,7 @@ impl Mods {
 				}).collect::<Vec<_>>();
 				if warnings.len() > 0 {
 					for msg in warnings {
-						ui.label_frame(msg, [1.0, 0.0, 0.0, 1.0]);
+						ui.label_frame(msg, [255, 0, 0, 255]);
 					}
 					ui.add_space(16.0);
 				}

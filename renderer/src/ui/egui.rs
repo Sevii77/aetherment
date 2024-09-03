@@ -168,8 +168,16 @@ impl<'a> Ui<'a> {
 		self.ui.horizontal(|ui| contents(&mut Ui::new(ui))).inner
 	}
 	
+	pub fn colored(&mut self, fg: [u8; 4], bg: [u8; 4], contents: impl FnOnce(&mut Ui)) {
+		contents(self);
+	}
+	
 	pub fn label<S: AsRef<str>>(&mut self, label: S) {
 		self.handle_add(egui::Label::new(label.as_ref()));
+	}
+	
+	pub fn label_frame<S: AsRef<str>>(&mut self, label: S, bg: [u8; 4]) {
+		todo!();
 	}
 	
 	pub fn button<S: AsRef<str>>(&mut self, label: S) -> Resp {

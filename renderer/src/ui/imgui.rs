@@ -43,7 +43,8 @@ fn id_str(id: impl Hash) -> CString {
 pub struct Ui<'a> {
 	a: std::marker::PhantomData<&'a mut i32>,
 	horizontal: bool,
-	horizontal_first: bool,
+	horizontal_stack: u8,
+	// horizontal_first: bool,
 	is_tooltip: bool,
 }
 
@@ -52,13 +53,18 @@ impl<'a> Ui<'a> {
 		Self {
 			a: std::marker::PhantomData,
 			horizontal: false,
-			horizontal_first: false,
+			horizontal_stack: 0,
+			// horizontal_first: false,
 			is_tooltip: false,
 		}
 	}
 	
-	fn handle_horizontal(&mut self) {
-		if self.horizontal && !self.horizontal_first {unsafe{sys::igSameLine(0.0, -1.0)}} else {self.horizontal_first = false}
+	fn handle_add(&mut self) {
+		// if self.horizontal && !self.horizontal_first {unsafe{sys::igSameLine(0.0, -1.0)}} else {self.horizontal_first = false}
+	}
+	
+	fn handle_post_add(&mut self) {
+		if self.horizontal {unsafe{sys::igSameLine(0.0, -1.0)}};
 	}
 	
 	fn text_size(&mut self, text: &str) -> [f32; 2] {
@@ -204,13 +210,14 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn collapsing_header<S: AsRef<str>>(&mut self, label: S, contents: impl FnOnce(&mut Ui)) {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = fix_text(label);
 		if unsafe{sys::igCollapsingHeader_TreeNodeFlags(label.as_ptr() as _, 0)} {
 			unsafe{sys::igIndent(0.0)};
 			contents(&mut Self::new());
-			unsafe{sys::igUnindent(0.0)}
+			unsafe{sys::igUnindent(0.0)};
 		}
+		self.handle_post_add();
 	}
 	
 	pub fn splitter(&mut self, id: impl Hash, default: f32, contents: impl FnOnce(&mut Ui, &mut Ui)) {
@@ -246,24 +253,45 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn horizontal<T>(&mut self, contents: impl FnOnce(&mut Ui) -> T) -> T {
+		// self.horizontal_first = false;
 		let mut ui = Self::new();
 		ui.horizontal = true;
-		ui.horizontal_first = true;
+		ui.horizontal_stack = self.horizontal_stack + 1;
+		// ui.horizontal_first = true;
 		let r = contents(&mut ui);
+		unsafe{sys::igSameLine(0.0, -1.0)};
+		if self.horizontal_stack == 0 {unsafe{sys::igNewLine()}};
 		r
 	}
 	
+	pub fn colored(&mut self, fg: [u8; 4], bg: [u8; 4], contents: impl FnOnce(&mut Ui)) {
+		unsafe {
+			sys::igPushStyleColor_U32(sys::ImGuiCol_Button as _, convert_color(bg, 1.0));
+			sys::igPushStyleColor_U32(sys::ImGuiCol_ButtonHovered as _, convert_color(bg, 0.8));
+			sys::igPushStyleColor_U32(sys::ImGuiCol_ButtonActive as _, convert_color(bg, 0.6));
+			sys::igPushStyleColor_U32(sys::ImGuiCol_FrameBg as _, convert_color(bg, 1.0));
+			sys::igPushStyleColor_U32(sys::ImGuiCol_FrameBgHovered as _, convert_color(bg, 0.8));
+			sys::igPushStyleColor_U32(sys::ImGuiCol_FrameBgActive as _, convert_color(bg, 0.6));
+			sys::igPushStyleColor_U32(sys::ImGuiCol_Text as _, convert_color(fg, 1.0));
+		}
+		
+		contents(&mut Self::new());
+		
+		unsafe{sys::igPopStyleColor(7)};
+	}
+	
 	pub fn label<S: AsRef<str>>(&mut self, label: S) {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = fix_text(label);
 		if self.is_tooltip {
 			unsafe{sys::igText(label.as_ptr() as _)};
 		} else {
 			unsafe{sys::igTextWrapped(label.as_ptr() as _)};
 		}
+		self.handle_post_add();
 	}
 	
-	pub fn label_frame<S: AsRef<str>>(&mut self, label: S, bg: [f32; 4]) {
+	pub fn label_frame<S: AsRef<str>>(&mut self, label: S, bg: [u8; 4]) {
 		unsafe {
 			let avail = self.available_size()[0] - 8.0;
 			let draw = sys::igGetWindowDrawList();
@@ -273,44 +301,50 @@ impl<'a> Ui<'a> {
 			let mut size = sys::ImVec2{x: 0.0, y: 0.0};
 			sys::igCalcTextSize(&mut size, label.as_ref().as_ptr() as _, (label.as_ref().as_ptr() as usize + label.as_ref().len()) as _, false, avail);
 			let o = (avail - size.x) / 2.0;
-			let clr = (((bg[3] * 255.0).clamp(0.0, 255.0) as u32) << 24) +
-			          (((bg[2] * 255.0).clamp(0.0, 255.0) as u32) << 16) +
-			          (((bg[1] * 255.0).clamp(0.0, 255.0) as u32) << 8) +
-			           ((bg[0] * 255.0).clamp(0.0, 255.0) as u32);
+			let clr = convert_color(bg, 1.0);
 			
 			sys::ImDrawList_AddRectFilled(draw, sys::ImVec2{x: pos.x + o, y: pos.y}, sys::ImVec2{x: pos.x + o + size.x + 8.0, y: pos.y + size.y + 8.0}, clr, rounding, 0 as _);
 			sys::igSetCursorPosX(sys::igGetCursorPosX() + o + 4.0);
 			sys::igSetCursorPosY(sys::igGetCursorPosY() + 4.0);
 		}
 		
-		self.handle_horizontal();
+		self.handle_add();
 		let label = fix_text(label);
 		unsafe{sys::igTextWrapped(label.as_ptr() as _)};
 		unsafe{sys::igSetCursorPosY(sys::igGetCursorPosY() + 4.0)};
+		self.handle_post_add();
 	}
 	
 	pub fn button<S: AsRef<str>>(&mut self, label: S) -> Resp {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
-		unsafe{sys::igButton(label.as_ptr(), sys::ImVec2{x: 0.0, y: 0.0})}.into()
+		let r = unsafe{sys::igButton(label.as_ptr(), sys::ImVec2{x: 0.0, y: 0.0})}.into();
+		self.handle_post_add();
+		r
 	}
 	
 	pub fn selectable<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
-		unsafe{sys::igSelectable_Bool(label.as_ptr(), selected, 0, sys::ImVec2{x: 0.0, y: 0.0})}.into()
+		let r = unsafe{sys::igSelectable_Bool(label.as_ptr(), selected, 0, sys::ImVec2{x: 0.0, y: 0.0})}.into();
+		self.handle_post_add();
+		r
 	}
 	
 	pub fn selectable_min<S: AsRef<str>>(&mut self, label: S, selected: bool) -> Resp {
-		self.handle_horizontal();
+		self.handle_add();
 		let clabel = CString::new(label.as_ref()).unwrap();
-		unsafe{sys::igSelectable_Bool(clabel.as_ptr(), selected, 0, sys::ImVec2{x: self.text_size(label.as_ref())[0], y: 0.0})}.into()
+		let r = unsafe{sys::igSelectable_Bool(clabel.as_ptr(), selected, 0, sys::ImVec2{x: self.text_size(label.as_ref())[0], y: 0.0})}.into();
+		self.handle_post_add();
+		r
 	}
 	
 	pub fn checkbox<S: AsRef<str>>(&mut self, label: S, checked: &mut bool) -> Resp {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
-		unsafe{sys::igCheckbox(label.as_ptr(), checked)}.into()
+		let r = unsafe{sys::igCheckbox(label.as_ptr(), checked)}.into();
+		self.handle_post_add();
+		r
 	}
 	
 	pub fn input_text<S: AsRef<str>>(&mut self, label: S, string: &mut String) -> Resp {
@@ -318,9 +352,10 @@ impl<'a> Ui<'a> {
 		if grow > 0 {string.reserve(grow as usize);}
 		string.push('\0');
 		
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
 		let r = unsafe{sys::igInputText(label.as_ptr(), string.as_mut_ptr() as *mut _, 256, 0, None, std::ptr::null::<*mut i8>() as *mut _)};
+		self.handle_post_add();
 		if let Some(p) = string.find('\0') {string.truncate(p);}
 		r.into()
 	}
@@ -330,61 +365,69 @@ impl<'a> Ui<'a> {
 		if grow > 0 {string.reserve(grow as usize);}
 		string.push('\0');
 		
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
 		let r = unsafe{sys::igInputTextMultiline(label.as_ptr(), string.as_mut_ptr() as *mut _, 8096, sys::ImVec2{x: 0.0, y: 0.0}, 0, None, std::ptr::null::<*mut i8>() as *mut _)};
+		self.handle_post_add();
 		if let Some(p) = string.find('\0') {string.truncate(p);}
 		r.into()
 	}
 	
 	pub fn combo<S: AsRef<str>, S2: AsRef<str>>(&mut self, label: S, preview: S2, contents: impl FnOnce(&mut Ui)) {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
 		let preview = CString::new(preview.as_ref()).unwrap();
 		if unsafe{sys::igBeginCombo(label.as_ptr(), preview.as_ptr(), 0)} {
 			contents(&mut Self::new());
 			unsafe{sys::igEndCombo()};
 		}
+		self.handle_post_add();
 	}
 	
 	pub fn helptext<S: AsRef<str>>(&mut self, text: S) {
 		self.label("(?)");
 		if unsafe{sys::igIsItemHovered(0)} {
 			let text = fix_text(text);
-			unsafe{sys::igSetTooltip(text.as_ptr() as _)}
+			unsafe{sys::igSetTooltip(text.as_ptr() as _)};
 		}
 	}
 	
 	pub fn color_edit_rgb<S: AsRef<str>>(&mut self, label: S, color: &mut [f32; 3]) -> Resp {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
-		unsafe{sys::igColorEdit3(label.as_ptr(), color.as_mut_ptr(), (
+		let r = unsafe{sys::igColorEdit3(label.as_ptr(), color.as_mut_ptr(), (
 			sys::ImGuiColorEditFlags_NoInputs |
-			sys::ImGuiColorEditFlags_PickerHueWheel) as i32)}.into()
+			sys::ImGuiColorEditFlags_PickerHueWheel) as i32)}.into();
+		self.handle_post_add();
+		r
 	}
 	
 	pub fn color_edit_rgba<S: AsRef<str>>(&mut self, label: S, color: &mut [f32; 4]) -> Resp {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
-		unsafe{sys::igColorEdit4(label.as_ptr(), color.as_mut_ptr(), (
+		let r = unsafe{sys::igColorEdit4(label.as_ptr(), color.as_mut_ptr(), (
 			sys::ImGuiColorEditFlags_NoInputs |
 			sys::ImGuiColorEditFlags_PickerHueWheel |
 			sys::ImGuiColorEditFlags_AlphaBar |
-			sys::ImGuiColorEditFlags_AlphaPreviewHalf) as i32)}.into()
+			sys::ImGuiColorEditFlags_AlphaPreviewHalf) as i32)}.into();
+		self.handle_post_add();
+		r
 	}
 	
 	pub fn slider<S: AsRef<str>, N: crate::Numeric>(&mut self, label: S, value: &mut N, range: std::ops::RangeInclusive<N>) -> Resp {
-		self.handle_horizontal();
+		self.handle_add();
 		let label = CString::new(label.as_ref()).unwrap();
 		if N::INT {
 			let mut v = value.to_i32();
 			let r = unsafe{sys::igSliderInt(label.as_ptr(), &mut v, range.start().to_i32(), range.end().to_i32(), 0 as _, 0)};
+			self.handle_post_add();
 			*value = N::from_i32(v);
 			r
 		} else {
 			let mut v = value.to_f32();
 			const FORMAT: &'static str = "%.3g\0";
 			let r = unsafe{sys::igSliderFloat(label.as_ptr(), &mut v, range.start().to_f32(), range.end().to_f32(), FORMAT.as_ptr() as _, 0)};
+			self.handle_post_add();
 			*value = N::from_f32(v);
 			r
 		}.into()
@@ -395,4 +438,8 @@ fn fix_text<S: AsRef<str>>(label: S) -> String {
 	let mut l = label.as_ref().replace("%", "%%");
 	l.push('\0');
 	l
+}
+
+fn convert_color(clr: [u8; 4], strength: f32) -> u32 {
+	((clr[3] as u32) << 24) + (((clr[2] as f32 * strength) as u32) << 16) + (((clr[1] as f32 * strength) as u32) << 8) + ((clr[0] as f32 * strength) as u32)
 }

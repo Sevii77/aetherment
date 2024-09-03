@@ -49,8 +49,8 @@ impl Tex {
 						let (w, h) = (tex.header.width as u32, tex.header.height as u32);
 						let mask_data = get_resized(tex, w, h, width, height);
 						
-						for (i, pixel) in data.chunks_exact_mut(4).enumerate() {
-							if mask_data[i * 4] as f32 / 255.0 < cull_point {
+						for (pixel, mask_pixel) in data.chunks_exact_mut(4).zip(mask_data.chunks_exact(4)) {
+							if mask_pixel[0] as f32 / 255.0 < cull_point {
 								pixel[0] = 0;
 								pixel[1] = 0;
 								pixel[2] = 0;
@@ -66,8 +66,8 @@ impl Tex {
 						let mask_data = get_resized(tex, w, h, width, height);
 						
 						let mut lowest = 255;
-						for (i, pixel) in data.chunks_exact_mut(4).enumerate() {
-							if mask_data[i * 4] as f32 / 255.0 < cull_point {
+						for (pixel, mask_pixel) in data.chunks_exact_mut(4).zip(mask_data.chunks_exact(4)) {
+							if mask_pixel[0] as f32 / 255.0 < cull_point {
 								pixel[0] = 0;
 								pixel[1] = 0;
 								pixel[2] = 0;

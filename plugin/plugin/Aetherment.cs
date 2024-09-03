@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -109,8 +110,8 @@ public class Aetherment: IDalamudPlugin {
 		
 		try {
 			state = initialize(init);
-		} catch {
-			Kill("Fatal error in initialize", 1);
+		} catch(Exception e) {
+			Kill(e.ToString(), 2);
 		}
 		
 		Interface.UiBuilder.Draw += Draw;
@@ -215,7 +216,7 @@ public class Aetherment: IDalamudPlugin {
 			// we dont care about the stack produced by ffi functions themselves
 			// or by functions outside our own assembly
 			if(frames[i].GetFileLineNumber() > 0 && frames[i].GetMethod()?.Module == typeof(Aetherment).Module)
-				stack.Add($"at {frames[i].GetMethod()}, {frames[i].GetFileName()}:{frames[i].GetFileLineNumber()}:{frames[i].GetFileColumnNumber()}");
+				stack.Add($"at {frames[i].GetMethod()} {frames[i].GetFileName()}:{frames[i].GetFileLineNumber()}:{frames[i].GetFileColumnNumber()}");
 		
 		error = string.Join("\n", stack);
 		state = 0;

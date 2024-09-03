@@ -119,7 +119,17 @@ impl Core {
 			modman::backend::Status::Error(_) => self.backend_last_error = true,
 		}
 		
-		ui.tabs(&["Mods", "Browser", "Settings", "Tools", "Debug"], &mut self.current_tab);
+		ui.horizontal(|ui| {
+			ui.tabs(&["Mods", "Browser", "Settings", "Tools", "Debug"], &mut self.current_tab);
+			let offset = ui.available_size()[0] - 210.0;
+			ui.add_space(offset);
+			ui.set_width(210.0);
+			ui.colored([0, 0, 0, 255], [254, 210, 0, 255], |ui| {
+				if ui.button("Support me on Buy Me a Coffee").clicked {
+					_ = open::that("https://buymeacoffee.com/sevii77");
+				}
+			});
+		});
 		
 		// TODO: make fancy
 		if self.install_progress.is_busy() {

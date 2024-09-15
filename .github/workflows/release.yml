@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    name: Build and upload
+    runs-on: ${{ matrix.os }}
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build: linux
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          
+          - build: windows
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Version
+        shell: bash
+        run: |
+          echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          version=${GITHUB_REF#refs/tags/}
+          
+          sed -i "s/\t\t<Version>[0-9\.]*<\/Version>/\t\t<Version>$version<\/Version>/" ./plugin/plugin/Aetherment.csproj
+          sed -i "0,/version = \"[0-9\.]*\"/s//version = \"$version\"/" ./plugin/Cargo.toml
+          sed -i "0,/version = \"[0-9\.]*\"/s//version = \"$version\"/" ./client/Cargo.toml
+      
+      - name: Commit Version
+        shell: bash
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          git config --global user.name "Actions User"
+          git config --global user.email "actions@github.com"
+          git fetch origin master
+          git branch -f master ${{ github.sha }}
+          git checkout master
+          git add ./plugin/plugin/Aetherment.csproj
+          git add ./plugin/Cargo.toml
+          git add ./client/Cargo.toml
+          git commit -m "[CI] Update version to ${{ env.VERSION }}"
+          git push origin master
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Install .NET
+        uses: actions/setup-dotnet@v1
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        with:
+          dotnet-version: '8.x.x'
+      
+      - name: Download Dalamud
+        shell: bash
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        run: |
+          curl https://goatcorp.github.io/dalamud-distrib/stg/latest.zip --output dalamud.zip
+          # mkdir -p "$HOME/.xlcore/dalamud/Hooks/dev"
+          # unzip dalamud.zip -d "$HOME/.xlcore/dalamud/Hooks/dev"
+          mkdir -p "$APPDATA/XIVLauncher/addon/Hooks/dev"
+          7z x dalamud.zip -o"$APPDATA/XIVLauncher/addon/Hooks/dev"
+      
+      - name: Build Plugin
+        shell: bash
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        run: |
+          dotnet build ./plugin/plugin/Aetherment.csproj -c Release
+          cargo build --lib --release --target x86_64-pc-windows-msvc --manifest-path=./plugin/Cargo.toml
+      
+      - name: Archive Plugin
+        shell: bash
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        run: |
+          dirname="aetherment-${{ env.VERSION }}-plugin"
+          mkdir "$dirname"
+          releasedir="./target/x86_64-pc-windows-msvc/release"
+          # zip $dirname.zip "$releasedir/Aetherment.json" "$releasedir/Aetherment.dll" "$releasedir/aetherment_core.dll"
+          7z a $dirname.zip "$releasedir/Aetherment.json" "$releasedir/Aetherment.dll" "$releasedir/aetherment_core.dll"
+          echo "ASSET=$dirname.zip" >> $GITHUB_ENV
+      
+      - name: Release Plugin
+        uses: softprops/action-gh-release@v1
+        if: matrix.target == 'x86_64-pc-windows-msvc'
+        with:
+          files: |
+            ${{ env.ASSET }}
+      
+      - name: Build Client
+        shell: bash
+        run: |
+          cargo build --release --target ${{ matrix.target }} --manifest-path=./client/Cargo.toml
+      
+      - name: Archive Client
+        shell: bash
+        run: |
+          dirname="aetherment-${{ env.VERSION }}-${{ matrix.target }}"
+          mkdir "$dirname"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv "target/${{ matrix.target }}/release/client.exe" "$dirname/aetherment.exe"
+          else
+            mv "target/${{ matrix.target }}/release/client" "$dirname/aetherment"
+          fi
+          
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a "$dirname.zip" "$dirname"
+            echo "ASSET=$dirname.zip" >> $GITHUB_ENV
+          else
+            tar -czf "$dirname.tar.gz" "$dirname"
+            echo "ASSET=$dirname.tar.gz" >> $GITHUB_ENV
+          fi
+      
+      - name: Release Client
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ env.ASSET }}

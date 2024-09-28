@@ -126,6 +126,35 @@ impl OptionValue for [f32; 2] {
 	}
 }
 
+impl OptionValue for [f32; 3] {
+	type Value = Self;
+	
+	fn get_value(value: &settings::Value) -> Option<Self::Value> {
+		match value {
+			settings::Value::Rgba(v) => Some([v[0], v[1], v[2]]),
+			settings::Value::Rgb(v) => Some(*v),
+			settings::Value::Grayscale(v) => Some([*v, *v, *v]),
+			_ => None,
+		}
+	}
+	
+	fn multiplied(a: Self::Value, b: Self::Value) -> Self::Value {
+		[
+			(a[0] * b[0]).clamp(0.0, 1.0),
+			(a[1] * b[1]).clamp(0.0, 1.0),
+			(a[2] * b[2]).clamp(0.0, 1.0),
+		]
+	}
+	
+	fn gradiant(a: Self::Value, b: Self::Value, scale: Self::Value) -> Self::Value {
+		[
+			a[0] * (1.0 - scale[0]) + b[0] * scale[0],
+			a[1] * (1.0 - scale[1]) + b[1] * scale[1],
+			a[2] * (1.0 - scale[2]) + b[2] * scale[2],
+		]
+	}
+}
+
 impl OptionValue for [f32; 4] {
 	type Value = Self;
 	

@@ -5,7 +5,8 @@ mod render_helper;
 mod config;
 pub mod modman;
 mod view;
-pub mod remote;
+mod remote;
+pub mod service;
 
 pub use log::LogType;
 // pub use renderer;
@@ -170,6 +171,16 @@ impl Core {
 					panic!("the kill switch was pressed");
 				}
 				
+				ui.add_space(16.0);
+				ui.label("UIColor Replacements");
+				for ((theme_color, index), [r, g, b]) in service::uicolor::get_colors() {
+					let mut clr = [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0];
+					if ui.color_edit_rgb(format!("{} {index}", if theme_color {"theme"} else {"normal"}), &mut clr).changed {
+						service::uicolor::set_color(theme_color, index, [(clr[0] * 255.0) as u8, (clr[1] * 255.0) as u8, (clr[2] * 255.0) as u8]);
+					}
+				}
+				
+				ui.add_space(16.0);
 				ui.debug();
 			}
 			

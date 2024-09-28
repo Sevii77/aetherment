@@ -26,7 +26,7 @@ public unsafe class Penumbra: IDisposable {
 		setModSettings = SetModSettings;
 		getModSettings = GetModSettings;
 		// defaultCollection = DefaultCollection;
-		currentCollection = CurrentCollection;
+		getCollection = GetCollection;
 		getCollections = GetCollections;
 		
 		// postSettingsDraw = Aetherment.Interface.GetIpcSubscriber<string, object>("Penumbra.PostSettingsDraw");
@@ -248,7 +248,9 @@ public unsafe class Penumbra: IDisposable {
 		};
 	}
 	
-	public static FFI.Str Collection(byte type) {
+	public GetCollectionDelegate getCollection;
+	public delegate FFI.Str GetCollectionDelegate(byte type);
+	public static FFI.Str GetCollection(byte type) {
 		try {
 			var collection = Aetherment.Interface.GetIpcSubscriber<byte, (Guid, string)?>("Penumbra.GetCollection").InvokeFunc(type);
 			if(collection.HasValue) {
@@ -259,12 +261,6 @@ public unsafe class Penumbra: IDisposable {
 		}
 		
 		return "";
-	}
-	
-	public CurrentCollectionDelegate currentCollection;
-	public delegate FFI.Str CurrentCollectionDelegate();
-	public FFI.Str CurrentCollection() {
-		return Collection(0xE2);
 	}
 	
 	public GetCollectionsDelegate getCollections;

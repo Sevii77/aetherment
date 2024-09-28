@@ -111,6 +111,12 @@ pub struct Collection {
 	pub id: String,
 }
 
+impl Collection {
+	pub fn is_valid(&self) -> bool {
+		self.id != "00000000-0000-0000-0000-000000000000"
+	}
+}
+
 pub trait Backend {
 	fn name(&self) -> &'static str;
 	fn description(&self) -> &'static str;

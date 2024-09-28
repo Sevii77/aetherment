@@ -1,6 +1,6 @@
 use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, io::{Read, Write}, sync::{Arc, Mutex}};
 use serde::{Deserialize, Serialize};
-use crate::{log, modman::meta, resource_loader::read_json};
+use crate::{log, modman::{meta, OptionOrStatic}, resource_loader::read_json};
 
 #[repr(packed)]
 pub struct GetModSettings {
@@ -26,7 +26,8 @@ fn set_mod_priority(collection_id: &str, mod_id: &str, priority: i32) -> u8 {uns
 fn set_mod_inherit(collection_id: &str, mod_id: &str, inherit: bool) -> u8 {unsafe {(FUNCS.as_ref().unwrap().set_mod_inherit)(collection_id, mod_id, inherit)}}
 fn set_mod_settings(collection_id: &str, mod_id: &str, option: &str, sub_options: Vec<&str>) -> u8 {unsafe {(FUNCS.as_ref().unwrap().set_mod_settings)(collection_id, mod_id, option, sub_options)}}
 pub(crate) fn get_mod_settings(collection_id: &str, mod_id: &str, inherit: bool) -> GetModSettings {unsafe {(FUNCS.as_ref().unwrap().get_mod_settings)(collection_id, mod_id, inherit)}}
-fn current_collection() -> super::Collection {unsafe {(FUNCS.as_ref().unwrap().current_collection)()}}
+pub(crate) fn get_collection(collection_type: super::CollectionType) -> super::Collection {unsafe {(FUNCS.as_ref().unwrap().get_collection)(collection_type)}}
+fn current_collection() -> super::Collection {get_collection(super::CollectionType::Current)}
 fn get_collections() -> Vec<super::Collection> {unsafe {(FUNCS.as_ref().unwrap().get_collections)()}}
 
 #[allow(improper_ctypes_definitions)]
@@ -58,7 +59,7 @@ pub struct PenumbraFunctions {
 	pub set_mod_inherit: Box<dyn Fn(&str, &str, bool) -> u8>,
 	pub set_mod_settings: Box<dyn Fn(&str, &str, &str, Vec<&str>) -> u8>,
 	pub get_mod_settings: Box<dyn Fn(&str, &str, bool) -> GetModSettings>,
-	pub current_collection: Box<dyn Fn() -> super::Collection>,
+	pub get_collection: Box<dyn Fn(super::CollectionType) -> super::Collection>,
 	pub get_collections: Box<dyn Fn() -> Vec<super::Collection>>,
 }
 
@@ -333,6 +334,44 @@ impl super::Backend for Penumbra {
 	}
 }
 
+fn apply_ui_colors() {
+	let mut final_ui_colors = HashMap::<(bool, u32), (i32, [u8; 3])>::new();
+	
+	let root = root_path();
+	for id in mod_list().into_iter() {
+		let mod_dir = root.join(&id);
+		let aeth_dir = mod_dir.join("aetherment");
+		if !aeth_dir.exists() {continue}
+		let collection = get_collection(super::CollectionType::Interface);
+		if !collection.is_valid() {continue}
+		let settings = get_mod_settings(&collection.id, &id, true);
+		if !settings.enabled {continue}
+		let priority = settings.priority;
+		let Ok(ui_colors) = read_json::<Vec<(bool, u32, OptionOrStatic<[f32; 3]>)>>(&aeth_dir.join("uicolorcache")) else {continue};
+		let Ok(meta) = read_json::<meta::Meta>(&aeth_dir.join("meta.json")) else {continue};
+		let mut settings = crate::modman::settings::Settings::open(&meta, &id);
+		let collection_settings = settings.get_collection(&meta, &collection.id);
+		for (use_theme, index, color) in ui_colors {
+			let Some(color) = color.resolve(&meta, &collection_settings) else {continue};
+			let color = [(color[0] * 255.0).clamp(0.0, 255.0) as u8, (color[1] * 255.0).clamp(0.0, 255.0) as u8, (color[2] * 255.0).clamp(0.0, 255.0) as u8];
+			
+			if let Some(c) = final_ui_colors.get_mut(&(use_theme, index)) {
+				if priority > c.0 {
+					c.0 = priority;
+					c.1 = color;
+				}
+			} else {
+				final_ui_colors.insert((use_theme, index), (priority, color));
+			}
+		}
+	}
+	
+	crate::service::uicolor::clear_colors();
+	for ((use_theme, index), (_, color)) in final_ui_colors {
+		crate::service::uicolor::set_color(use_theme, index, color);
+	}
+}
+
 // TODO: support only updating files of options that just changed (composite_info has info about that)
 fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progress: super::ApplyProgress) {
 	// 1. sort the queue based on priority, lowest > highest
@@ -424,6 +463,8 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 	for mod_id in to_cleanup {
 		cleanup_mod(&mod_id);
 	}
+	
+	apply_ui_colors();
 	
 	progress.set_busy(false);
 }
@@ -559,6 +600,8 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 		FileSwaps: HashMap::new(),
 		Manipulations: Vec::new(),
 	};
+	
+	let mut final_ui_colors = HashMap::<(bool, u32), OptionOrStatic<[f32; 3]>>::new();
 	
 	// let mut add_datas = |files: &HashMap<String, String>, swaps: &HashMap<String, String>, manips: &Vec<meta::Manipulation>| -> Result<(), crate::resource_loader::BacktraceError> {
 	let mut add_datas = |files: &HashMap<&str, &str>, swaps: &HashMap<&str, &str>, manips: &Vec<&meta::Manipulation>| -> Result<(), crate::resource_loader::BacktraceError> {
@@ -760,6 +803,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 					let mut files = o.files.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect::<HashMap<_, _>>();
 					let mut file_swaps = o.file_swaps.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect::<HashMap<_, _>>();
 					let mut manipulations = o.manipulations.iter().map(|v| v).collect::<Vec<_>>();
+					let mut ui_colors = o.ui_colors.iter().map(|v| v).collect::<Vec<_>>();
 					
 					let mut inherit_o = o;
 					loop {
@@ -771,9 +815,14 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 						inherit_o.files.iter().for_each(|(k, v)| if !contains(&files, k.as_str()) {log!("{k} does not exist in option, adding from inherit"); files.insert(k, v);});
 						inherit_o.file_swaps.iter().for_each(|(k, v)| if !file_swaps.contains_key(k.as_str()) {file_swaps.insert(k, v);});
 						inherit_o.manipulations.iter().for_each(|v| if !manipulations.contains(&v) {manipulations.push(v);});
+						inherit_o.ui_colors.iter().for_each(|v| if !ui_colors.contains(&v) {ui_colors.push(v);});
 					}
 					
 					add_datas(&files, &file_swaps, &manipulations)?;
+					
+					for color in ui_colors {
+						final_ui_colors.insert((color.use_theme, color.index), color.color.clone());
+					}
 				}
 			}
 			
@@ -787,6 +836,10 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 						let file_swaps = o.file_swaps.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect::<HashMap<_, _>>();
 						let manipulations = o.manipulations.iter().map(|v| v).collect::<Vec<_>>();
 						add_datas(&files, &file_swaps, &manipulations)?;
+						
+						for color in &o.ui_colors {
+							final_ui_colors.insert((color.use_theme, color.index), color.color.clone());
+						}
 					}
 				}
 			}
@@ -801,8 +854,13 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 		let file_swaps = meta.file_swaps.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect::<HashMap<_, _>>();
 		let manipulations = meta.manipulations.iter().map(|v| v).collect::<Vec<_>>();
 		add_datas(&files, &file_swaps, &manipulations)?;
+		
+		for color in &meta.ui_colors {
+			final_ui_colors.insert((color.use_theme, color.index), color.color.clone());
+		}
 	}
 	
+	// update penumbra mod
 	let mut group = match read_json::<PGroup>(&mod_dir.join("group_001__collection.json")) {
 		Ok(v) => v,
 		Err(_) => PGroup {
@@ -825,6 +883,11 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	
 	reload_mod(&mod_id);
 	set_mod_settings(&collection_id, &mod_id, "_collection", vec![&collection_id]);
+	
+	// save ui colors
+	if get_collection(crate::modman::backend::CollectionType::Interface).id == collection_id {
+		std::fs::write(aeth_dir.join("uicolorcache"), serde_json::to_vec(&final_ui_colors.iter().map(|((a, b), c)| (a, b, c)).collect::<Vec<_>>())?)?;
+	}
 	
 	Ok(changed_files)
 }

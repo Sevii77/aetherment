@@ -4,7 +4,7 @@ use crate::render_helper::EnumTools;
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Issue {
 	UiResolution(String),
-	UITheme(String),
+	UiTheme(String),
 	Collection(String),
 }
 
@@ -32,7 +32,7 @@ impl Issue {
 					                         and set 'UI Resolution' (2nd option) to {res}. Restart your game after."))
 				}
 			
-			Issue::UITheme(theme) =>
+			Issue::UiTheme(theme) =>
 				if match theme.to_ascii_lowercase().as_str() {
 					"dark" => Some(0),
 					"light" => Some(1),
@@ -50,7 +50,7 @@ impl Issue {
 			Issue::Collection(collection_type_name) =>
 				if super::backend::CollectionType::iter()
 					.find(|v| v.to_str().to_ascii_lowercase() == collection_type_name.to_ascii_lowercase())
-					.map_or(false, |v| (funcs.collection)(v).id != "00000000-0000-0000-0000-000000000000") {
+					.map_or(false, |v| (funcs.collection)(v).is_valid()) {
 					Status::Ok
 				} else {
 					Status::Warning(format!("A collection is required to be assigned to {collection_type_name}.\n\

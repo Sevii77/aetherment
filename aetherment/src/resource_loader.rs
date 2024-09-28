@@ -81,7 +81,8 @@ T: noumenon::File {
 // 	}
 // }
 
-// Load json file that can include the UTF-8 BOM
+// TODO: dont read all into memory, and use std::io::BufReader
+/// Load json file that can include the UTF-8 BOM
 pub fn read_json<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Result<T, crate::resource_loader::BacktraceError> {
 	let mut file = File::open(path)?;
 	let mut buf = Vec::new();

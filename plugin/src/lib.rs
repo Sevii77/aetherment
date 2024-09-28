@@ -51,7 +51,6 @@ pub struct Initializers {
 pub struct IssueFunctions {
 	ui_resolution: fn() -> u8,
 	ui_theme: fn() -> u8,
-	collection: fn(u8) -> FfiStr,
 }
 
 #[repr(packed)]
@@ -79,7 +78,7 @@ pub struct PenumbraFunctions {
 	set_mod_inherit: fn(FfiStr, FfiStr, bool) -> u8,
 	set_mod_settings: fn(FfiStr, FfiStr, FfiStr, FfiStr) -> u8,
 	get_mod_settings: fn(FfiStr, FfiStr, bool) -> PenumbraGetModSettings,
-	current_collection: fn() -> FfiStr,
+	get_collection: fn(u8) -> FfiStr,
 	get_collections: fn() -> FfiStr,
 }
 
@@ -99,7 +98,24 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 		
 		let funcs = init.penumbra_functions;
 		let issue_funcs = init.issue_functions;
-		Box::into_raw(Box::new(State {
+		
+		let get_collection = Box::new(move |collection_type| {
+			let v = (funcs.get_collection)(collection_type as _).to_string();
+			if !v.contains('\0') {
+				aetherment::modman::backend::Collection {
+					id: "00000000-0000-0000-0000-000000000000".to_string(),
+					name: "None".to_string(),
+				}
+			} else {
+				let mut split = v.split("\0");
+				aetherment::modman::backend::Collection {
+					id: split.next().unwrap().to_owned(),
+					name: split.next().unwrap().to_owned(),
+				}
+			}
+		});
+		
+		let state = Box::into_raw(Box::new(State {
 			visible: aetherment::config().config.plugin_open_on_launch,
 			core: aetherment::Core::new(log, backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
 				// config_dir: std::path::PathBuf::from(funcs.config_dir.to_string()),
@@ -136,16 +152,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 						},
 					}
 				}),
-				current_collection: Box::new(move || {
-					let collection = (funcs.current_collection)().to_string();
-					if collection.is_empty() {return aetherment::modman::backend::Collection{id: String::new(), name: String::new()}}
-					
-					let mut split = collection.split("\0");
-					aetherment::modman::backend::Collection {
-						id: split.next().unwrap().to_owned(),
-						name: split.next().unwrap_or("Failed getting collection").to_owned(),
-					}
-				}),
+				get_collection: get_collection.clone(),
 				get_collections: Box::new(move || {
 					let collections = (funcs.get_collections)().to_string();
 					if collections.is_empty() {return Vec::new()};
@@ -164,25 +171,15 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 			}), aetherment::modman::issue::IssueInitializers {
 				ui_resolution: Box::new(issue_funcs.ui_resolution),
 				ui_theme: Box::new(issue_funcs.ui_theme),
-				collection: Box::new(move |typ| {
-					let v = (issue_funcs.collection)(typ as _).to_string();
-					if !v.contains('\0') {
-						aetherment::modman::backend::Collection {
-							id: "00000000-0000-0000-0000-000000000000".to_string(),
-							name: "None".to_string(),
-						}
-					} else {
-						let mut split = v.split("\0");
-						aetherment::modman::backend::Collection {
-							id: split.next().unwrap().to_owned(),
-							name: split.next().unwrap().to_owned(),
-						}
-					}
-				}),
+				collection: get_collection,
 			}, aetherment::modman::meta::OptionalInitializers {
 				dalamud: Some(dalamud_add_style)
 			}),
-		}))
+		}));
+		
+		unsafe{aetherment::service::initialize()};
+		
+		state
 	}) {
 		Ok(v) => v,
 		Err(_) => 0 as *mut _,
@@ -191,6 +188,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 
 #[no_mangle]
 pub extern fn destroy(state: *mut State) {
+	unsafe{aetherment::service::disable()};
 	_ = unsafe{Box::from_raw(state)};
 }
 

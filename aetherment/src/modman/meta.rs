@@ -1,5 +1,5 @@
 use std::{collections::HashMap, fs::File, io::Write, path::Path};
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Serialize};
 use crate::render_helper::EnumTools;
 
 pub mod dalamud;
@@ -21,6 +21,7 @@ pub struct Meta {
 	pub files: HashMap<String, String>,
 	pub file_swaps: HashMap<String, String>,
 	pub manipulations: Vec<Manipulation>,
+	pub ui_colors: Vec<UiColor>,
 	
 	pub plugin_settings: PluginSettings,
 	
@@ -43,6 +44,7 @@ impl Default for Meta {
 			files: HashMap::new(),
 			file_swaps: HashMap::new(),
 			manipulations: Vec::new(),
+			ui_colors: Vec::new(),
 			
 			plugin_settings: PluginSettings::default(),
 			
@@ -106,11 +108,59 @@ impl Options {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum OptionType {
 	Category(String),
 	Option(Option),
+}
+
+impl<'de> Deserialize<'de> for OptionType {
+	fn deserialize<D>(d: D) -> Result<Self, D::Error> where
+	D: serde::Deserializer<'de> {
+		struct DeVisitor;
+		impl<'de> Visitor<'de> for DeVisitor {
+			type Value = OptionType;
+			
+			fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+				f.write_str("String or Option")
+			}
+			
+			fn visit_str<E>(self, v: &str) -> Result<Self::Value, E> where
+			E: serde::de::Error, {
+				Ok(OptionType::Category(v.to_owned()))
+			}
+			
+			fn visit_string<E>(self, v: String) -> Result<Self::Value, E> where
+			E: serde::de::Error, {
+				Ok(OptionType::Category(v))
+			}
+			
+			fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error> where
+			A: serde::de::MapAccess<'de>, {
+				let mut name = None;
+				let mut description = None;
+				let mut settings = None;
+				
+				while let Some(key) = map.next_key::<String>()? {
+					match key.as_str() {
+						"name" => name = Some(map.next_value()?),
+						"description" => description = Some(map.next_value()?),
+						"settings" => settings = Some(map.next_value()?),
+						_ => return Err(serde::de::Error::unknown_field(&key, &["name", "description", "settings"]))
+					}
+				}
+				
+				Ok(OptionType::Option(Option {
+					name: name.ok_or_else(|| serde::de::Error::missing_field("name"))?,
+					description: description.ok_or_else(|| serde::de::Error::missing_field("description"))?,
+					settings: settings.ok_or_else(|| serde::de::Error::missing_field("settings"))?,
+				}))
+			}
+		}
+		
+		d.deserialize_any(DeVisitor)
+	}
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
@@ -191,6 +241,7 @@ impl Default for ValueFiles {
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(default)]
 pub struct ValueFilesOption {
 	pub name: String,
 	pub description: String,
@@ -198,6 +249,7 @@ pub struct ValueFilesOption {
 	pub files: HashMap<String, String>,
 	pub file_swaps: HashMap<String, String>,
 	pub manipulations: Vec<Manipulation>,
+	pub ui_colors: Vec<UiColor>,
 }
 
 impl Default for ValueFilesOption {
@@ -209,6 +261,7 @@ impl Default for ValueFilesOption {
 			files: HashMap::new(),
 			file_swaps: HashMap::new(),
 			manipulations: Vec::new(),
+			ui_colors: Vec::new(),
 		}
 	}
 }
@@ -378,4 +431,13 @@ pub enum Manipulation {
 		sub_race: String,
 		attribute: String,
 	},
+}
+
+// ----------
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct UiColor {
+	pub use_theme: bool,
+	pub index: u32,
+	pub color: super::OptionOrStatic<[f32; 3]>,
 }

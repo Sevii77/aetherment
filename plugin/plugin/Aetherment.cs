@@ -43,7 +43,6 @@ public class Aetherment: IDalamudPlugin {
 	private unsafe struct IssueFunctions {
 		public nint ui_resolution;
 		public nint ui_theme;
-		public nint collection;
 	}
 
 	[StructLayout(LayoutKind.Sequential)]
@@ -61,7 +60,7 @@ public class Aetherment: IDalamudPlugin {
 		public nint set_mod_inherit;
 		public nint set_mod_settings;
 		public nint get_mod_settings;
-		public nint current_collection;
+		public nint get_collection;
 		public nint get_collections;
 	}
 	
@@ -85,7 +84,6 @@ public class Aetherment: IDalamudPlugin {
 			issue = new IssueFunctions {
 				ui_resolution = Marshal.GetFunctionPointerForDelegate(issue.getUiResolution),
 				ui_theme = Marshal.GetFunctionPointerForDelegate(issue.getUiTheme),
-				collection = Marshal.GetFunctionPointerForDelegate(issue.getCollection),
 			},
 			penumbra = new PenumbraFunctions {
 				// config_dir = Interface.ConfigDirectory.Parent! + "/Penumbra/",
@@ -102,7 +100,7 @@ public class Aetherment: IDalamudPlugin {
 				set_mod_settings = Marshal.GetFunctionPointerForDelegate(penumbra.setModSettings),
 				get_mod_settings = Marshal.GetFunctionPointerForDelegate(penumbra.getModSettings),
 				// default_collection = Marshal.GetFunctionPointerForDelegate(penumbra.defaultCollection),
-				current_collection = Marshal.GetFunctionPointerForDelegate(penumbra.currentCollection),
+				get_collection = Marshal.GetFunctionPointerForDelegate(penumbra.getCollection),
 				get_collections = Marshal.GetFunctionPointerForDelegate(penumbra.getCollections),
 			},
 			dalamud_add_style = Marshal.GetFunctionPointerForDelegate(dalamud.addStyle),

@@ -13,7 +13,6 @@ public class Issue {
 		
 		getUiResolution = GetUiResolution;
 		getUiTheme = GetUiTheme;
-		getCollection = GetCollection;
 	}
 	
 	private unsafe static uint? GetSetting(string name) {
@@ -44,11 +43,5 @@ public class Issue {
 	public delegate byte GetUiThemeDelegate();
 	public byte GetUiTheme() {
 		return theme;
-	}
-	
-	public GetCollectionDelegate getCollection;
-	public delegate FFI.Str GetCollectionDelegate(byte type);
-	public FFI.Str GetCollection(byte type) {
-		return Penumbra.Collection(type);
 	}
 }

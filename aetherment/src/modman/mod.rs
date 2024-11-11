@@ -2,7 +2,7 @@ use std::{collections::{HashSet, HashMap}, io::{Read, Write, Seek}};
 use serde::{Deserialize, Serialize};
 use crate::render_helper::EnumTools;
 
-pub mod backend;
+#[cfg(any(feature = "plugin", feature = "client"))] pub mod backend;
 pub mod meta;
 pub mod settings;
 // pub mod priority;

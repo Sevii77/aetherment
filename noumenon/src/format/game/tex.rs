@@ -382,7 +382,7 @@ impl Tiff for Tex {
 }
 
 impl Tga for Tex {
-    fn read<T>(reader: &mut T) -> Result<Self, Error> where 
+	fn read<T>(reader: &mut T) -> Result<Self, Error> where 
 	T: Read + Seek {
 		let img = image::io::Reader::with_format(BufReader::new(reader), image::ImageFormat::Tga)
 			.decode()?;
@@ -400,9 +400,9 @@ impl Tga for Tex {
 			},
 			data: img.into_rgba8().into_vec(),
 		})
-    }
-
-    fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	}
+	
+	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
 	T: Write + Seek {
 		let img = TgaEncoder::new(writer);
 		img.write_image(
@@ -413,5 +413,5 @@ impl Tga for Tex {
 		)?;
 		
 		Ok(())
-    }
+	}
 }

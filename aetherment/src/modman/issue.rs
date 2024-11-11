@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::render_helper::EnumTools;
+#[cfg(any(feature = "plugin", feature = "client"))] use crate::render_helper::EnumTools;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Issue {
@@ -14,6 +14,7 @@ pub enum Status {
 	Warning(String),
 }
 
+#[cfg(any(feature = "plugin", feature = "client"))]
 impl Issue {
 	pub fn get_status(&self) -> Status {
 		let funcs = unsafe{FUNCS.as_ref().unwrap()};
@@ -63,13 +64,16 @@ impl Issue {
 
 // ----------
 
+#[cfg(any(feature = "plugin", feature = "client"))] 
 pub struct IssueInitializers {
 	pub ui_resolution: Box<dyn Fn() -> u8>,
 	pub ui_theme: Box<dyn Fn() -> u8>,
 	pub collection: Box<dyn Fn(super::backend::CollectionType) -> super::backend::Collection>,
 }
 
+#[cfg(any(feature = "plugin", feature = "client"))] 
 static mut FUNCS: Option<IssueInitializers> = None;
+#[cfg(any(feature = "plugin", feature = "client"))] 
 pub(crate) fn initialize(funcs: IssueInitializers) {
 	unsafe{FUNCS = Some(funcs)}
 }

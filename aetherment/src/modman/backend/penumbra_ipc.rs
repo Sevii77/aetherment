@@ -335,6 +335,9 @@ impl super::Backend for Penumbra {
 }
 
 fn apply_ui_colors() {
+	let collection = get_collection(super::CollectionType::Interface);
+	if !collection.is_valid() {return}
+	
 	let mut final_ui_colors = HashMap::<(bool, u32), (i32, [u8; 3])>::new();
 	
 	let root = root_path();
@@ -342,8 +345,6 @@ fn apply_ui_colors() {
 		let mod_dir = root.join(&id);
 		let aeth_dir = mod_dir.join("aetherment");
 		if !aeth_dir.exists() {continue}
-		let collection = get_collection(super::CollectionType::Interface);
-		if !collection.is_valid() {continue}
 		let settings = get_mod_settings(&collection.id, &id, true);
 		if !settings.enabled {continue}
 		let priority = settings.priority;

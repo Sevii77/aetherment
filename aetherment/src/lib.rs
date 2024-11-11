@@ -1,17 +1,15 @@
 #[macro_use]
 mod log;
+pub use log::LogType;
+
 mod resource_loader;
 mod render_helper;
 mod config;
 pub mod modman;
-mod view;
-mod remote;
-pub mod service;
-
-pub use log::LogType;
-// pub use renderer;
-
-pub extern crate renderer;
+#[cfg(any(feature = "plugin", feature = "client"))] mod view;
+#[cfg(any(feature = "plugin", feature = "client"))] mod remote;
+#[cfg(any(feature = "plugin", feature = "client"))] pub mod service;
+#[cfg(any(feature = "plugin", feature = "client"))] pub extern crate renderer;
 pub use noumenon as noumenon_; // idk what to call it
 
 static mut CONFIG: Option<config::ConfigManager> = None;
@@ -26,7 +24,9 @@ pub fn config() -> &'static mut config::ConfigManager {
 
 // not thread safe (probably), being used across threads, it will bite me in the ass
 // TODO: fix
+#[cfg(any(feature = "plugin", feature = "client"))] 
 static mut BACKEND: Option<Box<dyn modman::backend::Backend>> = None;
+#[cfg(any(feature = "plugin", feature = "client"))] 
 pub fn backend() -> &'static mut Box<dyn modman::backend::Backend> {
 	unsafe{BACKEND.as_mut().unwrap()}
 }
@@ -53,6 +53,7 @@ pub fn json_pretty<T: serde::Serialize>(data: &T) -> Result<String, serde_json::
 	Ok(String::from_utf8(serializer.into_inner()).unwrap())
 }
 
+#[cfg(any(feature = "plugin", feature = "client"))]
 pub struct Core {
 	mods_tab: view::mods::Mods,
 	browser_tab: view::browser::Browser,
@@ -67,6 +68,7 @@ pub struct Core {
 	apply_progress: crate::modman::backend::ApplyProgress,
 }
 
+#[cfg(any(feature = "plugin", feature = "client"))]
 impl Core {
 	pub fn new(log: fn(log::LogType, String), backend_initializers: modman::backend::BackendInitializers, issue_initializers: modman::issue::IssueInitializers, optional_initializers: modman::meta::OptionalInitializers) -> Self {
 		unsafe {

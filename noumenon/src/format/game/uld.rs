@@ -1,4 +1,4 @@
-use std::{io::{Read, Seek, Write, SeekFrom}, fmt::Debug};
+use std::{fmt::Debug, io::{Read, Seek, SeekFrom, Write}};
 use binrw::{binrw, BinRead, BinWrite};
 use crate::{Error, NullReader, NullWriter};
 
@@ -80,9 +80,24 @@ impl BinRead for Uld {
 		
 		reader.seek(SeekFrom::Start(primary_pos + primary_header.component_offset as u64))?;
 		let components_header = ListHeader::read_options(reader, endian, ())?;
+		let components_pos = reader.stream_position()?;
+		
+		// read in component types since earlier nodes can reference later components (i hate this)
+		let mut component_types = std::collections::HashMap::new();
+		for _ in 0..components_header.element_count {
+			let id = u32::read_options(reader, endian, ())?;
+			reader.seek(SeekFrom::Current(3))?;
+			let component_type = ComponentType::read_options(reader, endian, ())?;
+			component_types.insert(id, component_type);
+			reader.seek(SeekFrom::Current(4))?;
+			let size = u16::read_options(reader, endian, ())?;
+			reader.seek(SeekFrom::Current(size as i64 - 14))?;
+		}
+		
+		reader.seek(SeekFrom::Start(components_pos))?;
 		let mut components = Vec::with_capacity(components_header.element_count as usize);
 		for _ in 0..components_header.element_count {
-			components.push(UldComponent::read_options(reader, endian, &components)?);
+			components.push(UldComponent::read_options(reader, endian, &component_types)?);
 		}
 		
 		reader.seek(SeekFrom::Start(primary_pos + primary_header.timeline_offset as u64))?;
@@ -100,7 +115,7 @@ impl BinRead for Uld {
 		let widget_header = ListHeader::read_options(reader, endian, ())?;
 		let mut widgets = Vec::with_capacity(widget_header.element_count as usize);
 		for _ in 0..widget_header.element_count {
-			widgets.push(WidgetData::read_options(reader, endian, &components[..])?);
+			widgets.push(WidgetData::read_options(reader, endian, &component_types)?);
 		}
 		
 		Ok(Self {
@@ -287,7 +302,7 @@ pub struct UldComponent {
 }
 
 impl BinRead for UldComponent {
-	type Args<'a> = &'a [UldComponent];
+	type Args<'a> = &'a std::collections::HashMap<u32, ComponentType>;
 	
 	fn read_options<R: Read + Seek>(reader: &mut R, endian: binrw::Endian, components: Self::Args<'_>,) -> binrw::BinResult<Self> {
 		let pos = reader.stream_position()?;
@@ -342,6 +357,7 @@ impl BinWrite for UldComponent {
 		self.component.write_options(writer, endian, ())?;
 		let node_pos = writer.stream_position()?;
 		for node in &self.nodes {
+			// println!("node {i}; pos {}; {node:#?}\n", writer.stream_position()?);
 			node.write_options(writer, endian, ())?;
 		}
 		
@@ -458,7 +474,7 @@ pub struct WidgetData {
 }
 
 impl BinRead for WidgetData {
-	type Args<'a> = &'a [UldComponent];
+	type Args<'a> = &'a std::collections::HashMap<u32, ComponentType>;
 	
 	fn read_options<R: Read + Seek>(reader: &mut R, endian: binrw::Endian, components: Self::Args<'_>,) -> binrw::BinResult<Self> {
 		let pos = reader.stream_position()?;

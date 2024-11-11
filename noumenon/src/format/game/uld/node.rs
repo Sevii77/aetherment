@@ -94,7 +94,7 @@ pub struct NodeData {
 }
 
 impl BinRead for NodeData {
-	type Args<'a> = &'a [super::UldComponent];
+	type Args<'a> = &'a std::collections::HashMap<u32, super::ComponentType>;
 	
 	fn read_options<R: Read + Seek>(reader: &mut R, endian: binrw::Endian, components: Self::Args<'_>,) -> binrw::BinResult<Self> {
 		let pos = reader.stream_position()?;
@@ -277,7 +277,7 @@ impl Default for Node {
 }
 
 impl BinRead for Node {
-	type Args<'a> = (u32, u16, &'a [super::UldComponent]);
+	type Args<'a> = (u32, u16, &'a std::collections::HashMap<u32, super::ComponentType>);
 	
 	fn read_options<R: Read + Seek>(reader: &mut R, endian: binrw::Endian, (node_type, node_size, components): Self::Args<'_>,) -> binrw::BinResult<Self> {
 		Ok(match node_type {
@@ -291,7 +291,8 @@ impl BinRead for Node {
 				if node_size <= 88 {
 					Node::Other(node_type)
 				} else if node_type > 1000 {
-					let component_type = components.iter().find(|c| c.id == node_type).map_or(super::ComponentType::Custom, |v| v.component.get_type());
+					// let component_type = components.iter().find(|c| c.id == node_type).map_or(super::ComponentType::Custom, |v| v.component.get_type());
+					let component_type = components.get(&node_type).map_or(super::ComponentType::Custom, |v| *v);
 					Node::Component(ComponentNode::read_options(reader, endian, (component_type, node_type))?)
 				} else {
 					let mut unknown_data = vec![0u8; node_size as usize - 88];

@@ -1,4 +1,4 @@
-use renderer::*;
+#[cfg(any(feature = "plugin", feature = "client"))] use renderer::*;
 
 pub trait EnumTools {
 	type Iterator: core::iter::Iterator<Item = Self>;
@@ -12,6 +12,7 @@ pub trait UiExt {
 	fn combo_enum<S: AsRef<str>, Enum: EnumTools + PartialEq>(&mut self, label: S, val: &mut Enum) -> bool;
 }
 
+#[cfg(any(feature = "plugin", feature = "client"))]
 impl<'a> UiExt for Ui<'a> {
 	fn combo_enum<S: AsRef<str>, Enum: EnumTools + PartialEq>(&mut self, label: S, val: &mut Enum) -> bool {
 		let mut changed = false;

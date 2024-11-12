@@ -158,9 +158,9 @@ impl Mods {
 				
 				let mut changed = false;
 				
-				let warnings = meta.issues.iter().filter_map(|v| match v.get_status() {
-					crate::modman::issue::Status::Ok => None,
-					crate::modman::issue::Status::Warning(msg) => Some(msg),
+				let warnings = meta.requirements.iter().filter_map(|v| match v.get_status() {
+					crate::modman::requirement::Status::Ok => None,
+					crate::modman::requirement::Status::Warning(msg) => Some(msg),
 				}).collect::<Vec<_>>();
 				if warnings.len() > 0 {
 					for msg in warnings {

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(any(feature = "plugin", feature = "client"))] use crate::render_helper::EnumTools;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-pub enum Issue {
+pub enum Requirement {
 	UiResolution(String),
 	UiTheme(String),
 	Collection(String),
@@ -15,12 +15,12 @@ pub enum Status {
 }
 
 #[cfg(any(feature = "plugin", feature = "client"))]
-impl Issue {
+impl Requirement {
 	pub fn get_status(&self) -> Status {
 		let funcs = unsafe{FUNCS.as_ref().unwrap()};
 		
 		match self {
-			Issue::UiResolution(res) =>
+			Requirement::UiResolution(res) =>
 				if match res.to_ascii_lowercase().as_str() {
 					"standard" => Some(0),
 					"high" => Some(1),
@@ -33,7 +33,7 @@ impl Issue {
 					                         and set 'UI Resolution' (2nd option) to {res}. Restart your game after."))
 				}
 			
-			Issue::UiTheme(theme) =>
+			Requirement::UiTheme(theme) =>
 				if match theme.to_ascii_lowercase().as_str() {
 					"dark" => Some(0),
 					"light" => Some(1),
@@ -48,7 +48,7 @@ impl Issue {
 					                         and select {theme} from the dropdown. Restart your game after."))
 				}
 			
-			Issue::Collection(collection_type_name) =>
+			Requirement::Collection(collection_type_name) =>
 				if super::backend::CollectionType::iter()
 					.find(|v| v.to_str().to_ascii_lowercase() == collection_type_name.to_ascii_lowercase())
 					.map_or(false, |v| (funcs.collection)(v).is_valid()) {
@@ -65,15 +65,15 @@ impl Issue {
 // ----------
 
 #[cfg(any(feature = "plugin", feature = "client"))] 
-pub struct IssueInitializers {
+pub struct RequirementInitializers {
 	pub ui_resolution: Box<dyn Fn() -> u8>,
 	pub ui_theme: Box<dyn Fn() -> u8>,
 	pub collection: Box<dyn Fn(super::backend::CollectionType) -> super::backend::Collection>,
 }
 
 #[cfg(any(feature = "plugin", feature = "client"))] 
-static mut FUNCS: Option<IssueInitializers> = None;
+static mut FUNCS: Option<RequirementInitializers> = None;
 #[cfg(any(feature = "plugin", feature = "client"))] 
-pub(crate) fn initialize(funcs: IssueInitializers) {
+pub(crate) fn initialize(funcs: RequirementInitializers) {
 	unsafe{FUNCS = Some(funcs)}
 }

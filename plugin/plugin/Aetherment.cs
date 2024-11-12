@@ -26,7 +26,7 @@ public class Aetherment: IDalamudPlugin {
 	private static string? error;
 	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? titleEntry;
 	
-	private Issue issue;
+	private Requirement requirement;
 	private Penumbra penumbra;
 	private DalamudStyle dalamud;
 	private TexFinder texfinder;
@@ -34,13 +34,13 @@ public class Aetherment: IDalamudPlugin {
 	[StructLayout(LayoutKind.Sequential)]
 	private unsafe struct Initializers {
 		public nint log;
-		public IssueFunctions issue;
+		public RequirementFunctions requirement;
 		public PenumbraFunctions penumbra;
 		public nint dalamud_add_style;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
-	private unsafe struct IssueFunctions {
+	private unsafe struct RequirementFunctions {
 		public nint ui_resolution;
 		public nint ui_theme;
 	}
@@ -74,16 +74,16 @@ public class Aetherment: IDalamudPlugin {
 		// }
 		
 		log = Log;
-		issue = new();
+		requirement = new();
 		penumbra = new();
 		dalamud = new();
 		texfinder = new();
 		
 		var init = new Initializers {
 			log = Marshal.GetFunctionPointerForDelegate(log),
-			issue = new IssueFunctions {
-				ui_resolution = Marshal.GetFunctionPointerForDelegate(issue.getUiResolution),
-				ui_theme = Marshal.GetFunctionPointerForDelegate(issue.getUiTheme),
+			requirement = new RequirementFunctions {
+				ui_resolution = Marshal.GetFunctionPointerForDelegate(requirement.getUiResolution),
+				ui_theme = Marshal.GetFunctionPointerForDelegate(requirement.getUiTheme),
 			},
 			penumbra = new PenumbraFunctions {
 				// config_dir = Interface.ConfigDirectory.Parent! + "/Penumbra/",

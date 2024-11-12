@@ -1,10 +1,10 @@
 namespace Aetherment;
 
-public class Issue {
+public class Requirement {
 	private byte uires;
 	private byte theme;
 	
-	public Issue() {
+	public Requirement() {
 		// we get these now since they require a restart, we dont want the live value
 		// might still break if aetherment is loaded after the user changed the setting
 		// without restarting but oh well.

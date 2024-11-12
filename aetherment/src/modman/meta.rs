@@ -25,7 +25,7 @@ pub struct Meta {
 	
 	pub plugin_settings: PluginSettings,
 	
-	pub issues: Vec<super::issue::Issue>,
+	pub requirements: Vec<super::requirement::Requirement>,
 }
 
 impl Default for Meta {
@@ -48,7 +48,7 @@ impl Default for Meta {
 			
 			plugin_settings: PluginSettings::default(),
 			
-			issues: Vec::new(),
+			requirements: Vec::new(),
 		}
 	}
 }

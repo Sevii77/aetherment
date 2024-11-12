@@ -97,7 +97,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 		};
 		
 		let funcs = init.penumbra_functions;
-		let issue_funcs = init.issue_functions;
+		let requirement_funcs = init.issue_functions;
 		
 		let get_collection = Box::new(move |collection_type| {
 			let v = (funcs.get_collection)(collection_type as _).to_string();
@@ -168,9 +168,9 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 				
 				// default_collection: Box::new(move || (funcs.default_collection)().to_string()),
 				// get_collections: Box::new(move || (funcs.get_collections)().to_string_vec()),
-			}), aetherment::modman::issue::IssueInitializers {
-				ui_resolution: Box::new(issue_funcs.ui_resolution),
-				ui_theme: Box::new(issue_funcs.ui_theme),
+			}), aetherment::modman::requirement::RequirementInitializers {
+				ui_resolution: Box::new(requirement_funcs.ui_resolution),
+				ui_theme: Box::new(requirement_funcs.ui_theme),
 				collection: get_collection,
 			}, aetherment::modman::meta::OptionalInitializers {
 				dalamud: Some(dalamud_add_style)

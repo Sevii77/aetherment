@@ -5,7 +5,7 @@
 	"Description": "Auto updates mods and allows for more customization such as color and compositing onto other files",
 	"InternalName": "Aetherment",
 	"ApplicableVersion": "any",
-	"DalamudApiLevel": 10,
+	"DalamudApiLevel": 11,
 	"LoadPriority": 1,
 	"Tags": ["Ui", "Modding"]
 }

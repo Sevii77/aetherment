@@ -341,6 +341,7 @@ pub struct JournalComponent {
 	pub unk1: u16,
 	pub unk2: u16,
 	pub padding: u16,
+	pub unk3: [u32; 6], // 7.1 requires this, no clue what it actually contains and where new stuff got added, this just fixes issues
 }
 
 #[binrw]

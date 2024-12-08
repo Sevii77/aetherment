@@ -55,7 +55,7 @@ public unsafe class Penumbra: IDisposable {
 	private static void ModSettingChanged(int type, Guid collection_id, string mod_id, bool inherited) {
 		// Aetherment.Logger.Debug($"{type} - {collection_id} - {mod_id} - {inherited}");
 		if(!inherited && Aetherment.state != 0)
-			backend_penumbraipc_modchanged((byte)type, collection_id.ToString(), mod_id);
+			Native.backend_penumbraipc_modchanged((byte)type, collection_id.ToString(), mod_id);
 	}
 	
 	public RedrawDelegate redraw;
@@ -300,6 +300,4 @@ public unsafe class Penumbra: IDisposable {
 	// 	
 	// 	return collections_str;
 	// }
-	
-	[DllImport("aetherment_core.dll")] private static extern unsafe void backend_penumbraipc_modchanged(byte type, FFI.Str collection_id, FFI.Str mod_id);
 }

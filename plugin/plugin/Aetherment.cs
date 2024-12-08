@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.Loader;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -32,7 +35,7 @@ public class Aetherment: IDalamudPlugin {
 	private TexFinder texfinder;
 	
 	[StructLayout(LayoutKind.Sequential)]
-	private unsafe struct Initializers {
+	public unsafe struct Initializers {
 		public nint log;
 		public RequirementFunctions requirement;
 		public PenumbraFunctions penumbra;
@@ -40,13 +43,13 @@ public class Aetherment: IDalamudPlugin {
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
-	private unsafe struct RequirementFunctions {
+	public unsafe struct RequirementFunctions {
 		public nint ui_resolution;
 		public nint ui_theme;
 	}
 
 	[StructLayout(LayoutKind.Sequential)]
-	private unsafe struct PenumbraFunctions {
+	public unsafe struct PenumbraFunctions {
 		// public FFI.Str config_dir;
 		public nint redraw;
 		public nint redraw_self;
@@ -107,7 +110,7 @@ public class Aetherment: IDalamudPlugin {
 		};
 		
 		try {
-			state = initialize(init);
+			state = Native.initialize(init);
 		} catch(Exception e) {
 			Kill(e.ToString(), 2);
 		}
@@ -144,7 +147,7 @@ public class Aetherment: IDalamudPlugin {
 	
 	public void Dispose() {
 		if(state != 0)
-			destroy(state);
+			Native.destroy(state);
 		
 		FFI.Str.Drop();
 		
@@ -162,6 +165,8 @@ public class Aetherment: IDalamudPlugin {
 		// if(watcher != null)
 		// 	watcher.Dispose();
 		state = 0;
+		
+		Native.Free();
 	}
 	
 	private void OpenConf() {
@@ -173,7 +178,7 @@ public class Aetherment: IDalamudPlugin {
 		
 		if(state != 0) {
 			try {
-				draw(state);
+				Native.draw(state);
 			} catch {
 				Kill("Fatal error in draw", 1);
 			}
@@ -199,7 +204,7 @@ public class Aetherment: IDalamudPlugin {
 		if(cmd != maincommand)
 			return;
 		
-		command(state, args);
+		Native.command(state, args);
 	}
 	
 	private void Kill(string msg, byte strip) {
@@ -234,9 +239,4 @@ public class Aetherment: IDalamudPlugin {
 		else
 			Logger.Debug(str);
 	}
-	
-	[DllImport("aetherment_core.dll")] private static extern unsafe nint initialize(Initializers data);
-	[DllImport("aetherment_core.dll")] private static extern unsafe void destroy(nint state);
-	[DllImport("aetherment_core.dll")] private static extern unsafe void command(nint state, FFI.Str args);
-	[DllImport("aetherment_core.dll")] private static extern unsafe void draw(nint state);
 }

@@ -1,4 +1,4 @@
-use std::{fs::File, io::{BufReader, BufWriter, Cursor, Read, Write}, path::PathBuf};
+use std::{fs::File, io::{BufReader, BufWriter, Cursor, Read, Write}, path::{Path, PathBuf}};
 
 use clap::{value_parser, Arg, ArgAction, Command};
 
@@ -34,7 +34,7 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 			.about("Convert files between formats")
 			.arg(Arg::new("informat")
 				.long("informat")
-				.help("Format of the input file, required if input is stdin")
+				.help("Format of the input file, required if input is stdin or if input is a directory")
 				.required_if_eq("in", "-")
 				.action(ArgAction::Set)
 				.num_args(1))
@@ -136,34 +136,98 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 		
 		Some(("convert", sub)) => {
 			let in_file = sub.get_one::<String>("in").ok_or("in is required")?;
+			let in_is_dir = Path::new(&in_file).is_dir();
 			let in_format = match sub.get_one::<String>("informat") {
 				Some(v) => v,
-				None => in_file.split(".").last().unwrap(),
+				None => if in_is_dir {
+						return Err("informat is required if in path is directory")?;
+					} else {
+						in_file.split(".").last().unwrap()
+					},
 			};
 			
-			let out_file = match sub.get_one::<String>("out") {
-				Some(v) => v.to_string(),
-				None => if in_file == "-" {"-".to_owned()} else {std::path::Path::new(&in_file).with_extension(default_target_ext(in_format)).to_string_lossy().to_string()}
-			};
-			let out_format = match sub.get_one::<String>("outformat") {
-				Some(v) => v,
-				None => out_file.split(".").last().unwrap(),
-			};
+			let out_file = sub.get_one::<String>("out").map(|v| v.to_string());
 			
-			let converter = if in_file == "-" {
-				let mut data = Vec::new();
-				std::io::stdin().lock().read_to_end(&mut data)?;
-				aetherment::noumenon_::Convert::from_ext(&in_format, &mut BufReader::new(Cursor::new(data)))?
+			if in_is_dir {
+				let out_format = match sub.get_one::<String>("outformat") {
+					Some(v) => v,
+					None => default_target_ext(in_format),
+				};
+				
+				fn do_dir(dir: &Path, cur_path: PathBuf, out_path: Option<&str>, in_format: &str, out_format: &str) {
+					let Ok(reader) = std::fs::read_dir(dir) else {return};
+					
+					for entry in reader {
+						let Ok(entry) = entry else {continue};
+						let path = entry.path();
+						
+						if path.is_dir() {
+							do_dir(&path, cur_path.join(path.file_name().unwrap()), out_path, in_format, out_format);
+						} else if path.is_file() && path.extension().map(|v| v.to_str()) == Some(Some(in_format)) {
+							let f = match File::open(&path) {
+								Ok(v) => v,
+								Err(err) => {println!("Failed converting {path:?} ({err:?})"); continue}
+							};
+							
+							let converter = match aetherment::noumenon_::Convert::from_ext(&in_format, &mut BufReader::new(f)) {
+								Ok(v) => v,
+								Err(err) => {println!("Failed converting {path:?} ({err:?})"); continue}
+							};
+							
+							let out_path = match out_path {
+								Some(v) => Path::new(v).join(&cur_path).join(path.with_extension(out_format).file_name().unwrap()),
+								None => path.with_extension(out_format),
+							};
+							
+							if let Some(parent) = out_path.parent() {
+								_ = std::fs::create_dir_all(parent);
+							}
+							
+							let f = match File::create(&out_path) {
+								Ok(v) => v,
+								Err(err) => {println!("Failed converting {path:?} ({err:?})"); continue}
+							};
+							
+							if let Err(err) = converter.convert(&out_format, &mut BufWriter::new(f)) {
+								println!("Failed converting {path:?} ({err:?})");
+								continue;
+							}
+							
+							println!("Converted {path:?} to {out_path:?}");
+						}
+					}
+				}
+				
+				do_dir(Path::new(in_file), PathBuf::new(), out_file.as_deref(), &in_format, &out_format);
 			} else {
-				aetherment::noumenon_::Convert::from_ext(&in_format, &mut BufReader::new(File::open(in_file)?))?
-			};
-			
-			if out_file == "-" {
-				let mut data = Vec::new();
-				converter.convert(&out_format, &mut BufWriter::new(Cursor::new(&mut data)))?;
-				std::io::stdout().lock().write_all(&data)?;
-			} else {
-				converter.convert(&out_format, &mut BufWriter::new(File::create(&out_file)?))?;
+				let out_file = match out_file {
+					Some(v) => v.to_string(),
+					None => if in_file == "-" {
+							"-".to_owned()
+						} else {
+							Path::new(&in_file).with_extension(default_target_ext(in_format)).to_string_lossy().to_string()
+						}
+				};
+				let out_format = match sub.get_one::<String>("outformat") {
+					Some(v) => v,
+					None => out_file.split(".").last().unwrap(),
+				};
+				
+				let converter = if in_file == "-" {
+					let mut data = Vec::new();
+					std::io::stdin().lock().read_to_end(&mut data)?;
+					aetherment::noumenon_::Convert::from_ext(&in_format, &mut BufReader::new(Cursor::new(data)))?
+				} else {
+					aetherment::noumenon_::Convert::from_ext(&in_format, &mut BufReader::new(File::open(in_file)?))?
+				};
+				
+				if out_file == "-" {
+					let mut data = Vec::new();
+					converter.convert(&out_format, &mut BufWriter::new(Cursor::new(&mut data)))?;
+					std::io::stdout().lock().write_all(&data)?;
+				} else {
+					converter.convert(&out_format, &mut BufWriter::new(File::create(&out_file)?))?;
+				}
 			}
 		}
 		

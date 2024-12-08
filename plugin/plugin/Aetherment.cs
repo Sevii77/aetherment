@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Reflection;
 using System.Runtime.InteropServices;
-using System.Runtime.Loader;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;

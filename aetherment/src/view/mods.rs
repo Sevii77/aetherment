@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::modman::settings::Settings;
 
 pub struct Mods {
@@ -131,7 +131,7 @@ impl Mods {
 			ui_right.mark_next_splitter();
 			
 			{
-				use crate::modman::{meta::OptionSettings, settings::Value::*, backend::SettingsType};
+				use crate::modman::{meta::OptionSettings, backend::SettingsType};
 				
 				let ui = ui_right;
 				
@@ -325,129 +325,32 @@ impl Mods {
 					}
 				}
 				
+				let mut grouped_options = HashSet::new();
+				for option in meta.options.options_iter() {
+					if let OptionSettings::Grouped(group) = &option.settings {
+						for sub in group.options.iter() {
+							for val in sub.options.iter() {
+								if let crate::modman::meta::ValueGroupedOptionEntryType::Option(val) = val {
+									for name in val.options.iter() {
+										grouped_options.insert(name.as_str());
+									}
+								}
+							}
+						}
+					}
+				}
+				
 				let mut cur_category = "Main";
-				for option_type in meta.options.0.iter() {
+				for option_type in meta.options.iter() {
 					let option = match option_type {
 						crate::modman::meta::OptionType::Option(v) => v,
 						crate::modman::meta::OptionType::Category(s) => {cur_category = s.as_ref(); continue},
 					};
 					
+					if grouped_options.contains(option.name.as_str()) {continue}
 					if categories.len() > 1 && cur_category != self.selected_category_tab {continue}
 					
-					let setting_id = &option.name;
-					let val = settings.get_mut(setting_id).unwrap();
-					
-					match val {
-						SingleFiles(val) => {
-							let OptionSettings::SingleFiles(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
-							ui.horizontal(|ui| {
-								ui.combo(&option.name, o.options.get(*val as usize).map_or("Invalid", |v| &v.name), |ui| {
-									for (i, sub) in o.options.iter().enumerate() {
-										ui.horizontal(|ui| {
-											changed |= ui.selectable_value(&sub.name, val,i as u32).clicked;
-											if !sub.description.is_empty() {
-												ui.helptext(&sub.description);
-											}
-										});
-									}
-								});
-								
-								if !option.description.is_empty() {
-									ui.helptext(&option.description);
-								}
-							});
-						}
-						
-						MultiFiles(val) => {
-							let OptionSettings::MultiFiles(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
-							ui.horizontal(|ui| {
-								ui.label(&option.name);
-								if !option.description.is_empty() {
-									ui.helptext(&option.description);
-								}
-							});
-							
-							ui.indent(|ui| {
-								for (i, sub) in o.options.iter().enumerate() {
-									ui.horizontal(|ui| {
-										let mut toggled = *val & (1 << i) != 0;
-										if ui.checkbox(&sub.name, &mut toggled).changed {
-											*val ^= 1 << i;
-											changed = true;
-										}
-										
-										if !sub.description.is_empty() {
-											ui.helptext(&sub.description);
-										}
-									});
-								}
-							});
-						}
-						
-						Rgb(val) => {
-							let OptionSettings::Rgb(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
-							ui.horizontal(|ui| {
-								changed |= ui.color_edit_rgb(&option.name, val).changed;
-								for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
-								if !option.description.is_empty() {
-									ui.helptext(&option.description);
-								}
-							});
-						}
-						
-						Rgba(val) => {
-							let OptionSettings::Rgba(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
-							ui.horizontal(|ui| {
-								changed |= ui.color_edit_rgba(&option.name, val).changed;
-								for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
-								if !option.description.is_empty() {
-									ui.helptext(&option.description);
-								}
-							});
-						}
-						
-						Grayscale(val) => {
-							let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
-							changed |= ui.slider(&option.name, val, o.min..=o.max).changed;
-							*val = val.clamp(o.min, o.max);
-							if !option.description.is_empty() {
-								ui.helptext(&option.description);
-							}
-						}
-						
-						Opacity(val) => {
-							let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
-							changed |= ui.slider(&option.name, val, o.min..=o.max).changed;
-							*val = val.clamp(o.min, o.max);
-							if !option.description.is_empty() {
-								ui.helptext(&option.description);
-							}
-						}
-						
-						Mask(val) => {
-							let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
-							changed |= ui.slider(&option.name, val, o.min..=o.max).changed;
-							*val = val.clamp(o.min, o.max);
-							if !option.description.is_empty() {
-								ui.helptext(&option.description);
-							}
-						}
-						
-						Path(val) => {
-							let OptionSettings::Path(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); continue};
-							ui.horizontal(|ui| {
-								ui.combo(&option.name, o.options.get(*val as usize).map_or("Invalid", |v| &v.0), |ui| {
-									for (i, (name, _)) in o.options.iter().enumerate() {
-										changed |= ui.selectable_value(name, val, i as u32).clicked;
-									}
-								});
-								
-								if !option.description.is_empty() {
-									ui.helptext(&option.description);
-								}
-							});
-						}
-					}
+					changed |= draw_option(ui, meta, settings, option, &option.name, &option.description);
 				}
 				
 				// ui.enabled(!is_busy, |ui| {
@@ -481,4 +384,172 @@ impl Mods {
 		
 		_ = config.save();
 	}
+}
+
+fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings: &mut crate::modman::settings::CollectionSettings, option: &crate::modman::meta::Option, name: &str, desc: &str) -> bool {
+	use crate::modman::{meta::OptionSettings, settings::Value::*};
+	
+	let mut changed = false;
+	let setting_id = &option.name;
+	let val = settings.get_mut(setting_id).unwrap();
+	
+	match val {
+		Grouped(val) => {
+			let OptionSettings::Grouped(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			let selected = o.options.get(*val as usize);
+			ui.horizontal(|ui| {
+				ui.combo(name, selected.map_or("Invalid", |v| &v.name), |ui| {
+					for (i, sub) in o.options.iter().enumerate() {
+						ui.horizontal(|ui| {
+							changed |= ui.selectable_value(&sub.name, val, i as u32).clicked;
+							if !sub.description.is_empty() {
+								ui.helptext(&sub.description);
+							}
+						});
+					}
+				});
+				
+				if !desc.is_empty() {
+					ui.helptext(&desc);
+				}
+			});
+			
+			if let Some(selected) = selected {
+				for sub in selected.options.iter() {
+					match sub {
+						crate::modman::meta::ValueGroupedOptionEntryType::Category(v) => ui.label(v),
+						
+						crate::modman::meta::ValueGroupedOptionEntryType::Option(v) => {
+							if let Some(first) = v.options.first() {
+								if let Some(opt) = meta.options.options_iter().find(|x| x.name == *first) {
+									if draw_option(ui, meta, settings, opt, &v.name, &v.description) {
+										let val = settings.get(first).unwrap().clone();
+										for name in v.options.iter() {
+											if let Some(opt) = meta.options.options_iter().find(|x| x.name == *name) {
+												*settings.get_mut(&opt.name).unwrap() = val.clone();
+											}
+										}
+										
+										changed = true;
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		SingleFiles(val) => {
+			let OptionSettings::SingleFiles(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			ui.horizontal(|ui| {
+				ui.combo(name, o.options.get(*val as usize).map_or("Invalid", |v| &v.name), |ui| {
+					for (i, sub) in o.options.iter().enumerate() {
+						ui.horizontal(|ui| {
+							changed |= ui.selectable_value(&sub.name, val, i as u32).clicked;
+							if !sub.description.is_empty() {
+								ui.helptext(&sub.description);
+							}
+						});
+					}
+				});
+				
+				if !desc.is_empty() {
+					ui.helptext(&desc);
+				}
+			});
+		}
+		
+		MultiFiles(val) => {
+			let OptionSettings::MultiFiles(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			ui.horizontal(|ui| {
+				ui.label(name);
+				if !desc.is_empty() {
+					ui.helptext(&desc);
+				}
+			});
+			
+			ui.indent(|ui| {
+				for (i, sub) in o.options.iter().enumerate() {
+					ui.horizontal(|ui| {
+						let mut toggled = *val & (1 << i) != 0;
+						if ui.checkbox(&sub.name, &mut toggled).changed {
+							*val ^= 1 << i;
+							changed = true;
+						}
+						
+						if !sub.description.is_empty() {
+							ui.helptext(&sub.description);
+						}
+					});
+				}
+			});
+		}
+		
+		Rgb(val) => {
+			let OptionSettings::Rgb(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			ui.horizontal(|ui| {
+				changed |= ui.color_edit_rgb(name, val).changed;
+				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
+				if !desc.is_empty() {
+					ui.helptext(&desc);
+				}
+			});
+		}
+		
+		Rgba(val) => {
+			let OptionSettings::Rgba(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			ui.horizontal(|ui| {
+				changed |= ui.color_edit_rgba(name, val).changed;
+				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
+				if !desc.is_empty() {
+					ui.helptext(&desc);
+				}
+			});
+		}
+		
+		Grayscale(val) => {
+			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			changed |= ui.slider(name, val, o.min..=o.max).changed;
+			*val = val.clamp(o.min, o.max);
+			if !desc.is_empty() {
+				ui.helptext(&desc);
+			}
+		}
+		
+		Opacity(val) => {
+			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			changed |= ui.slider(name, val, o.min..=o.max).changed;
+			*val = val.clamp(o.min, o.max);
+			if !desc.is_empty() {
+				ui.helptext(&desc);
+			}
+		}
+		
+		Mask(val) => {
+			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			changed |= ui.slider(name, val, o.min..=o.max).changed;
+			*val = val.clamp(o.min, o.max);
+			if !desc.is_empty() {
+				ui.helptext(&desc);
+			}
+		}
+		
+		Path(val) => {
+			let OptionSettings::Path(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
+			ui.horizontal(|ui| {
+				ui.combo(name, o.options.get(*val as usize).map_or("Invalid", |v| &v.0), |ui| {
+					for (i, (name, _)) in o.options.iter().enumerate() {
+						changed |= ui.selectable_value(name, val, i as u32).clicked;
+					}
+				});
+				
+				if !desc.is_empty() {
+					ui.helptext(&desc);
+				}
+			});
+		}
+	}
+	
+	changed
 }

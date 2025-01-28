@@ -100,11 +100,25 @@ pub struct OptionalInitializers {
 pub struct Options(pub Vec<OptionType>);
 impl Options {
 	pub fn options_iter(&self) -> impl Iterator<Item = &Option> + DoubleEndedIterator {
-		self.0.iter().filter_map(|v| if let OptionType::Option(v) = v {Some(v)} else {None})
+		self.iter().filter_map(|v| if let OptionType::Option(v) = v {Some(v)} else {None})
 	}
 	
 	pub fn categories_iter(&self) -> impl Iterator<Item = &str> + DoubleEndedIterator {
-		self.0.iter().filter_map(|v| if let OptionType::Category(v) = v {Some(v.as_str())} else {None})
+		self.iter().filter_map(|v| if let OptionType::Category(v) = v {Some(v.as_str())} else {None})
+	}
+}
+
+impl std::ops::Deref for Options {
+	type Target = Vec<OptionType>;
+	
+	fn deref(&self) -> &Self::Target {
+		&self.0
+	}
+}
+
+impl std::ops::DerefMut for Options {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.0
 	}
 }
 
@@ -141,6 +155,7 @@ impl<'de> Deserialize<'de> for OptionType {
 				let mut name = None;
 				let mut description = None;
 				let mut settings = None;
+				// let mut targets = None;
 				
 				while let Some(key) = map.next_key::<String>()? {
 					match key.as_str() {
@@ -168,6 +183,7 @@ pub struct Option {
 	pub name: String,
 	pub description: String,
 	pub settings: OptionSettings,
+	// pub targets: Vec<String>, // only used for ValueGrouped
 }
 
 impl std::hash::Hash for Option {
@@ -182,6 +198,7 @@ impl std::hash::Hash for Option {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum OptionSettings {
+	Grouped(ValueGrouped),
 	SingleFiles(ValueFiles),
 	MultiFiles(ValueFiles),
 	Rgb(ValueRgb),
@@ -194,10 +211,11 @@ pub enum OptionSettings {
 }
 
 impl EnumTools for OptionSettings {
-	type Iterator = std::array::IntoIter<Self, 8>;
+	type Iterator = std::array::IntoIter<Self, 9>;
 	
 	fn to_str(&self) -> &'static str {
 		match self {
+			Self::Grouped(_) => "Grouped",
 			Self::SingleFiles(_) => "Single Files",
 			Self::MultiFiles(_) => "Multi Files",
 			Self::Rgb(_) => "RGB",
@@ -211,6 +229,7 @@ impl EnumTools for OptionSettings {
 	
 	fn iter() -> Self::Iterator {
 		[
+			Self::Grouped(ValueGrouped::default()),
 			Self::SingleFiles(ValueFiles::default()),
 			Self::MultiFiles(ValueFiles::default()),
 			Self::Rgb(ValueRgb::default()),
@@ -226,6 +245,71 @@ impl EnumTools for OptionSettings {
 // ----------
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ValueGrouped {
+	pub default: u32,
+	pub options: Vec<ValueGroupedOption>,
+}
+
+impl Default for ValueGrouped {
+	fn default() -> Self {
+		Self {
+			default: 0,
+			options: Vec::new(),
+		}
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ValueGroupedOption {
+	pub name: String,
+	pub description: String,
+	pub options: Vec<ValueGroupedOptionEntryType>,
+}
+
+impl Default for ValueGroupedOption {
+	fn default() -> Self {
+		Self {
+			name: "New option".to_owned(),
+			description: String::new(),
+			options: Vec::new(),
+		}
+	}
+}
+
+impl std::hash::Hash for ValueGroupedOption {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.name.hash(state);
+		self.description.hash(state);
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum ValueGroupedOptionEntryType {
+	Category(String),
+	Option(ValueGroupedOptionEntry),
+}
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+pub struct ValueGroupedOptionEntry {
+	pub name: String,
+	pub description: String,
+	pub options: Vec<String>,
+}
+
+impl Default for ValueGroupedOptionEntry {
+	fn default() -> Self {
+		Self {
+			name: "New sub option".to_owned(),
+			description: String::new(),
+			options: Vec::new(),
+		}
+	}
+}
+
+// ----------
+
+#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub struct ValueFiles {
 	pub default: u32, // TODO: perhabs dupe this struct and have default value be a vec of bools for multi
 	pub options: Vec<ValueFilesOption>,
@@ -235,7 +319,7 @@ impl Default for ValueFiles {
 	fn default() -> Self {
 		Self {
 			default: 0,
-			options: vec![],
+			options: Vec::new(),
 		}
 	}
 }

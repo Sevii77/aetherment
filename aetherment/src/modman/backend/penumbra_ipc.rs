@@ -609,7 +609,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	let mut final_ui_colors = HashMap::<(bool, u32), OptionOrStatic<[f32; 3]>>::new();
 	
 	// let mut add_datas = |files: &HashMap<String, String>, swaps: &HashMap<String, String>, manips: &Vec<meta::Manipulation>| -> Result<(), crate::resource_loader::BacktraceError> {
-	let mut add_datas = |files: &HashMap<&str, &str>, swaps: &HashMap<&str, &str>, manips: &Vec<&meta::Manipulation>| -> Result<(), crate::resource_loader::BacktraceError> {
+	let mut add_datas = |files: &HashMap<&str, &str>, swaps: &HashMap<&str, &str>, _manips: &Vec<&meta::Manipulation>| -> Result<(), crate::resource_loader::BacktraceError> {
 		// use crate::modman::composite::*;
 		
 		for (game_path, real_path) in files {
@@ -673,117 +673,117 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			p_option.FileSwaps.insert(a.to_string(), b.to_string());
 		}
 		
-		for manip in manips {
-			match manip {
-				meta::Manipulation::Imc {
-					attribute_and_sound,
-					material_id,
-					decal_id,
-					vfx_id,
-					material_animation_id,
-					attribute_mask,
-					sound_id,
-					
-					primary_id,
-					secondary_id,
-					variant,
-					object_type,
-					equip_slot,
-					body_slot,
-				} => p_option.Manipulations.push(PManipulation::Imc {
-					Entry: ImcEntry {
-						AttributeAndSound: Some(*attribute_and_sound),
-						MaterialId: Some(*material_id),
-						DecalId: Some(*decal_id),
-						VfxId: Some(*vfx_id),
-						MaterialAnimationId: Some(*material_animation_id),
-						AttributeMask: Some(*attribute_mask),
-						SoundId: Some(*sound_id),
-					},
-					PrimaryId: *primary_id,
-					SecondaryId: *secondary_id,
-					Variant: *variant,
-					ObjectType: object_type.to_owned(),
-					EquipSlot: equip_slot.to_owned(),
-					BodySlot: body_slot.to_owned(),
-				}),
-				
-				meta::Manipulation::Eqdp {
-					entry,
-					set_id,
-					slot,
-					race,
-					gender,
-				} => p_option.Manipulations.push(PManipulation::Eqdp {
-					Entry: *entry,
-					SetId: *set_id,
-					Slot: slot.to_owned(),
-					Race: race.to_owned(),
-					Gender: gender.to_owned(),
-				}),
-				
-				meta::Manipulation::Eqp {
-					entry,
-					set_id,
-					slot,
-				} => p_option.Manipulations.push(PManipulation::Eqp {
-					Entry: *entry,
-					SetId: *set_id,
-					Slot: slot.to_owned(),
-				}),
-				
-				meta::Manipulation::Est {
-					entry,
-					set_id,
-					slot,
-					race,
-					gender,
-				} => p_option.Manipulations.push(PManipulation::Est {
-					Entry: *entry,
-					SetId: *set_id,
-					Slot: slot.to_owned(),
-					Race: race.to_owned(),
-					Gender: gender.to_owned(),
-				}),
-				
-				meta::Manipulation::Gmp {
-					enabled,
-					animated,
-					rotation_a,
-					rotation_b,
-					rotation_c,
-					unknown_a,
-					unknown_b,
-					unknown_total,
-					value,
-					
-					set_id,
-				} => p_option.Manipulations.push(PManipulation::Gmp {
-					Entry: GmpEntry {
-						Enabled: Some(*enabled),
-						Animated: Some(*animated),
-						RotationA: Some(*rotation_a),
-						RotationB: Some(*rotation_b),
-						RotationC: Some(*rotation_c),
-						UnknownA: Some(*unknown_a),
-						UnknownB: Some(*unknown_b),
-						UnknownTotal: Some(*unknown_total),
-						Value: Some(*value),
-					},
-					SetId: *set_id,
-				}),
-				
-				meta::Manipulation::Rsp {
-					entry,
-					sub_race,
-					attribute,
-				} => p_option.Manipulations.push(PManipulation::Rsp {
-					Entry: *entry,
-					SubRace: sub_race.to_owned(),
-					Attribute: attribute.to_owned(),
-				})
-			}
-		}
+		// for manip in manips {
+		// 	match manip {
+		// 		meta::Manipulation::Imc {
+		// 			attribute_and_sound,
+		// 			material_id,
+		// 			decal_id,
+		// 			vfx_id,
+		// 			material_animation_id,
+		// 			attribute_mask,
+		// 			sound_id,
+		// 			
+		// 			primary_id,
+		// 			secondary_id,
+		// 			variant,
+		// 			object_type,
+		// 			equip_slot,
+		// 			body_slot,
+		// 		} => p_option.Manipulations.push(PManipulation::Imc {
+		// 			Entry: ImcEntry {
+		// 				AttributeAndSound: Some(*attribute_and_sound),
+		// 				MaterialId: Some(*material_id),
+		// 				DecalId: Some(*decal_id),
+		// 				VfxId: Some(*vfx_id),
+		// 				MaterialAnimationId: Some(*material_animation_id),
+		// 				AttributeMask: Some(*attribute_mask),
+		// 				SoundId: Some(*sound_id),
+		// 			},
+		// 			PrimaryId: *primary_id,
+		// 			SecondaryId: *secondary_id,
+		// 			Variant: *variant,
+		// 			ObjectType: object_type.to_owned(),
+		// 			EquipSlot: equip_slot.to_owned(),
+		// 			BodySlot: body_slot.to_owned(),
+		// 		}),
+		// 		
+		// 		meta::Manipulation::Eqdp {
+		// 			entry,
+		// 			set_id,
+		// 			slot,
+		// 			race,
+		// 			gender,
+		// 		} => p_option.Manipulations.push(PManipulation::Eqdp {
+		// 			Entry: *entry,
+		// 			SetId: *set_id,
+		// 			Slot: slot.to_owned(),
+		// 			Race: race.to_owned(),
+		// 			Gender: gender.to_owned(),
+		// 		}),
+		// 		
+		// 		meta::Manipulation::Eqp {
+		// 			entry,
+		// 			set_id,
+		// 			slot,
+		// 		} => p_option.Manipulations.push(PManipulation::Eqp {
+		// 			Entry: *entry,
+		// 			SetId: *set_id,
+		// 			Slot: slot.to_owned(),
+		// 		}),
+		// 		
+		// 		meta::Manipulation::Est {
+		// 			entry,
+		// 			set_id,
+		// 			slot,
+		// 			race,
+		// 			gender,
+		// 		} => p_option.Manipulations.push(PManipulation::Est {
+		// 			Entry: *entry,
+		// 			SetId: *set_id,
+		// 			Slot: slot.to_owned(),
+		// 			Race: race.to_owned(),
+		// 			Gender: gender.to_owned(),
+		// 		}),
+		// 		
+		// 		meta::Manipulation::Gmp {
+		// 			enabled,
+		// 			animated,
+		// 			rotation_a,
+		// 			rotation_b,
+		// 			rotation_c,
+		// 			unknown_a,
+		// 			unknown_b,
+		// 			unknown_total,
+		// 			value,
+		// 			
+		// 			set_id,
+		// 		} => p_option.Manipulations.push(PManipulation::Gmp {
+		// 			Entry: GmpEntry {
+		// 				Enabled: Some(*enabled),
+		// 				Animated: Some(*animated),
+		// 				RotationA: Some(*rotation_a),
+		// 				RotationB: Some(*rotation_b),
+		// 				RotationC: Some(*rotation_c),
+		// 				UnknownA: Some(*unknown_a),
+		// 				UnknownB: Some(*unknown_b),
+		// 				UnknownTotal: Some(*unknown_total),
+		// 				Value: Some(*value),
+		// 			},
+		// 			SetId: *set_id,
+		// 		}),
+		// 		
+		// 		meta::Manipulation::Rsp {
+		// 			entry,
+		// 			sub_race,
+		// 			attribute,
+		// 		} => p_option.Manipulations.push(PManipulation::Rsp {
+		// 			Entry: *entry,
+		// 			SubRace: sub_race.to_owned(),
+		// 			Attribute: attribute.to_owned(),
+		// 		})
+		// 	}
+		// }
 		
 		Ok(())
 	};
@@ -1098,175 +1098,176 @@ struct POption {
 	Manipulations: Vec<PManipulation>,
 }
 
-#[allow(non_snake_case)]
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(tag = "Type", content = "Manipulation")]
-pub(crate) enum PManipulation {
-	Imc {
-		Entry: ImcEntry,
-		PrimaryId: i32,
-		SecondaryId: i32,
-		Variant: i32,
-		ObjectType: String,
-		EquipSlot: String,
-		BodySlot: String,
-	},
-	
-	Eqdp {
-		Entry: u64,
-		SetId: i32,
-		Slot: String,
-		Race: String,
-		Gender: String,
-	},
-	
-	Eqp {
-		Entry: u64,
-		SetId: i32,
-		Slot: String,
-	},
-	
-	Est {
-		Entry: u64,
-		SetId: i32,
-		Slot: String,
-		Race: String,
-		Gender: String,
-	},
-	
-	Gmp {
-		Entry: GmpEntry,
-		SetId: i32,
-	},
-	
-	Rsp {
-		Entry: f32,
-		SubRace: String,
-		Attribute: String,
-	},
-}
-
-impl PManipulation {
-	pub fn convert_to_aeth(self) -> meta::Manipulation {
-		match self {
-			Self::Imc {
-				Entry,
-				PrimaryId,
-				SecondaryId,
-				Variant,
-				ObjectType,
-				EquipSlot,
-				BodySlot,
-			} => meta::Manipulation::Imc {
-				attribute_and_sound: Entry.AttributeAndSound.unwrap_or(0),
-				material_id: Entry.MaterialId.unwrap_or(0),
-				decal_id: Entry.DecalId.unwrap_or(0),
-				vfx_id: Entry.VfxId.unwrap_or(0),
-				material_animation_id: Entry.MaterialAnimationId.unwrap_or(0),
-				attribute_mask: Entry.AttributeMask.unwrap_or(0),
-				sound_id: Entry.SoundId.unwrap_or(0),
-				
-				primary_id: PrimaryId,
-				secondary_id: SecondaryId,
-				variant: Variant,
-				object_type: ObjectType,
-				equip_slot: EquipSlot,
-				body_slot: BodySlot,
-			},
-			
-			Self::Eqdp {
-				Entry,
-				SetId,
-				Slot,
-				Race,
-				Gender,
-			} => meta::Manipulation::Eqdp {
-				entry: Entry,
-				set_id: SetId,
-				slot: Slot,
-				race: Race,
-				gender: Gender,
-			},
-			
-			Self::Eqp {
-				Entry,
-				SetId,
-				Slot,
-			} => meta::Manipulation::Eqp {
-				entry: Entry,
-				set_id: SetId,
-				slot: Slot,
-			},
-			
-			Self::Est {
-				Entry,
-				SetId,
-				Slot,
-				Race,
-				Gender,
-			} => meta::Manipulation::Est {
-				entry: Entry,
-				set_id: SetId,
-				slot: Slot,
-				race: Race,
-				gender: Gender,
-			},
-			
-			Self::Gmp {
-				Entry,
-				SetId,
-			} => meta::Manipulation::Gmp {
-				enabled: Entry.Enabled.unwrap_or(true),
-				animated: Entry.Animated.unwrap_or(true),
-				rotation_a: Entry.RotationA.unwrap_or(0),
-				rotation_b: Entry.RotationB.unwrap_or(0),
-				rotation_c: Entry.RotationC.unwrap_or(0),
-				unknown_a: Entry.UnknownA.unwrap_or(0),
-				unknown_b: Entry.UnknownB.unwrap_or(0),
-				unknown_total: Entry.UnknownTotal.unwrap_or(0),
-				value: Entry.Value.unwrap_or(0),
-				
-				set_id: SetId,
-			},
-			
-			Self::Rsp {
-				Entry,
-				SubRace,
-				Attribute,
-			} => meta::Manipulation::Rsp {
-				entry: Entry,
-				sub_race: SubRace,
-				attribute: Attribute,
-			},
-		}
-	}
-}
-
-// No clue if the options are needed, but during testing i had 1 group of 1 mod that didnt contain AttributeAndSound in the ImcEntry
-// and i just dont want to figure out what is optional and what isnt since the penumbra meta structs(if you can even call it that) arent cleanly laid out
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct ImcEntry {
-	AttributeAndSound: Option<i32>,
-	MaterialId: Option<i32>,
-	DecalId: Option<i32>,
-	VfxId: Option<i32>,
-	MaterialAnimationId: Option<i32>,
-	AttributeMask: Option<i32>,
-	SoundId: Option<i32>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct GmpEntry {
-	Enabled: Option<bool>,
-	Animated: Option<bool>,
-	RotationA: Option<i32>,
-	RotationB: Option<i32>,
-	RotationC: Option<i32>,
-	UnknownA: Option<i32>,
-	UnknownB: Option<i32>,
-	UnknownTotal: Option<i32>,
-	Value: Option<u64>,
-}
+type PManipulation = serde_json::Value;
+// #[allow(non_snake_case)]
+// #[derive(Debug, Deserialize, Serialize)]
+// #[serde(tag = "Type", content = "Manipulation")]
+// pub(crate) enum PManipulation {
+// 	Imc {
+// 		Entry: ImcEntry,
+// 		PrimaryId: i32,
+// 		SecondaryId: i32,
+// 		Variant: i32,
+// 		ObjectType: String,
+// 		EquipSlot: String,
+// 		BodySlot: String,
+// 	},
+// 	
+// 	Eqdp {
+// 		Entry: u64,
+// 		SetId: i32,
+// 		Slot: String,
+// 		Race: String,
+// 		Gender: String,
+// 	},
+// 	
+// 	Eqp {
+// 		Entry: u64,
+// 		SetId: i32,
+// 		Slot: String,
+// 	},
+// 	
+// 	Est {
+// 		Entry: u64,
+// 		SetId: i32,
+// 		Slot: String,
+// 		Race: String,
+// 		Gender: String,
+// 	},
+// 	
+// 	Gmp {
+// 		Entry: GmpEntry,
+// 		SetId: i32,
+// 	},
+// 	
+// 	Rsp {
+// 		Entry: f32,
+// 		SubRace: String,
+// 		Attribute: String,
+// 	},
+// }
+// 
+// impl PManipulation {
+// 	pub fn convert_to_aeth(self) -> meta::Manipulation {
+// 		match self {
+// 			Self::Imc {
+// 				Entry,
+// 				PrimaryId,
+// 				SecondaryId,
+// 				Variant,
+// 				ObjectType,
+// 				EquipSlot,
+// 				BodySlot,
+// 			} => meta::Manipulation::Imc {
+// 				attribute_and_sound: Entry.AttributeAndSound.unwrap_or(0),
+// 				material_id: Entry.MaterialId.unwrap_or(0),
+// 				decal_id: Entry.DecalId.unwrap_or(0),
+// 				vfx_id: Entry.VfxId.unwrap_or(0),
+// 				material_animation_id: Entry.MaterialAnimationId.unwrap_or(0),
+// 				attribute_mask: Entry.AttributeMask.unwrap_or(0),
+// 				sound_id: Entry.SoundId.unwrap_or(0),
+// 				
+// 				primary_id: PrimaryId,
+// 				secondary_id: SecondaryId,
+// 				variant: Variant,
+// 				object_type: ObjectType,
+// 				equip_slot: EquipSlot,
+// 				body_slot: BodySlot,
+// 			},
+// 			
+// 			Self::Eqdp {
+// 				Entry,
+// 				SetId,
+// 				Slot,
+// 				Race,
+// 				Gender,
+// 			} => meta::Manipulation::Eqdp {
+// 				entry: Entry,
+// 				set_id: SetId,
+// 				slot: Slot,
+// 				race: Race,
+// 				gender: Gender,
+// 			},
+// 			
+// 			Self::Eqp {
+// 				Entry,
+// 				SetId,
+// 				Slot,
+// 			} => meta::Manipulation::Eqp {
+// 				entry: Entry,
+// 				set_id: SetId,
+// 				slot: Slot,
+// 			},
+// 			
+// 			Self::Est {
+// 				Entry,
+// 				SetId,
+// 				Slot,
+// 				Race,
+// 				Gender,
+// 			} => meta::Manipulation::Est {
+// 				entry: Entry,
+// 				set_id: SetId,
+// 				slot: Slot,
+// 				race: Race,
+// 				gender: Gender,
+// 			},
+// 			
+// 			Self::Gmp {
+// 				Entry,
+// 				SetId,
+// 			} => meta::Manipulation::Gmp {
+// 				enabled: Entry.Enabled.unwrap_or(true),
+// 				animated: Entry.Animated.unwrap_or(true),
+// 				rotation_a: Entry.RotationA.unwrap_or(0),
+// 				rotation_b: Entry.RotationB.unwrap_or(0),
+// 				rotation_c: Entry.RotationC.unwrap_or(0),
+// 				unknown_a: Entry.UnknownA.unwrap_or(0),
+// 				unknown_b: Entry.UnknownB.unwrap_or(0),
+// 				unknown_total: Entry.UnknownTotal.unwrap_or(0),
+// 				value: Entry.Value.unwrap_or(0),
+// 				
+// 				set_id: SetId,
+// 			},
+// 			
+// 			Self::Rsp {
+// 				Entry,
+// 				SubRace,
+// 				Attribute,
+// 			} => meta::Manipulation::Rsp {
+// 				entry: Entry,
+// 				sub_race: SubRace,
+// 				attribute: Attribute,
+// 			},
+// 		}
+// 	}
+// }
+// 
+// // No clue if the options are needed, but during testing i had 1 group of 1 mod that didnt contain AttributeAndSound in the ImcEntry
+// // and i just dont want to figure out what is optional and what isnt since the penumbra meta structs(if you can even call it that) arent cleanly laid out
+// #[derive(Debug, Deserialize, Serialize)]
+// pub(crate) struct ImcEntry {
+// 	AttributeAndSound: Option<i32>,
+// 	MaterialId: Option<i32>,
+// 	DecalId: Option<i32>,
+// 	VfxId: Option<i32>,
+// 	MaterialAnimationId: Option<i32>,
+// 	AttributeMask: Option<i32>,
+// 	SoundId: Option<i32>,
+// }
+// 
+// #[derive(Debug, Deserialize, Serialize)]
+// pub(crate) struct GmpEntry {
+// 	Enabled: Option<bool>,
+// 	Animated: Option<bool>,
+// 	RotationA: Option<i32>,
+// 	RotationB: Option<i32>,
+// 	RotationC: Option<i32>,
+// 	UnknownA: Option<i32>,
+// 	UnknownB: Option<i32>,
+// 	UnknownTotal: Option<i32>,
+// 	Value: Option<u64>,
+// }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct SortOrder {

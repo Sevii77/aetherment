@@ -73,6 +73,7 @@ pub struct Preset {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
 pub enum Value {
+	Grouped(u32),
 	SingleFiles(u32),
 	MultiFiles(u32),
 	Rgb([f32; 3]),
@@ -86,6 +87,7 @@ pub enum Value {
 impl Value {
 	pub fn from_meta_option(option: &super::meta::Option) -> Self {
 		match &option.settings {
+			super::meta::OptionSettings::Grouped(v) => Self::Grouped(v.default),
 			super::meta::OptionSettings::SingleFiles(v) => Self::SingleFiles(v.default),
 			super::meta::OptionSettings::MultiFiles(v) => Self::MultiFiles(v.default),
 			super::meta::OptionSettings::Rgb(v) => Self::Rgb(v.default),

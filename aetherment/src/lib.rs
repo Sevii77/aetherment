@@ -103,10 +103,13 @@ impl Core {
 		
 		s.install_progress.apply = s.apply_progress.clone();
 		
-		let progress = s.install_progress.clone();
-		std::thread::spawn(move || {
-			remote::check_updates(progress);
-		});
+		if !s.backend_last_error {
+			let progress = s.install_progress.clone();
+			std::thread::spawn(move || {
+				backend().apply_services();
+				remote::check_updates(progress);
+			});
+		}
 		
 		s
 	}
@@ -116,6 +119,12 @@ impl Core {
 		match status {
 			modman::backend::Status::Ok => {
 				if self.backend_last_error {
+					let progress = self.install_progress.clone();
+					std::thread::spawn(move || {
+						backend().apply_services();
+						remote::check_updates(progress);
+					});
+					
 					self.mods_tab.refresh();
 				}
 				

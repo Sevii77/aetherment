@@ -25,6 +25,8 @@ impl Backend for Dummy {
 	fn finalize_apply(&mut self, _progress: ApplyProgress) {}
 	fn apply_queue_size(&self) -> usize {0}
 	
+	fn apply_services(&self) {}
+	
 	fn load_mods(&mut self) {}
 	fn get_mod_meta(&self, _mod_id: &str) -> Option<&crate::modman::meta::Meta> {None}
 	// fn get_mod_settings(&self, _mod_id: &str, _collection_id: &str) -> Option<crate::modman::settings::Settings> {None}

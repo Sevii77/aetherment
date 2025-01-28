@@ -66,5 +66,7 @@ pub fn check_updates(progress: crate::modman::backend::InstallProgress) {
 		}
 	}
 	
-	crate::backend().install_mods(progress, files);
+	if files.len() > 0 {
+		crate::backend().install_mods(progress, files);
+	}
 }

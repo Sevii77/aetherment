@@ -150,6 +150,8 @@ pub trait Backend {
 	fn finalize_apply(&mut self, progress: ApplyProgress);
 	fn apply_queue_size(&self) -> usize;
 	
+	fn apply_services(&self);
+	
 	// fn get_aeth_meta(&self, mod_id: &str) -> Option<super::meta::Meta>;
 	
 	fn load_mods(&mut self);

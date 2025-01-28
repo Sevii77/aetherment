@@ -288,6 +288,10 @@ impl super::Backend for Penumbra {
 		self.apply_queue.lock().unwrap().len()
 	}
 	
+	fn apply_services(&self) {
+		apply_ui_colors();
+	}
+	
 	fn load_mods(&mut self) {
 		let root = root_path();
 		

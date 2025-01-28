@@ -161,6 +161,26 @@ impl super::Backend for Penumbra {
 					pack.by_name("meta.json")?.read_to_end(&mut meta_buf)?;
 					let meta = serde_json::from_slice::<meta::Meta>(&meta_buf)?;
 					
+					// get all files that are used directly, so we can keep the rest zipped
+					let mut direct_files = HashSet::new();
+					for (path, _) in meta.files.iter() {
+						if !path.ends_with(".comp") {
+							direct_files.insert(path.as_str());
+						}
+					}
+					for opt in meta.options.options_iter() {
+						if let crate::modman::meta::OptionSettings::SingleFiles(v) |
+							crate::modman::meta::OptionSettings::MultiFiles(v) = &opt.settings {
+							for sub in v.options.iter() {
+								for (path, _) in sub.files.iter() {
+									if !path.ends_with(".comp") {
+										direct_files.insert(path.as_str());
+									}
+								}
+							}
+						}
+					}
+					
 					// let mod_id = meta.name.clone();
 					let mod_dir = root_path().join(&mod_id);
 					_ = std::fs::create_dir(&mod_dir);
@@ -170,6 +190,13 @@ impl super::Backend for Penumbra {
 					_ = std::fs::create_dir(&files_dir);
 					File::create(aeth_dir.join("meta.json"))?.write_all(&meta_buf)?;
 					// buf.clear();
+					
+					let mut compdata_used = false;
+					let mut compdata = zip::ZipWriter::new(std::io::BufWriter::new(File::create(files_dir.join("_compdata"))?));
+					compdata.add_directory("files", zip::write::FileOptions::default()
+						.compression_method(zip::CompressionMethod::Deflated)
+						.compression_level(Some(9))
+						.large_file(true))?;
 					
 					File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&PMeta {
 						FileVersion: 3,
@@ -214,27 +241,40 @@ impl super::Backend for Penumbra {
 						let name = name.to_owned();
 						let hash = name.to_string_lossy().to_string();
 						let ext = if let Some(p) = hash.find(".") {&hash[p + 1..]} else {""};
-						let mut buf = Vec::new();
-						f.read_to_end(&mut buf)?;
-						let mut write_org = false;
-						for org_path in remap_rev.get(&hash).ok_or("Remap does not contain hash")? {
-							if org_path.starts_with("ui/") {
-								let hashed_path = crate::hash_str(blake3::hash(org_path.as_bytes()));
-								let new_name = format!("{hashed_path}.{ext}");
-								// std::io::copy(&mut f, &mut File::create(files_dir.join(&new_name))?)?;
-								std::fs::write(files_dir.join(&new_name), &buf)?;
-								remap.insert(org_path.to_owned(), new_name);
-							} else {
-								write_org = true;
+						
+						let org_paths = remap_rev.get(&hash).ok_or("Remap does not contain hash")?;
+						let is_direct = org_paths.iter().any(|v| direct_files.contains(v.as_str()));
+						if is_direct {
+							let mut buf = Vec::new();
+							f.read_to_end(&mut buf)?;
+							
+							let mut write_org = false;
+							for org_path in org_paths {
+								if org_path.starts_with("ui/") {
+									let hashed_path = crate::hash_str(blake3::hash(org_path.as_bytes()));
+									let new_name = format!("{hashed_path}.{ext}");
+									// std::io::copy(&mut f, &mut File::create(files_dir.join(&new_name))?)?;
+									std::fs::write(files_dir.join(&new_name), &buf)?;
+									remap.insert(org_path.to_owned(), new_name);
+								} else {
+									write_org = true;
+								}
 							}
+							
+							if write_org {
+								// std::io::copy(&mut f, &mut File::create(files_dir.join(name))?)?;
+								std::fs::write(files_dir.join(&name), &buf)?;
+							}
+						} else {
+							compdata_used = true;
+							compdata.raw_copy_file(f)?;
 						}
-						
-						if write_org {
-							// std::io::copy(&mut f, &mut File::create(files_dir.join(name))?)?;
-							std::fs::write(files_dir.join(&name), &buf)?;
-						}
-						
-						std::fs::write(aeth_dir.join("remap"), crate::json_pretty(&remap)?.as_bytes())?;
+					}
+					
+					std::fs::write(aeth_dir.join("remap"), crate::json_pretty(&remap)?.as_bytes())?;
+					
+					if !compdata_used {
+						_ = std::fs::remove_file(files_dir.join("_compdata"));
 					}
 					
 					add_mod_entry(&mod_id);
@@ -537,10 +577,30 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 		}
 	};
 	
+	let files_compdata = std::rc::Rc::new(std::cell::RefCell::new(File::open(files_dir.join("_compdata")).ok().and_then(|v| zip::ZipArchive::new(std::io::BufReader::new(v)).ok())));
+	let read_compdata = |path: &str| {
+		if let Some(compdata) = &mut *files_compdata.borrow_mut() {
+			if let Ok(mut f) = compdata.by_name(&format!("files/{path}")) {
+				if f.is_file() {
+					let mut buf = Vec::new();
+					f.read_to_end(&mut buf).ok()?;
+					return Some(buf);
+				}
+			}
+		}
+		
+		None
+	};
+	
 	let file_resolver = |path: &crate::modman::Path| {
 		match path {
 			crate::modman::Path::Mod(path) => {
 				let Some(true_path) = remap.get(path) else {return None};
+				
+				if let Some(data) = read_compdata(&true_path) {
+					return Some(Cow::Owned(data));
+				}
+				
 				crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).ok().map(|v| Cow::Owned::<Vec<u8>>(v))
 			}
 			
@@ -633,7 +693,10 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			if game_path.ends_with(".comp") {
 				// log!(log, "compositing file {game_path}");
 				let ext = game_path.trim_end_matches(".comp").split(".").last().unwrap();
-				let comp = crate::modman::composite::open_composite(ext, &crate::resource_loader::read_utf8(&files_dir.join(real_path_remapped))?);
+				let comp = read_compdata(real_path_remapped)
+					.or_else(|| crate::resource_loader::read_utf8(&files_dir.join(real_path_remapped)).ok())
+					.and_then(|v| crate::modman::composite::open_composite(ext, &v));
+				
 				// let comp: Option<Box<dyn Composite>> = match ext {
 				// 	"tex" | "atex" => Some(Box::new(read_json::<tex::Tex>(&files_dir.join(real_path_remapped))?)),
 				// 	_ => None

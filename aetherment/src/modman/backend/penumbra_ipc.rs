@@ -163,7 +163,7 @@ impl super::Backend for Penumbra {
 					
 					// get all files that are used directly, so we can keep the rest zipped
 					let mut direct_files = HashSet::new();
-					for (path, _) in meta.files.iter() {
+					for (_, path) in meta.files.iter() {
 						if !path.ends_with(".comp") {
 							direct_files.insert(path.as_str());
 						}
@@ -172,7 +172,7 @@ impl super::Backend for Penumbra {
 						if let crate::modman::meta::OptionSettings::SingleFiles(v) |
 							crate::modman::meta::OptionSettings::MultiFiles(v) = &opt.settings {
 							for sub in v.options.iter() {
-								for (path, _) in sub.files.iter() {
+								for (_, path) in sub.files.iter() {
 									if !path.ends_with(".comp") {
 										direct_files.insert(path.as_str());
 									}

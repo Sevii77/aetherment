@@ -109,7 +109,7 @@ public class Aetherment: IDalamudPlugin {
 		try {
 			state = Native.initialize(init);
 		} catch(Exception e) {
-			Kill(e.ToString(), 2);
+			Kill($"{e.GetBaseException().Message}\n\n{e}", 2);
 		}
 		
 		Interface.UiBuilder.Draw += Draw;
@@ -144,7 +144,7 @@ public class Aetherment: IDalamudPlugin {
 	
 	public void Dispose() {
 		if(state != 0)
-			Native.destroy(state);
+			try{Native.destroy(state);}catch{}
 		
 		FFI.Str.Drop();
 		
@@ -176,8 +176,8 @@ public class Aetherment: IDalamudPlugin {
 		if(state != 0) {
 			try {
 				Native.draw(state);
-			} catch {
-				Kill("Fatal error in draw", 1);
+			} catch(Exception e) {
+				Kill($"Fatal error in draw\n\n{e}", 1);
 			}
 		} else {
 			ImGuiNET.ImGui.Begin("Aetherment");
@@ -201,7 +201,11 @@ public class Aetherment: IDalamudPlugin {
 		if(cmd != maincommand)
 			return;
 		
-		Native.command(state, args);
+		try {
+			Native.command(state, args);
+		} catch(Exception e) {
+			Kill($"Fatal error in command\n\n{e}", 1);
+		}
 	}
 	
 	private void Kill(string msg, byte strip) {

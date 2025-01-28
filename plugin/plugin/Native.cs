@@ -8,23 +8,20 @@ namespace Aetherment;
 /*
 	Some anti virus don't like the fact that core uses retour/region
 	(ACT suffers from the same issue https://github.com/ravahn/FFXIV_ACT_Plugin/issues/324)
-	this exists so that we can bypass dalamuds shadowcopy and do it ourselfs to a static location.
+	this way we stop dalamuds shadow copy (why does it even do that, idfk)
 	this would allow people that run into an anti virus issue to add an easy exception
 */
 public static class Native {
 	private static nint handle;
 	
 	static Native() {
-		var shadow_dir_path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Aetherment", "plugin");
-		var shadow_path = Path.Join(shadow_dir_path, "aetherment_core.dll");
-		if(File.Exists(shadow_path))
-			File.Delete(shadow_path);
+		var core_path = Path.Join(Interface.AssemblyLocation.DirectoryName, "aetherment_core.dll");
+		if(!Path.Exists(core_path))
+			throw new Exception("aetherment_core.dll file does not exist, this could be caused by your anti virus.");
 		
-		Directory.CreateDirectory(shadow_dir_path);
-		File.Copy(Path.Join(Interface.AssemblyLocation.DirectoryName, "aetherment_core.dll"), shadow_path);
-		
-		handle = LoadLibrary(shadow_path);
-		// handle = LoadLibrary(Path.Join(Interface.AssemblyLocation.DirectoryName, "aetherment_core.dll"));
+		handle = LoadLibrary(core_path);
+		if(handle == 0)
+			throw new Exception("aetherment_core.dll failed to load", new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()));
 		
 		initialize = Marshal.GetDelegateForFunctionPointer<delegate__initialize>(NativeLibrary.GetExport(handle, "initialize"));
 		destroy = Marshal.GetDelegateForFunctionPointer<delegate__destroy>(NativeLibrary.GetExport(handle, "destroy"));

@@ -1,3 +1,6 @@
+#![cfg_attr(feature = "plugin", feature(lazy_cell))]
+#![allow(static_mut_refs)]
+
 #[macro_use]
 mod log;
 pub use log::LogType;

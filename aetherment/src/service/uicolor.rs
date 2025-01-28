@@ -1,5 +1,4 @@
 use std::{collections::BTreeMap, sync::{LazyLock, RwLock}};
-
 use retour::GenericDetour;
 
 static GET_COLOR_SIG: &str = "4C 8B 91 ?? ?? ?? ?? 4C 8B D9 49 8B 02";

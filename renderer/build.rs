@@ -19,7 +19,7 @@ fn main() {
 fn generate_bindings() {
 	bindgen::Builder::default()
 		.header("./lib/cimgui.h")
-		.parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
+		.parse_callbacks(Box::new(bindgen::CargoCallbacks))
 		.clang_arg("--language=c++")
 		.clang_arg("-DCIMGUI_DEFINE_ENUMS_AND_STRUCTS")
 		.layout_tests(false)

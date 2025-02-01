@@ -1026,7 +1026,7 @@ checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
 name = "client"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aetherment",
  "clap 4.5.27",
@@ -3154,7 +3154,7 @@ checksum = "953ec861398dccce10c670dfeaf3ec4911ca479e9c02154b3a215178c5f566f2"
 
 [[package]]
 name = "plugin"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aetherment",
 ]

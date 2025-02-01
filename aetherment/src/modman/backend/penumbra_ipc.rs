@@ -618,6 +618,11 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 				match &path.1 {
 					crate::modman::meta::ValuePathPath::Mod(path) => {
 						let Some(true_path) = remap.get(path) else {return None};
+						
+						if let Some(data) = read_compdata(&true_path) {
+							return Some(Cow::Owned(data));
+						}
+						
 						crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).ok().map(|v| Cow::Owned(v))
 					}
 				}
@@ -659,8 +664,8 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	// actually do the thing
 	let mut p_option = POption {
 		Name: collection_id.to_owned(),
-		Description: Some(String::new()),
-		Priority: Some(1),
+		Description: String::new(),
+		Priority: 1,
 		Files: HashMap::new(),
 		FileSwaps: HashMap::new(),
 		Manipulations: Vec::new(),
@@ -686,6 +691,8 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			
 			let Some(real_path_remapped) = remap.get(*real_path) else {
 				log!("remap did not contain {real_path}");
+				
+				files_done += 1;
 				continue;
 			};
 			let mut true_real_path = format!("files/{real_path_remapped}");
@@ -719,6 +726,8 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 						
 						Err(err) => {
 							log!(log, "Failed to composite file {game_path} ({err:?})");
+							
+							files_done += 1;
 							continue;
 						}
 					}
@@ -933,10 +942,10 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 		Ok(v) => v,
 		Err(_) => PGroup {
 			Name: "_collection".to_string(),
-			Description: Some("Aetherment managed\nDON'T TOUCH THIS".to_string()),
+			Description: "Aetherment managed\nDON'T TOUCH THIS".to_string(),
 			Priority: 1,
 			Type: "Single".to_string(),
-			DefaultSettings: Some(0),
+			DefaultSettings: 0,
 			Options: Vec::new(),
 		}
 	};
@@ -1118,16 +1127,24 @@ fn get_mod_groups(path: &std::path::Path) -> Option<HashMap<String, PGroup>> {
 // 	path.trim().chars().map(|v| if !INVALID_CHARS.contains(&(v as u8)) {v.to_ascii_lowercase()} else {'_'}).collect::<String>()
 // }
 
+// idc anymore, i keep finding mods that have a null value on new things, and i dont want to option everything, so this will do
+// #[serde(deserialize_with = "null_deserialize")] 
+fn null_deserialize<'de, D, T>(deserializer: D) -> Result<T, D::Error> where
+T: Default + Deserialize<'de>,
+D: serde::Deserializer<'de> {
+	Ok(Option::deserialize(deserializer)?.unwrap_or_default())
+}
+
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 struct PMeta {
-	FileVersion: i32,
-	Name: String,
-	Author: String,
-	Description: String,
-	Version: String,
-	Website: String,
-	ModTags: Vec<String>,
+	#[serde(deserialize_with = "null_deserialize")] FileVersion: i32,
+	#[serde(deserialize_with = "null_deserialize")] Name: String,
+	#[serde(deserialize_with = "null_deserialize")] Author: String,
+	#[serde(deserialize_with = "null_deserialize")] Description: String,
+	#[serde(deserialize_with = "null_deserialize")] Version: String,
+	#[serde(deserialize_with = "null_deserialize")] Website: String,
+	#[serde(deserialize_with = "null_deserialize")] ModTags: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -1135,30 +1152,31 @@ struct PMeta {
 struct PDefaultMod {
 	// Name: String,
 	// Description: String,
-	Files: HashMap<String, String>,
-	FileSwaps: HashMap<String, String>,
-	Manipulations: Vec<PManipulation>,
+	#[serde(deserialize_with = "null_deserialize")] Files: HashMap<String, String>,
+	#[serde(deserialize_with = "null_deserialize")] FileSwaps: HashMap<String, String>,
+	#[serde(deserialize_with = "null_deserialize")] Manipulations: Vec<PManipulation>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 struct PGroup {
-	Name: String,
-	Description: Option<String>,
-	Priority: i32,
-	Type: String,
-	DefaultSettings: Option<u32>,
-	Options: Vec<POption>,
+	#[serde(deserialize_with = "null_deserialize")] Name: String,
+	#[serde(deserialize_with = "null_deserialize")] Description: String,
+	#[serde(deserialize_with = "null_deserialize")] Priority: i64,
+	#[serde(deserialize_with = "null_deserialize")] Type: String,
+	#[serde(deserialize_with = "null_deserialize")] DefaultSettings: u32,
+	#[serde(deserialize_with = "null_deserialize")] Options: Vec<POption>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(default)]
 struct POption {
-	Name: String,
-	Description: Option<String>,
-	Priority: Option<u32>, // used for multi
-	Files: HashMap<String, String>,
-	FileSwaps: HashMap<String, String>,
-	Manipulations: Vec<PManipulation>,
+	#[serde(deserialize_with = "null_deserialize")] Name: String,
+	#[serde(deserialize_with = "null_deserialize")] Description: String,
+	#[serde(deserialize_with = "null_deserialize")] Priority: i64, // used for multi
+	#[serde(deserialize_with = "null_deserialize")] Files: HashMap<String, String>,
+	#[serde(deserialize_with = "null_deserialize")] FileSwaps: HashMap<String, String>,
+	#[serde(deserialize_with = "null_deserialize")] Manipulations: Vec<PManipulation>,
 }
 
 type PManipulation = serde_json::Value;

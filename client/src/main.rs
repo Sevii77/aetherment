@@ -50,7 +50,10 @@ fn main() {
 				ui_theme: Box::new(|| 255),
 				collection: Box::new(|_| aetherment::modman::backend::Collection{name: "None".to_string(), id: "00000000-0000-0000-0000-000000000000".to_string()}),
 			},
-			Default::default()
+			Default::default(),
+			aetherment::service::ServicesInitializers {
+				uicolor: Box::new(|_| {}),
+			},
 		)))
 	})).unwrap();
 }

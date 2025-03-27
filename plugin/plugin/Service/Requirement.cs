@@ -19,10 +19,10 @@ public class Requirement {
 		var c = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance()->SystemConfig.SystemConfigBase.ConfigBase;
 		for(var i = 0; i < c.ConfigCount; ++i) {
 			var entry = c.ConfigEntry[i];
-			if((nint)entry.Name == 0)
+			if((nint)entry.Name.Value == 0)
 				continue;
 			
-			var s = System.Text.Encoding.UTF8.GetString(entry.Name, 128);
+			var s = System.Text.Encoding.UTF8.GetString(entry.Name.Value, 128);
 			s = s.Substring(0, s.IndexOf('\0'));
 			if(s != name)
 				continue;

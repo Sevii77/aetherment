@@ -62,6 +62,7 @@ pub struct Core {
 	browser_tab: view::browser::Browser,
 	settings_tab: view::settings::Settings,
 	tools_tab: view::tool::Tools,
+	debug_tab: view::debug::Debug,
 	
 	// current_tab: &'static str,
 	current_tab: String,
@@ -73,7 +74,7 @@ pub struct Core {
 
 #[cfg(any(feature = "plugin", feature = "client"))]
 impl Core {
-	pub fn new(log: fn(log::LogType, String), backend_initializers: modman::backend::BackendInitializers, requirement_initializers: modman::requirement::RequirementInitializers, optional_initializers: modman::meta::OptionalInitializers) -> Self {
+	pub fn new(log: fn(log::LogType, String), backend_initializers: modman::backend::BackendInitializers, requirement_initializers: modman::requirement::RequirementInitializers, optional_initializers: modman::meta::OptionalInitializers, services_initializers: service::ServicesInitializers) -> Self {
 		unsafe {
 			log::LOG = log;
 			// BACKEND = Some(std::sync::Mutex::new(modman::backend::new_backend(backend_initializers)));
@@ -83,6 +84,8 @@ impl Core {
 			if let Some(dalamud) = optional_initializers.dalamud {
 				modman::meta::dalamud::SETSTYLE = dalamud;
 			}
+			
+			service::initialize(services_initializers);
 		}
 		
 		// backend().load_mods();
@@ -92,6 +95,7 @@ impl Core {
 			browser_tab: view::browser::Browser::new(),
 			settings_tab: view::settings::Settings::new(),
 			tools_tab: view::tool::Tools::new(),
+			debug_tab: view::debug::Debug::new(),
 			
 			// current_tab: "Mods",
 			current_tab: "Mods".to_string(),
@@ -181,21 +185,7 @@ impl Core {
 			}
 			
 			"Debug" => {
-				if ui.button("kill").clicked {
-					panic!("the kill switch was pressed");
-				}
-				
-				ui.add_space(16.0);
-				ui.label("UIColor Replacements");
-				for ((theme_color, index), [r, g, b]) in service::uicolor::get_colors() {
-					let mut clr = [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0];
-					if ui.color_edit_rgb(format!("{} {index}", if theme_color {"theme"} else {"normal"}), &mut clr).changed {
-						service::uicolor::set_color(theme_color, index, [(clr[0] * 255.0) as u8, (clr[1] * 255.0) as u8, (clr[2] * 255.0) as u8]);
-					}
-				}
-				
-				ui.add_space(16.0);
-				ui.debug();
+				self.debug_tab.draw(ui);
 			}
 			
 			_ => {

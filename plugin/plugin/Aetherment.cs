@@ -1,8 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
+using Dalamud.Game;
 using Dalamud.Game.Command;
+using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -12,12 +16,14 @@ namespace Aetherment;
 public class Aetherment: IDalamudPlugin {
 	public string Name => "Aetherment";
 	
-	[PluginService] public static IDalamudPluginInterface Interface {get; private set;} = null!;
-	[PluginService] public static ICommandManager         Commands  {get; private set;} = null!;
-	[PluginService] public static IPluginLog              Logger    {get; private set;} = null!;
-	[PluginService] public static IObjectTable            Objects   {get; private set;} = null!;
-	[PluginService] public static ITitleScreenMenu        TitleMenu {get; private set;} = null!;
-	[PluginService] public static ITextureProvider        Textures  {get; private set;} = null!;
+	[PluginService] public static IDalamudPluginInterface Interface  {get; private set;} = null!;
+	[PluginService] public static ICommandManager         Commands   {get; private set;} = null!;
+	[PluginService] public static IPluginLog              Logger     {get; private set;} = null!;
+	[PluginService] public static IObjectTable            Objects    {get; private set;} = null!;
+	[PluginService] public static ITitleScreenMenu        TitleMenu  {get; private set;} = null!;
+	[PluginService] public static ITextureProvider        Textures   {get; private set;} = null!;
+	[PluginService] public static ISigScanner             SigScanner {get; private set;} = null!;
+	[PluginService] public static IGameInteropProvider    HookProv   {get; private set;} = null!;
 	
 	private const string maincommand = "/aetherment";
 	private const string texfindercommand = "/texfinder";
@@ -26,9 +32,39 @@ public class Aetherment: IDalamudPlugin {
 	private static string? error;
 	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? titleEntry;
 	
+	// idfc, entry changed to some other bs that always returns a texture wrap but cant be provided a texture wrap.
+	// i'm not going to dive into the docs to figure out a "proper way"
+	private struct TextureWrap: Dalamud.Interface.Textures.ISharedImmediateTexture {
+		private IDalamudTextureWrap wrap;
+		
+		public TextureWrap(IDalamudTextureWrap wrap) {
+			this.wrap = wrap;
+		}
+		
+		public IDalamudTextureWrap? GetWrapOrDefault(IDalamudTextureWrap? defaultWrap = null) {
+			return wrap ?? defaultWrap;
+		}
+		
+		public IDalamudTextureWrap GetWrapOrEmpty() {
+			return wrap;
+		}
+		
+		public Task<IDalamudTextureWrap> RentAsync(System.Threading.CancellationToken cancellationToken = default) {
+			var wrap = this.wrap;
+			return Task.Run(() => {return wrap;});
+		}
+		
+		public bool TryGetWrap([NotNullWhen(true)] out IDalamudTextureWrap? texture, out Exception? exception) {
+			texture = wrap;
+			exception = null;
+			return true;
+		}
+	}
+	
 	private Requirement requirement;
 	private Penumbra penumbra;
 	private DalamudStyle dalamud;
+	private UiColor uicolor;
 	private TexFinder texfinder;
 	
 	[StructLayout(LayoutKind.Sequential)]
@@ -36,6 +72,7 @@ public class Aetherment: IDalamudPlugin {
 		public nint log;
 		public RequirementFunctions requirement;
 		public PenumbraFunctions penumbra;
+		public ServicesFunctions services;
 		public nint dalamud_add_style;
 	}
 	
@@ -43,6 +80,11 @@ public class Aetherment: IDalamudPlugin {
 	public unsafe struct RequirementFunctions {
 		public nint ui_resolution;
 		public nint ui_theme;
+	}
+	
+	[StructLayout(LayoutKind.Sequential)]
+	public unsafe struct ServicesFunctions {
+		public nint set_ui_colors;
 	}
 
 	[StructLayout(LayoutKind.Sequential)]
@@ -77,6 +119,7 @@ public class Aetherment: IDalamudPlugin {
 		requirement = new();
 		penumbra = new();
 		dalamud = new();
+		uicolor = new();
 		texfinder = new();
 		
 		var init = new Initializers {
@@ -103,6 +146,9 @@ public class Aetherment: IDalamudPlugin {
 				get_collection = Marshal.GetFunctionPointerForDelegate(penumbra.getCollection),
 				get_collections = Marshal.GetFunctionPointerForDelegate(penumbra.getCollections),
 			},
+			services = new ServicesFunctions {
+				set_ui_colors = Marshal.GetFunctionPointerForDelegate(uicolor.setUiColors),
+			},
 			dalamud_add_style = Marshal.GetFunctionPointerForDelegate(dalamud.addStyle),
 		};
 		
@@ -117,7 +163,7 @@ public class Aetherment: IDalamudPlugin {
 		
 		// TODO: proper icon
 		var icon_data = new byte[64 * 64 * 4];
-		var icon = Textures.CreateFromRaw(new Dalamud.Interface.Textures.RawImageSpecification(64, 64, 28), icon_data, "Aetherment Icon");
+		var icon = new TextureWrap(Textures.CreateFromRaw(new Dalamud.Interface.Textures.RawImageSpecification(64, 64, 28), icon_data, "Aetherment Icon"));
 		titleEntry ??= TitleMenu.AddEntry(1, "Manage Aetherment", icon, OpenConf);
 		
 		Commands.AddHandler(maincommand, new CommandInfo(OnCommand) {
@@ -155,6 +201,9 @@ public class Aetherment: IDalamudPlugin {
 			TitleMenu.RemoveEntry(titleEntry);
 			titleEntry = null;
 		}
+		
+		penumbra.Dispose();
+		uicolor.Dispose();
 		
 		Commands.RemoveHandler(maincommand);
 		Commands.RemoveHandler(texfindercommand);

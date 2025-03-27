@@ -74,7 +74,7 @@ impl<'a> Ui<'a> {
 	}
 	
 	pub fn debug(&mut self) {
-		self.label("debug here");
+		self.label("UI rendering debug here");
 	}
 	
 	pub fn get_f32(&mut self, key: impl Hash, default: f32) -> f32 {

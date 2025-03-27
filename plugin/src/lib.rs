@@ -43,6 +43,7 @@ pub struct Initializers {
 	log: fn(u8, FfiStr),
 	issue_functions: IssueFunctions,
 	penumbra_functions: PenumbraFunctions,
+	services_functions: ServicesFunctions,
 	dalamud_add_style: fn(FfiStr),
 }
 
@@ -82,6 +83,20 @@ pub struct PenumbraFunctions {
 	get_collections: fn() -> FfiStr,
 }
 
+#[allow(dead_code)]
+#[repr(packed)]
+struct UiColorsColor {
+	use_theme: bool,
+	index: u32,
+	clr: u32,
+}
+
+#[derive(Clone, Copy)]
+#[repr(packed)]
+pub struct ServicesFunctions {
+	set_ui_colors: fn(*const UiColorsColor, usize)
+}
+
 #[no_mangle]
 pub extern fn initialize(init: Initializers) -> *mut State {
 	use aetherment::modman::backend;
@@ -98,6 +113,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 		
 		let funcs = init.penumbra_functions;
 		let requirement_funcs = init.issue_functions;
+		let services_funcs = init.services_functions;
 		
 		let get_collection = Box::new(move |collection_type| {
 			let v = (funcs.get_collection)(collection_type as _).to_string();
@@ -174,10 +190,15 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 				collection: get_collection,
 			}, aetherment::modman::meta::OptionalInitializers {
 				dalamud: Some(dalamud_add_style)
+			}, aetherment::service::ServicesInitializers {
+				uicolor: Box::new(move |colors| {
+					let colors = colors.iter().map(|((t, i), c)| UiColorsColor{use_theme: *t, index: *i, clr: *c}).collect::<Vec<_>>();
+					(services_funcs.set_ui_colors)(colors.as_ptr(), colors.len());
+				})
 			}),
 		}));
 		
-		unsafe{aetherment::service::initialize()};
+		// unsafe{aetherment::service::initialize()};
 		
 		state
 	}) {
@@ -188,7 +209,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 
 #[no_mangle]
 pub extern fn destroy(state: *mut State) {
-	unsafe{aetherment::service::disable()};
+	aetherment::service::disable();
 	_ = unsafe{Box::from_raw(state)};
 }
 

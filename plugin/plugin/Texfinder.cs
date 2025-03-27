@@ -99,9 +99,9 @@ public partial class TexFinder {
 						
 						// The preview
 						var s = ImGui.GetContentRegionAvail();
-						var ratio = Math.Min(s.X / texture->Width, s.Y / texture->Height);
+						var ratio = Math.Min(s.X / texture->ActualWidth, s.Y / texture->ActualHeight);
 						var pos = ImGui.GetCursorScreenPos();
-						var imgsize = new Vector2(texture->Width, texture->Height) * ratio;
+						var imgsize = new Vector2(texture->ActualWidth, texture->ActualHeight) * ratio;
 						draw.AddImage(new IntPtr(texture->D3D11ShaderResourceView), pos, pos + imgsize);
 						
 						var scale = hr1 ? 2 : 1;
@@ -140,9 +140,9 @@ public partial class TexFinder {
 							}
 							
 							var s = ImGui.GetContentRegionAvail();
-							var ratio = Math.Min(s.X / texture->Width, s.Y / texture->Height);
+							var ratio = Math.Min(s.X / texture->ActualWidth, s.Y / texture->ActualHeight);
 							var pos = ImGui.GetCursorScreenPos();
-							var imgsize = new Vector2(texture->Width, texture->Height) * ratio;
+							var imgsize = new Vector2(texture->ActualWidth, texture->ActualHeight) * ratio;
 							draw.AddImage(new IntPtr(texture->D3D11ShaderResourceView), pos, pos + imgsize);
 							
 							// outline

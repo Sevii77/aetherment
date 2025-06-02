@@ -5,7 +5,7 @@ pub enum LogType {
 	Fatal = 255,
 }
 
-pub(crate) static mut LOG: fn(LogType, String) = |typ, msg| {
+pub(crate) static mut LOG: fn(LogType, &str) = |typ, msg| {
 	let typ = match typ {
 		LogType::Log => "LOG",
 		LogType::Error => "ERROR",
@@ -19,21 +19,21 @@ pub(crate) static mut LOG: fn(LogType, String) = |typ, msg| {
 macro_rules! log {
 	(ftl, $($e:tt)*) => {{
 		let s = format!($($e)*);
-		unsafe{crate::log::LOG(crate::log::LogType::Fatal, s)};
+		unsafe{crate::log::LOG(crate::log::LogType::Fatal, &s)};
 	}};
 	
 	(log, $($e:tt)*) => {{
 		let s = format!($($e)*);
-		unsafe{crate::log::LOG(crate::log::LogType::Log, s)};
+		unsafe{crate::log::LOG(crate::log::LogType::Log, &s)};
 	}};
 	
 	(err, $($e:tt)*) => {{
 		let s = format!($($e)*);
-		unsafe{crate::log::LOG(crate::log::LogType::Error, s)};
+		unsafe{crate::log::LOG(crate::log::LogType::Error, &s)};
 	}};
 	
 	($($e:tt)*) => {{
 		let s = format!($($e)*);
-		unsafe{crate::log::LOG(crate::log::LogType::Log, s)};
+		unsafe{crate::log::LOG(crate::log::LogType::Log, &s)};
 	}};
 }

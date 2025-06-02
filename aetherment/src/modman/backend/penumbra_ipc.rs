@@ -30,9 +30,7 @@ pub(crate) fn get_collection(collection_type: super::CollectionType) -> super::C
 fn current_collection() -> super::Collection {get_collection(super::CollectionType::Current)}
 fn get_collections() -> Vec<super::Collection> {unsafe {(FUNCS.as_ref().unwrap().get_collections)()}}
 
-#[allow(improper_ctypes_definitions)]
-#[no_mangle]
-pub extern fn backend_penumbraipc_modchanged(typ: u8, collection_id: &str, mod_id: &str) {
+pub fn subscriber_modchanged(typ: u8, collection_id: &str, mod_id: &str) {
 	// log!("{typ} {mod_id} {collection_id}");
 	// super fucking cheesy, idc
 	let is_aeth = root_path().join(mod_id).join("aetherment").exists();

@@ -74,7 +74,7 @@ pub struct Core {
 
 #[cfg(any(feature = "plugin", feature = "client"))]
 impl Core {
-	pub fn new(log: fn(log::LogType, String), backend_initializers: modman::backend::BackendInitializers, requirement_initializers: modman::requirement::RequirementInitializers, optional_initializers: modman::meta::OptionalInitializers, services_initializers: service::ServicesInitializers) -> Self {
+	pub fn new(log: fn(log::LogType, &str), backend_initializers: modman::backend::BackendInitializers, requirement_initializers: modman::requirement::RequirementInitializers, optional_initializers: modman::meta::OptionalInitializers, services_initializers: service::ServicesInitializers) -> Self {
 		unsafe {
 			log::LOG = log;
 			// BACKEND = Some(std::sync::Mutex::new(modman::backend::new_backend(backend_initializers)));

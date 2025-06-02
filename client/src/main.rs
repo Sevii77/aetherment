@@ -4,7 +4,7 @@ extern crate aetherment;
 
 mod cli;
 
-fn log(typ: aetherment::LogType, msg: String) {
+fn log(typ: aetherment::LogType, msg: &str) {
 	let typ = match typ {
 		aetherment::LogType::Log => "LOG",
 		aetherment::LogType::Error => "ERROR",
@@ -19,7 +19,7 @@ struct CoreWrapper(aetherment::Core);
 impl eframe::App for CoreWrapper {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 		egui::CentralPanel::default().show(&ctx, |ui| {
-			self.0.draw(&mut aetherment::renderer::Ui::new(ui));
+			// self.0.draw(&mut aetherment::renderer::Ui::new(ui));
 		});
 	}
 }

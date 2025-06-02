@@ -69,6 +69,7 @@ public class Aetherment: IDalamudPlugin {
 	
 	[StructLayout(LayoutKind.Sequential)]
 	public unsafe struct Initializers {
+		public nint ffi_str_drop;
 		public nint log;
 		public RequirementFunctions requirement;
 		public PenumbraFunctions penumbra;
@@ -123,6 +124,7 @@ public class Aetherment: IDalamudPlugin {
 		texfinder = new();
 		
 		var init = new Initializers {
+			ffi_str_drop = Marshal.GetFunctionPointerForDelegate(FFI.Str.drop),
 			log = Marshal.GetFunctionPointerForDelegate(log),
 			requirement = new RequirementFunctions {
 				ui_resolution = Marshal.GetFunctionPointerForDelegate(requirement.getUiResolution),
@@ -192,8 +194,6 @@ public class Aetherment: IDalamudPlugin {
 		if(state != 0)
 			try{Native.destroy(state);}catch{}
 		
-		FFI.Str.Drop();
-		
 		Interface.UiBuilder.Draw -= Draw;
 		Interface.UiBuilder.OpenMainUi -= OpenConf;
 		
@@ -212,7 +212,7 @@ public class Aetherment: IDalamudPlugin {
 		// 	watcher.Dispose();
 		state = 0;
 		
-		Native.Free();
+		// Native.Free();
 	}
 	
 	private void OpenConf() {
@@ -220,8 +220,6 @@ public class Aetherment: IDalamudPlugin {
 	}
 	
 	private void Draw() {
-		FFI.Str.HandleResources();
-		
 		if(state != 0) {
 			try {
 				Native.draw(state);

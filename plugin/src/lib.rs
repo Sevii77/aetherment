@@ -1,36 +1,20 @@
 #![allow(improper_ctypes_definitions)]
 
-use std::collections::HashMap;
-
-// using str itself doesnt seem to work, no clue why but oh well
-#[repr(packed)]
-#[allow(dead_code)]
-#[derive(Clone, Copy)]
-struct FfiStr(*const u8, usize);
-impl FfiStr {
-	fn new(s: &str) -> Self {
-		Self(s.as_ptr(), s.len())
-	}
-	
-	fn to_string(&self) -> String {
-		unsafe{std::str::from_utf8_unchecked(std::slice::from_raw_parts(self.0, self.1)).to_string()}
-	}
-	
-	fn to_string_vec(&self) -> Vec<String> {
-		self.to_string().split('\0').map(|v| v.to_string()).collect()
-	}
+mod ffi {
+	pub mod str;
 }
 
+use std::collections::HashMap;
+use ffi::str::{FfiString, FfiStr};
+
 static mut LOG: fn(u8, FfiStr) = |_, _| {};
-fn log(typ: aetherment::LogType, msg: String) {
-	let s = msg.as_str();
-	unsafe{crate::LOG(typ as _, FfiStr(s.as_ptr(), s.len()))};
-	drop(msg);
+fn log(typ: aetherment::LogType, msg: &str) {
+	unsafe{crate::LOG(typ as _, FfiStr::new(msg))};
 }
 
 static mut ADDSTYLE: fn(FfiStr) = |_| {};
 fn dalamud_add_style(s: &str) {
-	unsafe{ADDSTYLE(FfiStr(s.as_ptr(), s.len()))}
+	unsafe{ADDSTYLE(FfiStr::new(s))}
 }
 
 pub struct State {
@@ -38,8 +22,9 @@ pub struct State {
 	core: aetherment::Core,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct Initializers {
+	ffi_str_drop: fn(*const u8, usize),
 	log: fn(u8, FfiStr),
 	issue_functions: IssueFunctions,
 	penumbra_functions: PenumbraFunctions,
@@ -48,30 +33,30 @@ pub struct Initializers {
 }
 
 #[derive(Clone, Copy)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct IssueFunctions {
 	ui_resolution: fn() -> u8,
 	ui_theme: fn() -> u8,
 }
 
-#[repr(packed)]
+#[repr(C, packed)]
 struct PenumbraGetModSettings {
 	exists: bool,
 	enabled: bool,
 	inherit: bool,
 	priority: i32,
-	options: FfiStr,
+	options: FfiString,
 }
 
 #[derive(Clone, Copy)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct PenumbraFunctions {
 	// config_dir: FfiStr,
 	redraw: fn(),
 	redraw_self: fn(),
 	is_enabled: fn() -> bool,
-	root_path: fn() -> FfiStr,
-	mod_list: fn() -> FfiStr,
+	root_path: fn() -> FfiString,
+	mod_list: fn() -> FfiString,
 	add_mod_entry: fn(FfiStr) -> u8,
 	reload_mod: fn(FfiStr) -> u8,
 	set_mod_enabled: fn(FfiStr, FfiStr, bool) -> u8,
@@ -79,12 +64,12 @@ pub struct PenumbraFunctions {
 	set_mod_inherit: fn(FfiStr, FfiStr, bool) -> u8,
 	set_mod_settings: fn(FfiStr, FfiStr, FfiStr, FfiStr) -> u8,
 	get_mod_settings: fn(FfiStr, FfiStr, bool) -> PenumbraGetModSettings,
-	get_collection: fn(u8) -> FfiStr,
-	get_collections: fn() -> FfiStr,
+	get_collection: fn(u8) -> FfiString,
+	get_collections: fn() -> FfiString,
 }
 
 #[allow(dead_code)]
-#[repr(packed)]
+#[repr(C, packed)]
 struct UiColorsColor {
 	use_theme: bool,
 	index: u32,
@@ -92,21 +77,22 @@ struct UiColorsColor {
 }
 
 #[derive(Clone, Copy)]
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct ServicesFunctions {
 	set_ui_colors: fn(*const UiColorsColor, usize)
 }
 
 #[no_mangle]
-pub extern fn initialize(init: Initializers) -> *mut State {
+pub extern "C" fn initialize(init: Initializers) -> *mut State {
 	use aetherment::modman::backend;
 	
 	std::panic::set_hook(Box::new(|info| {
-		log(aetherment::LogType::Fatal, format!("{}", info));
+		log(aetherment::LogType::Fatal, &format!("{}", info));
 	}));
 	
 	match std::panic::catch_unwind(move || {
 		unsafe {
+			ffi::str::DROP = init.ffi_str_drop;
 			LOG = init.log;
 			ADDSTYLE = init.dalamud_add_style;
 		};
@@ -139,7 +125,7 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 				redraw_self: Box::new(funcs.redraw_self),
 				is_enabled: Box::new(funcs.is_enabled),
 				root_path: Box::new(move || std::path::PathBuf::from((funcs.root_path)().to_string())),
-				mod_list: Box::new(move || (funcs.mod_list)().to_string_vec()),
+				mod_list: Box::new(move || (funcs.mod_list)().to_string().split('\0').map(|v| v.to_string()).collect()),
 				add_mod_entry: Box::new(move |id| (funcs.add_mod_entry)(FfiStr::new(id))),
 				reload_mod: Box::new(move |id| (funcs.reload_mod)(FfiStr::new(id))),
 				set_mod_enabled: Box::new(move |collection, id, enabled| (funcs.set_mod_enabled)(FfiStr::new(collection), FfiStr::new(id), enabled)),
@@ -208,13 +194,13 @@ pub extern fn initialize(init: Initializers) -> *mut State {
 }
 
 #[no_mangle]
-pub extern fn destroy(state: *mut State) {
+pub extern "C" fn destroy(state: *mut State) {
 	aetherment::service::disable();
 	_ = unsafe{Box::from_raw(state)};
 }
 
 #[no_mangle]
-pub extern fn command(state: *mut State, args: &str) {
+pub extern "C" fn command(state: *mut State, args: FfiString) {
 	let state = unsafe{&mut *state};
 	// log(aetherment::LogType::Log, format!("{}", args));
 	match args {
@@ -223,7 +209,7 @@ pub extern fn command(state: *mut State, args: &str) {
 }
 
 #[no_mangle]
-pub extern fn draw(state: *mut State) {
+pub extern "C" fn draw(state: *mut State) {
 	let state = unsafe{&mut *state};
 	
 	let ui = &mut aetherment::renderer::Ui::new();
@@ -234,4 +220,9 @@ pub extern fn draw(state: *mut State) {
 			..Default::default()
 		}, |ui| state.core.draw(ui));
 	}
+}
+
+#[no_mangle]
+pub extern "C" fn backend_penumbraipc_modchanged(typ: u8, collection_id: FfiString, mod_id: FfiString) {
+	aetherment::modman::backend::penumbra_ipc::subscriber_modchanged(typ, &collection_id.to_string(), &mod_id.to_string());
 }

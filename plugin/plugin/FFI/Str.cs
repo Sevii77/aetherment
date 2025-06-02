@@ -1,58 +1,41 @@
 using System.Text;
 using System.Runtime.InteropServices;
-using System.Diagnostics;
-using System.Collections.Generic;
 
 namespace Aetherment.FFI;
 
 [StructLayout(LayoutKind.Explicit)]
 public struct Str {
 	[FieldOffset(0x0)] private nint ptr;
-	[FieldOffset(0x8)] private ulong length;
-	
-	// if we dropped things every frame it might cause issues due to multi-threading bs, thats why time
-	private static Queue<((nint, ulong), Stopwatch)> strings;
+	[FieldOffset(0x8)] private nint length;
 	
 	static Str() {
-		strings = new();
-	}
-	
-	public static void HandleResources() {
-		while(strings.TryPeek(out var s)) {
-			if(s.Item2.ElapsedMilliseconds < 100)
-				break;
-			
-			var str = strings.Dequeue();
-			Marshal.FreeHGlobal(str.Item1.Item1);
-			// Aetherment.Logger.Debug($"destroyed string of {str.Item1.Item2} bytes");
-		}
-	}
-	
-	public static void Drop() {
-		while(strings.TryDequeue(out var str))
-			Marshal.FreeHGlobal(str.Item1.Item1);
+		drop = Drop;
 	}
 	
 	public Str(string str) {
-		var len = Encoding.UTF8.GetByteCount(str);
-		
-		ptr = Marshal.AllocHGlobal(len);;
-		length = (ulong)len;
+		length = Encoding.UTF8.GetByteCount(str);
+		ptr = Marshal.AllocHGlobal(length);;
+		Aetherment.Logger.Verbose($"creating ffi.str {ptr:X} [{length}]");
 		
 		unsafe {
 			var p = (byte*)ptr;
 			fixed(char* chars = str) {
-				Encoding.UTF8.GetBytes(chars, str.Length, p, len);
+				Encoding.UTF8.GetBytes(chars, str.Length, p, (int)length);
 			}
 		}
-		
-		strings.Enqueue(((ptr, length), Stopwatch.StartNew()));
-		// Aetherment.Logger.Debug($"created string of {len} bytes");
+	}
+	
+	public static DropDelegate drop;
+	public delegate void DropDelegate(nint ptr, nint length);
+	public static void Drop(nint ptr, nint length) {
+		Aetherment.Logger.Verbose($"dropping ffi.str {ptr:X} [{length}]");
+		Marshal.FreeHGlobal(ptr);
 	}
 	
 	public static implicit operator Str(string str) => new Str(str);
 	
 	public static unsafe implicit operator string(Str str) {
+		Aetherment.Logger.Verbose($"casting ffi.str {str.ptr:X} [{str.length}]");
 		return Encoding.UTF8.GetString((byte*)str.ptr, (int)str.length);
 	}
 	

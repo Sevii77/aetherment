@@ -20,7 +20,8 @@ pub struct ModEntry {
 pub fn get_mods() -> Result<Vec<ModEntry>, crate::resource_loader::BacktraceError> {
 	Ok(ureq::get(&format!("{REMOTE_URL}/mods"))
 		.call()?
-		.into_json::<Vec<ModEntry>>()?)
+		.into_body()
+		.read_json::<Vec<ModEntry>>()?)
 }
 
 pub fn download(mod_id: &str, version: &str) -> Result<std::fs::File, crate::resource_loader::BacktraceError> {
@@ -31,6 +32,7 @@ pub fn download(mod_id: &str, version: &str) -> Result<std::fs::File, crate::res
 	let mut f = tempfile::tempfile()?;
 	let mut data = ureq::get(&format!("{REMOTE_URL}/mod/{mod_id}/{version}"))
 		.call()?
+		.into_body()
 		.into_reader();
 	io::copy(&mut data, &mut f)?;
 	Ok(f)

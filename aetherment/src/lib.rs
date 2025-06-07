@@ -9,10 +9,10 @@ mod resource_loader;
 mod render_helper;
 mod config;
 pub mod modman;
-#[cfg(any(feature = "plugin", feature = "client"))] mod view;
+// #[cfg(any(feature = "plugin", feature = "client"))] mod view;
 #[cfg(any(feature = "plugin", feature = "client"))] mod remote;
 #[cfg(any(feature = "plugin", feature = "client"))] pub mod service;
-#[cfg(any(feature = "plugin", feature = "client"))] pub extern crate renderer;
+// #[cfg(any(feature = "plugin", feature = "client"))] pub extern crate renderer;
 pub use noumenon as noumenon_; // idk what to call it
 
 static mut CONFIG: Option<config::ConfigManager> = None;
@@ -58,11 +58,11 @@ pub fn json_pretty<T: serde::Serialize>(data: &T) -> Result<String, serde_json::
 
 #[cfg(any(feature = "plugin", feature = "client"))]
 pub struct Core {
-	mods_tab: view::mods::Mods,
-	browser_tab: view::browser::Browser,
-	settings_tab: view::settings::Settings,
-	tools_tab: view::tool::Tools,
-	debug_tab: view::debug::Debug,
+	// mods_tab: view::mods::Mods,
+	// browser_tab: view::browser::Browser,
+	// settings_tab: view::settings::Settings,
+	// tools_tab: view::tool::Tools,
+	// debug_tab: view::debug::Debug,
 	
 	// current_tab: &'static str,
 	current_tab: String,
@@ -91,11 +91,11 @@ impl Core {
 		// backend().load_mods();
 		
 		let mut s = Self {
-			mods_tab: view::mods::Mods::new(),
-			browser_tab: view::browser::Browser::new(),
-			settings_tab: view::settings::Settings::new(),
-			tools_tab: view::tool::Tools::new(),
-			debug_tab: view::debug::Debug::new(),
+			// mods_tab: view::mods::Mods::new(),
+			// browser_tab: view::browser::Browser::new(),
+			// settings_tab: view::settings::Settings::new(),
+			// tools_tab: view::tool::Tools::new(),
+			// debug_tab: view::debug::Debug::new(),
 			
 			// current_tab: "Mods",
 			current_tab: "Mods".to_string(),
@@ -118,79 +118,83 @@ impl Core {
 		s
 	}
 	
-	pub fn draw(&mut self, ui: &mut renderer::Ui) {
-		let status = backend().get_status();
-		match status {
-			modman::backend::Status::Ok => {
-				if self.backend_last_error {
-					let progress = self.install_progress.clone();
-					std::thread::spawn(move || {
-						backend().apply_services();
-						remote::check_updates(progress);
-					});
-					
-					self.mods_tab.refresh();
-				}
-				
-				self.backend_last_error = false;
-			}
-			
-			modman::backend::Status::Error(_) => self.backend_last_error = true,
-		}
-		
-		ui.horizontal(|ui| {
-			ui.tabs(&["Mods", "Browser", "Settings", "Tools", "Debug"], &mut self.current_tab);
-			let offset = ui.available_size()[0] - 210.0;
-			ui.add_space(offset);
-			ui.set_width(210.0);
-			ui.colored([0, 0, 0, 255], [254, 210, 0, 255], |ui| {
-				if ui.button("Support me on Buy Me a Coffee").clicked {
-					_ = open::that("https://buymeacoffee.com/sevii77");
-				}
-			});
-		});
-		
-		// TODO: make fancy
-		if self.install_progress.is_busy() {
-			ui.label(format!("{:.0}% {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()));
-			ui.label(format!("{:.0}% {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()));
-		}
-		
-		if self.apply_progress.is_busy() {
-			ui.label(format!("{:.0}% {}", self.apply_progress.mods.get() * 100.0, self.apply_progress.mods.get_msg()));
-			ui.label(format!("{:.0}% {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()));
-		}
-		
-		match self.current_tab.as_str() {
-			"Mods" => {
-				match status {
-					modman::backend::Status::Ok => self.mods_tab.draw(ui, self.install_progress.clone(), self.apply_progress.clone()),
-					modman::backend::Status::Error(err) => ui.label(err),
-				}
-			}
-			
-			"Browser" => {
-				match status {
-					modman::backend::Status::Ok => self.browser_tab.draw(ui, self.install_progress.clone()),
-					modman::backend::Status::Error(err) => ui.label(err),
-				}
-			}
-			
-			"Settings" => {
-				self.settings_tab.draw(ui);
-			}
-			
-			"Tools" => {
-				self.tools_tab.draw(ui);
-			}
-			
-			"Debug" => {
-				self.debug_tab.draw(ui);
-			}
-			
-			_ => {
-				ui.label("How did you get here, this tab is not supposed to be a thing")
-			}
-		}
+	pub fn draw(&mut self, ui: &mut egui::Ui) {
+		ui.heading("Test 🗁");
 	}
+	
+	// pub fn draw(&mut self, ui: &mut renderer::Ui) {
+	// 	let status = backend().get_status();
+	// 	match status {
+	// 		modman::backend::Status::Ok => {
+	// 			if self.backend_last_error {
+	// 				let progress = self.install_progress.clone();
+	// 				std::thread::spawn(move || {
+	// 					backend().apply_services();
+	// 					remote::check_updates(progress);
+	// 				});
+	// 				
+	// 				self.mods_tab.refresh();
+	// 			}
+	// 			
+	// 			self.backend_last_error = false;
+	// 		}
+	// 		
+	// 		modman::backend::Status::Error(_) => self.backend_last_error = true,
+	// 	}
+	// 	
+	// 	ui.horizontal(|ui| {
+	// 		ui.tabs(&["Mods", "Browser", "Settings", "Tools", "Debug"], &mut self.current_tab);
+	// 		let offset = ui.available_size()[0] - 210.0;
+	// 		ui.add_space(offset);
+	// 		ui.set_width(210.0);
+	// 		ui.colored([0, 0, 0, 255], [254, 210, 0, 255], |ui| {
+	// 			if ui.button("Support me on Buy Me a Coffee").clicked {
+	// 				_ = open::that("https://buymeacoffee.com/sevii77");
+	// 			}
+	// 		});
+	// 	});
+	// 	
+	// 	// TODO: make fancy
+	// 	if self.install_progress.is_busy() {
+	// 		ui.label(format!("{:.0}% {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()));
+	// 		ui.label(format!("{:.0}% {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()));
+	// 	}
+	// 	
+	// 	if self.apply_progress.is_busy() {
+	// 		ui.label(format!("{:.0}% {}", self.apply_progress.mods.get() * 100.0, self.apply_progress.mods.get_msg()));
+	// 		ui.label(format!("{:.0}% {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()));
+	// 	}
+	// 	
+	// 	match self.current_tab.as_str() {
+	// 		"Mods" => {
+	// 			match status {
+	// 				modman::backend::Status::Ok => self.mods_tab.draw(ui, self.install_progress.clone(), self.apply_progress.clone()),
+	// 				modman::backend::Status::Error(err) => ui.label(err),
+	// 			}
+	// 		}
+	// 		
+	// 		"Browser" => {
+	// 			match status {
+	// 				modman::backend::Status::Ok => self.browser_tab.draw(ui, self.install_progress.clone()),
+	// 				modman::backend::Status::Error(err) => ui.label(err),
+	// 			}
+	// 		}
+	// 		
+	// 		"Settings" => {
+	// 			self.settings_tab.draw(ui);
+	// 		}
+	// 		
+	// 		"Tools" => {
+	// 			self.tools_tab.draw(ui);
+	// 		}
+	// 		
+	// 		"Debug" => {
+	// 			self.debug_tab.draw(ui);
+	// 		}
+	// 		
+	// 		_ => {
+	// 			ui.label("How did you get here, this tab is not supposed to be a thing")
+	// 		}
+	// 	}
+	// }
 }

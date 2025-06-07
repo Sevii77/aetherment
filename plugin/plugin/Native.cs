@@ -56,7 +56,7 @@ namespace Aetherment;
 public static class Native {
 	[DllImport("aetherment_core.dll")] public static extern unsafe nint initialize(Initializers data);
 	[DllImport("aetherment_core.dll")] public static extern unsafe void destroy(nint state);
-	[DllImport("aetherment_core.dll")] public static extern unsafe void command(nint state, FFI.Str args);
-	[DllImport("aetherment_core.dll")] public static extern unsafe void draw(nint state);
+	[DllImport("aetherment_core.dll")] public static extern unsafe byte command(nint state, FFI.Str args);
+	[DllImport("aetherment_core.dll")] public static extern unsafe nint draw(nint state, nint d3d11_device, Io io);
 	[DllImport("aetherment_core.dll")] public static extern unsafe void backend_penumbraipc_modchanged(byte type, FFI.Str collection_id, FFI.Str mod_id);
 }

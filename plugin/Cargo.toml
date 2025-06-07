@@ -7,5 +7,20 @@ edition = "2021"
 name = "aetherment_core"
 crate-type = ["cdylib"]
 
+[dependencies.windows]
+version = "0.61"
+features = [
+	"Win32_Graphics_Direct3D",
+	"Win32_Graphics_Direct3D11",
+	"Win32_Graphics_Dxgi_Common",
+	"Win32_Graphics_Direct3D_Fxc",
+	"Win32_UI_WindowsAndMessaging",
+]
+
 [dependencies]
 aetherment = {path = "../aetherment", features = ["plugin"]}
+
+naga = {version = "24.0.0", features = ["wgsl-in", "hlsl-out"]}
+egui = "0.29.0"
+clipboard-win = "5.4.0"
+opener = "0.8.2"

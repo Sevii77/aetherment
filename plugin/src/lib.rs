@@ -3,6 +3,7 @@
 mod ffi {
 	pub mod str;
 }
+mod renderer;
 
 use std::collections::HashMap;
 use ffi::str::{FfiString, FfiStr};
@@ -17,10 +18,7 @@ fn dalamud_add_style(s: &str) {
 	unsafe{ADDSTYLE(FfiStr::new(s))}
 }
 
-pub struct State {
-	visible: bool,
-	core: aetherment::Core,
-}
+// ------------------------------
 
 #[repr(C, packed)]
 pub struct Initializers {
@@ -29,7 +27,7 @@ pub struct Initializers {
 	issue_functions: IssueFunctions,
 	penumbra_functions: PenumbraFunctions,
 	services_functions: ServicesFunctions,
-	dalamud_add_style: fn(FfiStr),
+	d3d11_device: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -79,7 +77,30 @@ struct UiColorsColor {
 #[derive(Clone, Copy)]
 #[repr(C, packed)]
 pub struct ServicesFunctions {
-	set_ui_colors: fn(*const UiColorsColor, usize)
+	set_ui_colors: fn(*const UiColorsColor, usize),
+	dalamud_add_style: fn(FfiStr),
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Default)]
+pub struct Io {
+	pub width: f32,
+	pub height: f32,
+	pub mouse_x: f32,
+	pub mouse_y: f32,
+	pub wheel_x: f32,
+	pub wheel_y: f32,
+	pub mods: u32,
+	_padding: u32,
+	pub input_buf_ptr: usize,
+	pub input_buf_len: usize,
+}
+
+// ------------------------------\
+
+pub struct State {
+	renderer: renderer::Renderer,
+	core: aetherment::Core,
 }
 
 #[no_mangle]
@@ -91,15 +112,15 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 	}));
 	
 	match std::panic::catch_unwind(move || {
-		unsafe {
-			ffi::str::DROP = init.ffi_str_drop;
-			LOG = init.log;
-			ADDSTYLE = init.dalamud_add_style;
-		};
-		
 		let funcs = init.penumbra_functions;
 		let requirement_funcs = init.issue_functions;
 		let services_funcs = init.services_functions;
+		
+		unsafe {
+			ffi::str::DROP = init.ffi_str_drop;
+			LOG = init.log;
+			ADDSTYLE = services_funcs.dalamud_add_style;
+		};
 		
 		let get_collection = Box::new(move |collection_type| {
 			let v = (funcs.get_collection)(collection_type as _).to_string();
@@ -118,7 +139,8 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 		});
 		
 		let state = Box::into_raw(Box::new(State {
-			visible: aetherment::config().config.plugin_open_on_launch,
+			// visible: aetherment::config().config.plugin_open_on_launch,
+			renderer: unsafe{renderer::Renderer::new(init.d3d11_device)}.unwrap(),
 			core: aetherment::Core::new(log, backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
 				// config_dir: std::path::PathBuf::from(funcs.config_dir.to_string()),
 				redraw: Box::new(funcs.redraw),
@@ -200,25 +222,39 @@ pub extern "C" fn destroy(state: *mut State) {
 }
 
 #[no_mangle]
-pub extern "C" fn command(state: *mut State, args: FfiString) {
-	let state = unsafe{&mut *state};
-	// log(aetherment::LogType::Log, format!("{}", args));
-	match args {
-		_ => state.visible = !state.visible,
-	}
+pub extern "C" fn command(state: *mut State, _args: FfiString) -> bool {
+	let _state = unsafe{&mut *state};
+	
+	// match args {
+	// 	_ => state.visible = !state.visible,
+	// }
+	
+	false
 }
 
 #[no_mangle]
-pub extern "C" fn draw(state: *mut State) {
+pub extern "C" fn draw(state: *mut State, d3d11_device: usize, io: Io) -> usize {
 	let state = unsafe{&mut *state};
 	
-	let ui = &mut aetherment::renderer::Ui::new();
-	if state.visible {
-		ui.window(aetherment::renderer::WindowArgs {
-			title: "Aetherment",
-			open: Some(&mut state.visible),
-			..Default::default()
-		}, |ui| state.core.draw(ui));
+	// let draw = |ui| {
+	// 	state.core.draw(ui)
+	// }
+	
+	match state.renderer.draw(d3d11_device, io, |ctx| {
+		egui::CentralPanel::default().frame(egui::Frame {
+			inner_margin: egui::Margin::same(0.0),
+			outer_margin: egui::Margin::same(2.0),
+			shadow: egui::epaint::Shadow::NONE,
+			fill: egui::Color32::TRANSPARENT,
+			stroke: egui::Stroke::NONE,
+			rounding: egui::Rounding::ZERO,
+		}).show(ctx, |ui| {state.core.draw(ui)});
+	}) {
+		Ok(v) => v,
+		Err(err) => {
+			log(aetherment::LogType::Error, &format!("Failed drawing: {err:#?}"));
+			0 as _
+		}
 	}
 }
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dalamud.Game;
@@ -10,6 +11,7 @@ using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
+using ImGuiNET;
 
 namespace Aetherment;
 
@@ -27,6 +29,8 @@ public class Aetherment: IDalamudPlugin {
 	
 	private const string maincommand = "/aetherment";
 	private const string texfindercommand = "/texfinder";
+	
+	private bool open;
 	
 	internal static nint state;
 	private static string? error;
@@ -67,6 +71,8 @@ public class Aetherment: IDalamudPlugin {
 	private UiColor uicolor;
 	private TexFinder texfinder;
 	
+	private SharpDX.Direct3D11.Device device;
+	
 	[StructLayout(LayoutKind.Sequential)]
 	public unsafe struct Initializers {
 		public nint ffi_str_drop;
@@ -74,7 +80,7 @@ public class Aetherment: IDalamudPlugin {
 		public RequirementFunctions requirement;
 		public PenumbraFunctions penumbra;
 		public ServicesFunctions services;
-		public nint dalamud_add_style;
+		public nint d3d11_device;
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
@@ -86,6 +92,7 @@ public class Aetherment: IDalamudPlugin {
 	[StructLayout(LayoutKind.Sequential)]
 	public unsafe struct ServicesFunctions {
 		public nint set_ui_colors;
+		public nint dalamud_add_style;
 	}
 
 	[StructLayout(LayoutKind.Sequential)]
@@ -107,6 +114,20 @@ public class Aetherment: IDalamudPlugin {
 		public nint get_collections;
 	}
 	
+	[StructLayout(LayoutKind.Sequential)]
+	public struct Io {
+		public float width;
+		public float height;
+		public float mouse_x;
+		public float mouse_y;
+		public float wheel_x;
+		public float wheel_y;
+		public uint mods;
+		private uint _padding;
+		public nint input_buf_ptr;
+		public nint input_buf_len;
+	}
+	
 	public unsafe Aetherment() {
 		// var c = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance()->SystemConfig.SystemConfigBase.ConfigBase;
 		// for(var i = 0; i < c.ConfigCount; ++i) {
@@ -122,6 +143,8 @@ public class Aetherment: IDalamudPlugin {
 		dalamud = new();
 		uicolor = new();
 		texfinder = new();
+		
+		device = Interface.UiBuilder.Device;
 		
 		var init = new Initializers {
 			ffi_str_drop = Marshal.GetFunctionPointerForDelegate(FFI.Str.drop),
@@ -150,8 +173,9 @@ public class Aetherment: IDalamudPlugin {
 			},
 			services = new ServicesFunctions {
 				set_ui_colors = Marshal.GetFunctionPointerForDelegate(uicolor.setUiColors),
+				dalamud_add_style = Marshal.GetFunctionPointerForDelegate(dalamud.addStyle),
 			},
-			dalamud_add_style = Marshal.GetFunctionPointerForDelegate(dalamud.addStyle),
+			d3d11_device = device.NativePointer,
 		};
 		
 		try {
@@ -220,18 +244,70 @@ public class Aetherment: IDalamudPlugin {
 	}
 	
 	private void Draw() {
+		ImGui.SetNextWindowPos(new Vector2(50), ImGuiCond.FirstUseEver);
+		ImGui.SetNextWindowSize(new Vector2(200), ImGuiCond.FirstUseEver);
+		ImGui.Begin("Aetherment", ref open);
 		if(state != 0) {
 			try {
-				Native.draw(state);
+				var io = ImGui.GetIO();
+				var pos = ImGui.GetCursorScreenPos();
+				var size = ImGui.GetContentRegionAvail();
+				var focused = ImGui.IsWindowFocused();
+				var drawlist = ImGui.GetWindowDrawList();
+				
+				if(focused)
+					io.WantTextInput = true;
+				
+				ImGui.InvisibleButton("input_blocker", size);
+				if(ImGui.IsItemHovered())
+					io.ConfigFlags = io.ConfigFlags | ImGuiConfigFlags.NoMouseCursorChange;
+				else
+					io.ConfigFlags = io.ConfigFlags & ~ImGuiConfigFlags.NoMouseCursorChange;
+				
+				nint input_buf_ptr = 0;
+				nint input_buf_len = io.InputQueueCharacters.Size;
+				if(input_buf_len > 0) {
+					input_buf_ptr = Marshal.AllocHGlobal(input_buf_len  * 2);
+					
+					for(var i = 0; i < io.InputQueueCharacters.Size; i++)
+						unsafe{*(ushort*)(input_buf_ptr + i * 2) = io.InputQueueCharacters[i];}
+				}
+				
+				var tex = Native.draw(state, device.NativePointer, new() {
+					width = size.X,
+					height = size.Y,
+					mouse_x = io.MousePos.X - pos.X,
+					mouse_y = io.MousePos.Y - pos.Y,
+					wheel_x = io.MouseWheelH,
+					wheel_y = io.MouseWheel,
+					mods = (uint)(
+						(io.KeyAlt ? 0b001 : 0) +
+						(io.KeyCtrl ? 0b010 : 0) +
+						(io.KeyShift ? 0b100 : 0) +
+						
+						(io.MouseDown[0] ? 0b00001000 : 0) +
+						(io.MouseDown[1] ? 0b00010000 : 0) +
+						(io.MouseDown[2] ? 0b00100000 : 0) +
+						(io.MouseDown[3] ? 0b01000000 : 0) +
+						(io.MouseDown[4] ? 0b10000000 : 0) +
+						
+						(focused ? 0b1_00000000 : 0)),
+					input_buf_ptr = input_buf_ptr,
+					input_buf_len = input_buf_len
+				});
+				
+				drawlist.AddImage(tex, pos, pos + size);
+				
+				if(input_buf_ptr != 0)
+					Marshal.FreeHGlobal(input_buf_ptr);
 			} catch(Exception e) {
 				Kill($"Fatal error in draw\n\n{e}", 1);
 			}
 		} else {
-			ImGuiNET.ImGui.Begin("Aetherment");
 			ImGuiNET.ImGui.Text("Aetherment has encountered an unrecoverable error");
 			ImGuiNET.ImGui.Text(error ?? "No Error");
-			ImGuiNET.ImGui.End();
 		}
+		ImGui.End();
 		
 		texfinder.Draw();
 	}
@@ -249,7 +325,8 @@ public class Aetherment: IDalamudPlugin {
 			return;
 		
 		try {
-			Native.command(state, args);
+			if(Native.command(state, args) == 0)
+				open = !open;
 		} catch(Exception e) {
 			Kill($"Fatal error in command\n\n{e}", 1);
 		}

@@ -19,7 +19,7 @@ struct CoreWrapper(aetherment::Core);
 impl eframe::App for CoreWrapper {
 	fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 		egui::CentralPanel::default().show(&ctx, |ui| {
-			// self.0.draw(&mut aetherment::renderer::Ui::new(ui));
+			self.0.draw(ui);
 		});
 	}
 }
@@ -43,7 +43,7 @@ fn main() {
 	
 	eframe::run_native("Aetherment", options, Box::new(|cc| {
 		let _backend = cc.wgpu_render_state.as_ref().unwrap().adapter.get_info().backend;
-		Box::new(CoreWrapper(aetherment::Core::new(log,
+		Ok(Box::new(CoreWrapper(aetherment::Core::new(log,
 			aetherment::modman::backend::BackendInitializers::None,
 			aetherment::modman::requirement::RequirementInitializers {
 				ui_resolution: Box::new(|| 255),
@@ -54,6 +54,6 @@ fn main() {
 			aetherment::service::ServicesInitializers {
 				uicolor: Box::new(|_| {}),
 			},
-		)))
+		))))
 	})).unwrap();
 }

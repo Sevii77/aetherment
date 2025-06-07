@@ -474,6 +474,10 @@ impl Renderer {
 		
 		let out = self.egui_ctx.run(input, draw);
 		
+		if io.mods & 0b1_00000000 != 0 && self.egui_ctx.wants_keyboard_input() {
+			unsafe{*(io.set_keyboard_focus as *mut u8) = 1};
+		}
+		
 		if !out.platform_output.copied_text.is_empty() {
 			_ = clipboard_win::set_clipboard_string(&out.platform_output.copied_text);
 		}

@@ -91,9 +91,10 @@ pub struct Io {
 	pub wheel_x: f32,
 	pub wheel_y: f32,
 	pub mods: u32,
-	_padding: u32,
 	pub input_buf_ptr: usize,
 	pub input_buf_len: usize,
+	
+	pub set_keyboard_focus: usize,
 }
 
 // ------------------------------\

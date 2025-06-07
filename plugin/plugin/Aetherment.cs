@@ -116,7 +116,7 @@ public class Aetherment: IDalamudPlugin {
 	}
 	
 	[StructLayout(LayoutKind.Sequential)]
-	public struct Io {
+	public unsafe struct Io {
 		public float width;
 		public float height;
 		public float mouse_x;
@@ -124,9 +124,10 @@ public class Aetherment: IDalamudPlugin {
 		public float wheel_x;
 		public float wheel_y;
 		public uint mods;
-		private uint _padding;
 		public nint input_buf_ptr;
 		public nint input_buf_len;
+		
+		public byte* set_keyboard_focus;
 	}
 	
 	public unsafe Aetherment() {
@@ -256,9 +257,6 @@ public class Aetherment: IDalamudPlugin {
 				var focused = ImGui.IsWindowFocused();
 				var drawlist = ImGui.GetWindowDrawList();
 				
-				if(focused)
-					io.WantTextInput = true;
-				
 				ImGui.InvisibleButton("input_blocker", size);
 				if(ImGui.IsItemHovered()) {
 					io.ConfigFlags = io.ConfigFlags | ImGuiConfigFlags.NoMouseCursorChange;
@@ -277,28 +275,37 @@ public class Aetherment: IDalamudPlugin {
 						unsafe{*(ushort*)(input_buf_ptr + i * 2) = io.InputQueueCharacters[i];}
 				}
 				
-				var tex = Native.draw(state, device.NativePointer, new() {
-					width = size.X,
-					height = size.Y,
-					mouse_x = io.MousePos.X - pos.X,
-					mouse_y = io.MousePos.Y - pos.Y,
-					wheel_x = io.MouseWheelH,
-					wheel_y = io.MouseWheel,
-					mods = (uint)(
-						(io.KeyAlt ? 0b001 : 0) +
-						(io.KeyCtrl ? 0b010 : 0) +
-						(io.KeyShift ? 0b100 : 0) +
+				byte set_keyboard_focus = 0;
+				nint tex;
+				unsafe {
+					tex = Native.draw(state, device.NativePointer, new() {
+						width = size.X,
+						height = size.Y,
+						mouse_x = io.MousePos.X - pos.X,
+						mouse_y = io.MousePos.Y - pos.Y,
+						wheel_x = io.MouseWheelH,
+						wheel_y = io.MouseWheel,
+						mods = (uint)(
+							(io.KeyAlt ? 0b001 : 0) +
+							(io.KeyCtrl ? 0b010 : 0) +
+							(io.KeyShift ? 0b100 : 0) +
+							
+							(io.MouseDown[0] ? 0b00001000 : 0) +
+							(io.MouseDown[1] ? 0b00010000 : 0) +
+							(io.MouseDown[2] ? 0b00100000 : 0) +
+							(io.MouseDown[3] ? 0b01000000 : 0) +
+							(io.MouseDown[4] ? 0b10000000 : 0) +
+							
+							(focused ? 0b1_00000000 : 0)),
+						input_buf_ptr = input_buf_ptr,
+						input_buf_len = input_buf_len,
 						
-						(io.MouseDown[0] ? 0b00001000 : 0) +
-						(io.MouseDown[1] ? 0b00010000 : 0) +
-						(io.MouseDown[2] ? 0b00100000 : 0) +
-						(io.MouseDown[3] ? 0b01000000 : 0) +
-						(io.MouseDown[4] ? 0b10000000 : 0) +
-						
-						(focused ? 0b1_00000000 : 0)),
-					input_buf_ptr = input_buf_ptr,
-					input_buf_len = input_buf_len
-				});
+						set_keyboard_focus = &set_keyboard_focus
+					});
+				}
+				
+				if(set_keyboard_focus != 0)
+					io.WantTextInput = true;
 				
 				drawlist.AddImage(tex, pos, pos + size);
 				

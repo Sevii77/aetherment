@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use windows::{core::{Interface, PCSTR}, Win32::Graphics::{Direct3D::{Fxc::D3DCompile, *}, Direct3D11::*, Dxgi::Common::*}};
+use windows::{core::{Interface, PCSTR}, Win32::{Graphics::{Direct3D::{Fxc::D3DCompile, *}, Direct3D11::*, Dxgi::Common::*}}};
 
 pub type Error = Box<dyn std::error::Error>;
 
@@ -187,8 +187,8 @@ impl Texture {
 	
 	pub unsafe fn paint_region(&mut self, d3d11_ctx: &ID3D11DeviceContext, data: &[u32], sx: u32, sy: u32, w: u32, h: u32) {
 		let mut pixels = data.iter();
-		for y in sy..h {
-			for x in sx..w {
+		for y in sy..sy + h {
+			for x in sx..sx + w {
 				self.data[(y * self.w + x) as usize] = *pixels.next().unwrap();
 			}
 		}
@@ -245,6 +245,7 @@ impl Renderer {
 		device.CreateRasterizerState(&D3D11_RASTERIZER_DESC {
 			FillMode: D3D11_FILL_SOLID,
 			CullMode: D3D11_CULL_NONE,
+			ScissorEnable: windows::core::BOOL(1),
 			..Default::default()
 		}, Some(&mut raster))?;
 		
@@ -342,7 +343,7 @@ impl Renderer {
 		let device = ID3D11Device::from_raw_borrowed(device).ok_or("Failed borrowing device")?;
 		
 		let (w, h) = (io.width, io.height);
-		if self.last_io.width != w || self.last_io.height != h {
+		if (self.last_io.width != w || self.last_io.height != h) && w > 16.0 && h > 16.0 {
 			// crate::log!("resizing rendertarget to {w}x{h}");
 			self.rt = RenderTarget::new(device, w as u32, h as u32)?;
 		}
@@ -526,6 +527,7 @@ impl Renderer {
 			
 			let sx = delta.pos.map_or(0, |v| v[0] as u32);
 			let sy = delta.pos.map_or(0, |v| v[1] as u32);
+			// crate::log(aetherment::LogType::Log, &format!("updating texture[{id}] {sx},{sy} {w}x{h}; whole: {}", delta.is_whole()));
 			
 			let pixels = match delta.image {
 				egui::ImageData::Color(img) => img.pixels.clone(),
@@ -541,12 +543,12 @@ impl Renderer {
 		}
 		
 		for prim in self.egui_ctx.tessellate(out.shapes, 1.0) {
-			// unsafe{d3d11_ctx.RSSetScissorRects(Some(&[RECT {
-			// 	left: prim.clip_rect.left() as i32,
-			// 	top: prim.clip_rect.top() as i32,
-			// 	right: prim.clip_rect.right() as i32,
-			// 	bottom: prim.clip_rect.bottom() as i32,
-			// }]))};
+			unsafe{self.d3d11_ctx.RSSetScissorRects(Some(&[windows::Win32::Foundation::RECT {
+				left: prim.clip_rect.left() as i32,
+				top: prim.clip_rect.top() as i32,
+				right: prim.clip_rect.right() as i32,
+				bottom: prim.clip_rect.bottom() as i32,
+			}]))};
 			
 			match prim.primitive {
 				egui::epaint::Primitive::Callback(_) => {}

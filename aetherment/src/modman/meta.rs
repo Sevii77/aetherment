@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fs::File, io::Write, path::Path};
 use serde::{de::Visitor, Deserialize, Serialize};
-use crate::render_helper::EnumTools;
+use crate::ui_ext::EnumTools;
 
 pub mod dalamud;
 

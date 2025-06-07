@@ -140,7 +140,7 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 		
 		let state = Box::into_raw(Box::new(State {
 			// visible: aetherment::config().config.plugin_open_on_launch,
-			renderer: unsafe{renderer::Renderer::new(init.d3d11_device)}.unwrap(),
+			renderer: renderer::Renderer::new(init.d3d11_device).unwrap(),
 			core: aetherment::Core::new(log, backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
 				// config_dir: std::path::PathBuf::from(funcs.config_dir.to_string()),
 				redraw: Box::new(funcs.redraw),
@@ -243,7 +243,7 @@ pub extern "C" fn draw(state: *mut State, d3d11_device: usize, io: Io) -> usize 
 	match state.renderer.draw(d3d11_device, io, |ctx| {
 		egui::CentralPanel::default().frame(egui::Frame {
 			inner_margin: egui::Margin::same(0.0),
-			outer_margin: egui::Margin::same(2.0),
+			outer_margin: egui::Margin::same(0.0),
 			shadow: egui::epaint::Shadow::NONE,
 			fill: egui::Color32::TRANSPARENT,
 			stroke: egui::Stroke::NONE,

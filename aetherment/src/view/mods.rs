@@ -1,13 +1,16 @@
 use std::collections::{HashMap, HashSet};
-use crate::modman::settings::Settings;
+use crate::{modman::settings::Settings, ui_ext::UiExt};
 
 pub struct Mods {
+	install_progress: crate::modman::backend::InstallProgress,
+	apply_progress: crate::modman::backend::ApplyProgress,
+	
 	active_collection: String,
 	selected_mod: String,
 	selected_category_tab: String,
 	gamma: u8,
 	
-	import_picker: Option<renderer::FilePicker>,
+	import_picker: Option<egui_file::FileDialog>,
 	new_preset_name: String,
 	
 	last_was_busy: bool,
@@ -19,8 +22,11 @@ pub struct Mods {
 }
 
 impl Mods {
-	pub fn new() -> Self {
+	pub fn new(install_progress: crate::modman::backend::InstallProgress, apply_progress: crate::modman::backend::ApplyProgress) -> Self {
 		let mut s = Self {
+			install_progress,
+			apply_progress,
+			
 			active_collection: String::new(),
 			selected_mod: String::new(),
 			selected_category_tab: String::new(),
@@ -57,34 +63,54 @@ impl Mods {
 			self.active_collection = backend.get_active_collection();
 		}
 	}
-	
-	pub fn draw(&mut self, ui: &mut renderer::Ui, install_progress: crate::modman::backend::InstallProgress, apply_progress: crate::modman::backend::ApplyProgress) {
+}
+
+impl super::View for Mods {
+	fn name(&self) -> &'static str {
+		"Mods"
+	}
+
+	fn render(&mut self, ui: &mut egui::Ui) {
 		let backend = crate::backend();
 		let config = crate::config();
 		config.mark_for_changes();
-		let is_busy = install_progress.is_busy() || apply_progress.is_busy();
+		let is_busy = self.install_progress.is_busy() || self.apply_progress.is_busy();
 		if self.last_was_busy && !is_busy {
 			self.refresh();
 		}
 		self.last_was_busy = is_busy;
 		
-		ui.splitter("splitter", 0.3, |ui_left, ui_right| {
-			{
-				let ui = ui_left;
+		crate::ui_ext::Splitter::new("splitter", crate::ui_ext::SplitterAxis::Horizontal)
+			.default_pos(0.3)
+			.show(ui, |ui_left, ui_right| {
+			egui::ScrollArea::vertical().id_salt("left").auto_shrink(false).show(ui_left, |ui| {
+				ui.combo(self.collections.get(&self.active_collection).map_or("Invalid Collection", |v| v.as_str()), "", |ui| {
+					for (id, name) in &self.collections {
+						if ui.selectable_label(self.active_collection == *id, name).clicked {
+							self.active_collection = id.clone();
+						}
+					}
+				});
+				
 				if ui.button("Import Mods").clicked && self.import_picker.is_none() {
-					self.import_picker = Some(renderer::FilePicker::new("Import Mods", &config.config.file_dialog_path, &[".aeth"], renderer::FilePickerMode::OpenFileMultiple));
+					let mut dialog = egui_file::FileDialog::open_file(Some(config.config.file_dialog_path.clone()))
+						.title("Import Mods")
+						.multi_select(true)
+						.filename_filter(Box::new(|name| name.ends_with(".aeth")));
+					dialog.open();
+					self.import_picker = Some(dialog);
 				}
 				
 				if let Some(picker) = &mut self.import_picker {
-					match picker.show(ui) {
-						renderer::FilePickerStatus::Success(dir, paths) => {
-							backend.install_mods_path(install_progress.clone(), paths);
-							config.config.file_dialog_path = dir;
+					match picker.show(&ui.ctx()).state() {
+						egui_file::State::Selected => {
+							backend.install_mods_path(self.install_progress.clone(), picker.selection().into_iter().map(|v| v.to_path_buf()).collect());
+							config.config.file_dialog_path = picker.directory().to_path_buf();
 							self.import_picker = None;
 						}
 						
-						renderer::FilePickerStatus::Canceled(dir) => {
-							config.config.file_dialog_path = dir;
+						egui_file::State::Cancelled => {
+							config.config.file_dialog_path = picker.directory().to_path_buf();
 							self.import_picker = None;
 						}
 						
@@ -106,10 +132,10 @@ impl Mods {
 				ui.add_space(16.0);
 				
 				let queue_size = backend.apply_queue_size();
-				ui.enabled(!is_busy && queue_size > 0 , |ui| {
+				ui.add_enabled_ui(!is_busy && queue_size > 0 , |ui| {
 					ui.label(format!("{queue_size} mods have changes that might require an apply"));
 					if ui.button("Apply").clicked {
-						backend.finalize_apply(apply_progress.clone());
+						backend.finalize_apply(self.apply_progress.clone());
 					}
 				});
 				
@@ -120,33 +146,16 @@ impl Mods {
 				for m in &self.mods {
 					if let Some(meta) = backend.get_mod_meta(m) {
 						ui.push_id(m, |ui| {
-							if ui.selectable(&meta.name, self.selected_mod == *m).clicked {
+							if ui.selectable_label(self.selected_mod == *m, &meta.name).clicked {
 								self.selected_mod = m.clone();
 							}
 						});
 					}
 				}
-			}
+			});
 			
-			ui_right.mark_next_splitter();
-			
-			{
+			egui::ScrollArea::vertical().id_salt("right").auto_shrink(false).show(ui_right, |ui| {
 				use crate::modman::{meta::OptionSettings, backend::SettingsType};
-				
-				let ui = ui_right;
-				
-				ui.horizontal(|ui| {
-					let offset = ui.available_size()[0] - 150.0;
-					ui.add_space(offset);
-					ui.set_width(150.0);
-					ui.combo("", self.collections.get(&self.active_collection).map_or("Invalid Collection", |v| v.as_str()), |ui| {
-						for (id, name) in &self.collections {
-							if ui.selectable(name, self.active_collection == *id).clicked {
-								self.active_collection = id.clone();
-							}
-						}
-					});
-				});
 				
 				let Some(meta) = backend.get_mod_meta(&self.selected_mod) else {return};
 				let Some(mod_settings) = self.mod_settings.get_mut(&self.selected_mod) else {return};
@@ -164,7 +173,7 @@ impl Mods {
 				}).collect::<Vec<_>>();
 				if warnings.len() > 0 {
 					for msg in warnings {
-						ui.label_frame(msg, [255, 0, 0, 255]);
+						ui.label(egui::RichText::new(msg).background_color(egui::Color32::from_rgb(255, 0, 0)));
 					}
 					ui.add_space(16.0);
 				}
@@ -180,7 +189,7 @@ impl Mods {
 					ui.add_space(16.0);
 				}
 				
-				if !remote_settings.origin.is_empty() && ui.checkbox("Auto Update", &mut remote_settings.auto_update).changed {
+				if !remote_settings.origin.is_empty() && ui.checkbox(&mut remote_settings.auto_update, "Auto Update").changed {
 					remote_settings.save(&self.selected_mod);
 				}
 				
@@ -210,7 +219,7 @@ impl Mods {
 				check_presets(&meta.presets);
 				check_presets(&presets);
 				
-				ui.combo("Preset", &selected_preset, |ui| {
+				ui.combo(&selected_preset, "Preset", |ui| {
 					let mut set_settings = |values: &HashMap<String, crate::modman::settings::Value>| {
 						for (name, value) in settings.iter_mut() {
 							*value = values.get(name).map_or_else(|| crate::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()), |v| v.to_owned());
@@ -220,13 +229,13 @@ impl Mods {
 					};
 					
 					if meta.presets.len() == 0 {
-						if ui.selectable("Default", "Default" == selected_preset).clicked {
+						if ui.selectable_label("Default" == selected_preset, "Default").clicked {
 							set_settings(&HashMap::new());
 						}
 					}
 					
 					for p in &meta.presets {
-						if ui.selectable(&p.name, p.name == selected_preset).clicked {
+						if ui.selectable_label(p.name == selected_preset, &p.name).clicked {
 							set_settings(&p.settings);
 						}
 					}
@@ -235,26 +244,22 @@ impl Mods {
 					for (i, p) in presets.iter().enumerate() {
 						ui.horizontal(|ui| {
 							ui.push_id(i, |ui| {
-								let resp = ui.button("D");
+								let resp = ui.button("🗑");
 								if resp.clicked {
 									delete = Some(i);
 								}
-								if resp.hovered {
-									ui.tooltip_text("Delete");
-								}
+								resp.on_hover_text("Delete");
 								
-								let resp = ui.button("C");
+								let resp = ui.button("📋");
 								if resp.clicked {
 									if let Ok(json) = serde_json::to_vec(p) {
 										log!("copied {}", base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, &json));
 										ui.set_clipboard(base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, json));
 									}
 								}
-								if resp.hovered {
-									ui.tooltip_text("Copy to clipboard");
-								}
+								resp.on_hover_text("Copy to clipboard");
 								
-								if ui.selectable(&p.name, p.name == selected_preset).clicked {
+								if ui.selectable_label(p.name == selected_preset, &p.name).clicked {
 									set_settings(&p.settings);
 								}
 							});
@@ -282,7 +287,7 @@ impl Mods {
 							self.new_preset_name.clear();
 							changed = true;
 						}
-						ui.input_text("", &mut self.new_preset_name);
+						ui.text_edit_singleline(&mut self.new_preset_name)
 					});
 					
 					if ui.button("Import preset from clipboard").clicked {'import: {
@@ -319,7 +324,12 @@ impl Mods {
 				}
 				
 				if categories.len() > 1 {
-					ui.tabs(&categories, &mut self.selected_category_tab);
+					ui.horizontal(|ui| {
+						for cat in categories.iter() {
+							ui.selectable_value(&mut self.selected_category_tab, cat.to_string(), *cat);
+						}
+					});
+					
 					if !categories.contains(&self.selected_category_tab.as_str()) {
 						self.selected_category_tab = categories[0].to_string();
 					}
@@ -368,8 +378,7 @@ impl Mods {
 							style.apply(&meta.name, meta, settings, gamma);
 						}
 						
-						ui.set_width(150.0);
-						ui.slider("Gamma", &mut self.gamma, 0..=100);
+						ui.slider(&mut self.gamma, 0..=100, "Gamma");
 						ui.helptext("Set this to your game gamma setting");
 					});
 				}
@@ -379,14 +388,13 @@ impl Mods {
 					mod_settings.presets = presets;
 					mod_settings.save(&self.selected_mod);
 				}
-			}
-		});
+			});});
 		
 		_ = config.save();
 	}
 }
 
-fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings: &mut crate::modman::settings::CollectionSettings, option: &crate::modman::meta::Option, name: &str, desc: &str) -> bool {
+fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &mut crate::modman::settings::CollectionSettings, option: &crate::modman::meta::Option, name: &str, desc: &str) -> bool {
 	use crate::modman::{meta::OptionSettings, settings::Value::*};
 	
 	let mut changed = false;
@@ -398,10 +406,10 @@ fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings
 			let OptionSettings::Grouped(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			let selected = o.options.get(*val as usize);
 			ui.horizontal(|ui| {
-				ui.combo(name, selected.map_or("Invalid", |v| &v.name), |ui| {
+				ui.combo(selected.map_or("Invalid", |v| &v.name), name, |ui| {
 					for (i, sub) in o.options.iter().enumerate() {
 						ui.horizontal(|ui| {
-							changed |= ui.selectable_value(&sub.name, val, i as u32).clicked;
+							changed |= ui.selectable_value(val, i as u32, &sub.name).clicked;
 							if !sub.description.is_empty() {
 								ui.helptext(&sub.description);
 							}
@@ -410,14 +418,14 @@ fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings
 				});
 				
 				if !desc.is_empty() {
-					ui.helptext(&desc);
+					ui.helptext(&*desc);
 				}
 			});
 			
 			if let Some(selected) = selected {
 				for sub in selected.options.iter() {
 					match sub {
-						crate::modman::meta::ValueGroupedOptionEntryType::Category(v) => ui.label(v),
+						crate::modman::meta::ValueGroupedOptionEntryType::Category(v) => _ = ui.label(v),
 						
 						crate::modman::meta::ValueGroupedOptionEntryType::Option(v) => {
 							if let Some(first) = v.options.first() {
@@ -443,10 +451,10 @@ fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings
 		SingleFiles(val) => {
 			let OptionSettings::SingleFiles(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			ui.horizontal(|ui| {
-				ui.combo(name, o.options.get(*val as usize).map_or("Invalid", |v| &v.name), |ui| {
+				ui.combo(o.options.get(*val as usize).map_or("Invalid", |v| &v.name), name, |ui| {
 					for (i, sub) in o.options.iter().enumerate() {
 						ui.horizontal(|ui| {
-							changed |= ui.selectable_value(&sub.name, val, i as u32).clicked;
+							changed |= ui.selectable_value(val, i as u32, &sub.name).clicked;
 							if !sub.description.is_empty() {
 								ui.helptext(&sub.description);
 							}
@@ -455,7 +463,7 @@ fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings
 				});
 				
 				if !desc.is_empty() {
-					ui.helptext(&desc);
+					ui.helptext(&*desc);
 				}
 			});
 		}
@@ -465,15 +473,15 @@ fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings
 			ui.horizontal(|ui| {
 				ui.label(name);
 				if !desc.is_empty() {
-					ui.helptext(&desc);
+					ui.helptext(&*desc);
 				}
 			});
 			
-			ui.indent(|ui| {
+			ui.indent("", |ui| {
 				for (i, sub) in o.options.iter().enumerate() {
 					ui.horizontal(|ui| {
 						let mut toggled = *val & (1 << i) != 0;
-						if ui.checkbox(&sub.name, &mut toggled).changed {
+						if ui.checkbox(&mut toggled, &sub.name).changed {
 							*val ^= 1 << i;
 							changed = true;
 						}
@@ -489,10 +497,11 @@ fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings
 		Rgb(val) => {
 			let OptionSettings::Rgb(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			ui.horizontal(|ui| {
-				changed |= ui.color_edit_rgb(name, val).changed;
+				changed |= ui.color_edit_button_rgb(val).changed;
+				ui.label(name);
 				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
 				if !desc.is_empty() {
-					ui.helptext(&desc);
+					ui.helptext(&*desc);
 				}
 			});
 		}
@@ -500,52 +509,54 @@ fn draw_option(ui: &mut renderer::Ui, meta: &crate::modman::meta::Meta, settings
 		Rgba(val) => {
 			let OptionSettings::Rgba(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			ui.horizontal(|ui| {
-				changed |= ui.color_edit_rgba(name, val).changed;
+				// changed |= ui.color_edit_rgba(name, val).changed;
+				changed |= ui.color_edit_button_rgba_unmultiplied(val).changed;
+				ui.label(name);
 				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
 				if !desc.is_empty() {
-					ui.helptext(&desc);
+					ui.helptext(&*desc);
 				}
 			});
 		}
 		
 		Grayscale(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(name, val, o.min..=o.max).changed;
+			changed |= ui.slider(val, o.min..=o.max, name).changed;
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
-				ui.helptext(&desc);
+				ui.helptext(&*desc);
 			}
 		}
 		
 		Opacity(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(name, val, o.min..=o.max).changed;
+			changed |= ui.slider(val, o.min..=o.max, name).changed;
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
-				ui.helptext(&desc);
+				ui.helptext(&*desc);
 			}
 		}
 		
 		Mask(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(name, val, o.min..=o.max).changed;
+			changed |= ui.slider(val, o.min..=o.max, name).changed;
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
-				ui.helptext(&desc);
+				ui.helptext(&*desc);
 			}
 		}
 		
 		Path(val) => {
 			let OptionSettings::Path(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			ui.horizontal(|ui| {
-				ui.combo(name, o.options.get(*val as usize).map_or("Invalid", |v| &v.0), |ui| {
+				ui.combo(o.options.get(*val as usize).map_or("Invalid", |v| &v.0), name, |ui| {
 					for (i, (name, _)) in o.options.iter().enumerate() {
-						changed |= ui.selectable_value(name, val, i as u32).clicked;
+						changed |= ui.selectable_value(val, i as u32, name).clicked;
 					}
 				});
 				
 				if !desc.is_empty() {
-					ui.helptext(&desc);
+					ui.helptext(&*desc);
 				}
 			});
 		}

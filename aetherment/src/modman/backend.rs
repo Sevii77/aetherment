@@ -193,7 +193,7 @@ pub enum CollectionType {
 	Current   = 0xE2,
 }
 
-impl crate::render_helper::EnumTools for CollectionType {
+impl crate::ui_ext::EnumTools for CollectionType {
 	type Iterator = std::array::IntoIter<Self, 4>;
 	
 	fn to_str(&self) -> &'static str {

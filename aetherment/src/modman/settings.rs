@@ -71,7 +71,7 @@ pub struct Preset {
 	pub settings: HashMap<String, Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Value {
 	Grouped(u32),
 	SingleFiles(u32),
@@ -96,6 +96,29 @@ impl Value {
 			super::meta::OptionSettings::Opacity(v) => Self::Opacity(v.default),
 			super::meta::OptionSettings::Mask(v) => Self::Mask(v.default),
 			super::meta::OptionSettings::Path(v) => Self::Path(v.default),
+		}
+	}
+}
+
+macro_rules! eq {
+	($a:expr, $b:expr) => {{
+		$a > $b - 0.00001 && $a < $b + 0.00001
+	}};
+}
+
+impl PartialEq for Value {
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Self::Grouped(a),     Self::Grouped(b))     => a == b,
+			(Self::SingleFiles(a), Self::SingleFiles(b)) => a == b,
+			(Self::MultiFiles(a),  Self::MultiFiles(b))  => a == b,
+			(Self::Rgb(a),         Self::Rgb(b))         => eq!(a[0], b[0]) && eq!(a[1], b[1]) && eq!(a[2], b[2]),
+			(Self::Rgba(a),        Self::Rgba(b))        => eq!(a[0], b[0]) && eq!(a[1], b[1]) && eq!(a[2], b[2]) && eq!(a[3], b[3]),
+			(Self::Grayscale(a),   Self::Grayscale(b))   => eq!(*a, *b),
+			(Self::Opacity(a),     Self::Opacity(b))     => eq!(*a, *b),
+			(Self::Mask(a),        Self::Mask(b))        => eq!(*a, *b),
+			(Self::Path(a),        Self::Path(b))        => a == b,
+			_ => false,
 		}
 	}
 }

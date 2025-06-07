@@ -1,63 +1,28 @@
 use std::{ops::DerefMut, sync::{Arc, Mutex, RwLock}};
 
-pub struct Browser {
-	busy: Arc<RwLock<bool>>,
-	mods: Arc<Mutex<BrowseResult>>,
-}
+use crate::ui_ext::UiExt;
 
 enum BrowseResult {
 	Mods(Vec<(usize, crate::remote::ModEntry)>),
 	Error(String),
 }
 
+pub struct Browser {
+	busy: Arc<RwLock<bool>>,
+	mods: Arc<Mutex<BrowseResult>>,
+	install_progress: crate::modman::backend::InstallProgress
+}
+
 impl Browser {
-	pub fn new() -> Self {
+	pub fn new(install_progress: crate::modman::backend::InstallProgress) -> Self {
 		let s = Self {
 			busy: Arc::new(RwLock::new(false)),
 			mods: Arc::new(Mutex::new(BrowseResult::Mods(Vec::new()))),
+			install_progress,
 		};
 		
 		s.load_mods();
 		s
-	}
-	
-	pub fn draw(&mut self, ui: &mut renderer::Ui, install_progress: crate::modman::backend::InstallProgress) {
-		let is_busy = *self.busy.read().unwrap();
-		match self.mods.lock().unwrap().deref_mut() {
-			BrowseResult::Mods(mods) => {
-				for (selected_version, m) in mods.iter_mut() {
-					// ui.child(&m.id, [0.0, 0.0], |ui| {
-					ui.push_id(&m.id, |ui| {
-						ui.horizontal(|ui| {
-							ui.label(&m.name);
-							ui.label(format!("(by {})", m.author))
-						});
-						ui.label(&m.description);
-						ui.horizontal(|ui| {
-							if !is_busy && ui.button("Install").clicked {
-								self.download_mod(m.id.clone(), m.versions[*selected_version].clone(), install_progress.clone());
-							}
-							
-							ui.combo("Version", &m.versions[*selected_version], |ui| {
-								for (i, version) in m.versions.iter().enumerate() {
-									ui.selectable_value(version, selected_version, i);
-								}
-							});
-						});
-					});
-					
-					ui.add_space(32.0);
-				}
-			}
-			
-			BrowseResult::Error(err) => {
-				ui.label(&err);
-			}
-		}
-		
-		if !is_busy && ui.button("Refresh").clicked {
-			self.load_mods();
-		}
 	}
 	
 	fn load_mods(&self) {
@@ -99,5 +64,50 @@ impl Browser {
 			
 			*busy.write().unwrap() = false;
 		});
+	}
+}
+
+impl super::View for Browser {
+	fn name(&self) -> &'static str {
+		"Browser"
+	}
+
+	fn render(&mut self, ui: &mut egui::Ui) {
+		let is_busy = *self.busy.read().unwrap();
+		match self.mods.lock().unwrap().deref_mut() {
+			BrowseResult::Mods(mods) => {
+				for (selected_version, m) in mods.iter_mut() {
+					// ui.child(&m.id, [0.0, 0.0], |ui| {
+					ui.push_id(&m.id, |ui| {
+						ui.horizontal(|ui| {
+							ui.label(&m.name);
+							ui.label(format!("(by {})", m.author))
+						});
+						ui.label(&m.description);
+						ui.horizontal(|ui| {
+							if !is_busy && ui.button("Install").clicked {
+								self.download_mod(m.id.clone(), m.versions[*selected_version].clone(), self.install_progress.clone());
+							}
+							
+							ui.combo(&m.versions[*selected_version], "Version", |ui| {
+								for (i, version) in m.versions.iter().enumerate() {
+									ui.selectable_value(selected_version, i, version);
+								}
+							});
+						});
+					});
+					
+					ui.add_space(32.0);
+				}
+			}
+			
+			BrowseResult::Error(err) => {
+				ui.label(&*err);
+			}
+		}
+		
+		if !is_busy && ui.button("Refresh").clicked {
+			self.load_mods();
+		}
 	}
 }

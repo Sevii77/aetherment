@@ -1,6 +1,6 @@
 use std::{collections::{HashSet, HashMap}, io::{Read, Write, Seek}};
 use serde::{Deserialize, Serialize};
-use crate::render_helper::EnumTools;
+use crate::ui_ext::EnumTools;
 
 #[cfg(any(feature = "plugin", feature = "client"))] pub mod backend;
 pub mod meta;

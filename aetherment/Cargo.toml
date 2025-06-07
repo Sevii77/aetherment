@@ -8,6 +8,8 @@ edition = "2021"
 noumenon = {path = "../noumenon"}
 
 egui = "0.29.0"
+egui_dock = "0.14"
+egui_file = "0.19.0"
 
 serde = {version = "1.0.171", features = ["derive"]}
 serde_json = "1.0.103"
@@ -18,7 +20,8 @@ binrw = "0.11.2"
 ureq = {version = "3.0.11", features = ["json"]}
 tempfile = "3.10.1"
 open = "5.3.0"
-retour = {version = "0.3.1"}
+clipboard = "0.5.0"
+# retour = {version = "0.3.1"}
 # retour = {version = "0.3.0", features = ["static-detour"]}
 
 image = "0.24.2"

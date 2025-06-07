@@ -6,10 +6,10 @@ mod log;
 pub use log::LogType;
 
 mod resource_loader;
-mod render_helper;
+mod ui_ext;
 mod config;
 pub mod modman;
-// #[cfg(any(feature = "plugin", feature = "client"))] mod view;
+#[cfg(any(feature = "plugin", feature = "client"))] mod view;
 #[cfg(any(feature = "plugin", feature = "client"))] mod remote;
 #[cfg(any(feature = "plugin", feature = "client"))] pub mod service;
 // #[cfg(any(feature = "plugin", feature = "client"))] pub extern crate renderer;
@@ -58,14 +58,10 @@ pub fn json_pretty<T: serde::Serialize>(data: &T) -> Result<String, serde_json::
 
 #[cfg(any(feature = "plugin", feature = "client"))]
 pub struct Core {
-	// mods_tab: view::mods::Mods,
-	// browser_tab: view::browser::Browser,
-	// settings_tab: view::settings::Settings,
-	// tools_tab: view::tool::Tools,
-	// debug_tab: view::debug::Debug,
+	views: egui_dock::DockState<Box<dyn view::View>>,
 	
 	// current_tab: &'static str,
-	current_tab: String,
+	// current_tab: String,
 	backend_last_error: bool,
 	
 	install_progress: crate::modman::backend::InstallProgress,
@@ -88,24 +84,31 @@ impl Core {
 			service::initialize(services_initializers);
 		}
 		
-		// backend().load_mods();
+		let mut install_progress = crate::modman::backend::InstallProgress::new();
+		let apply_progress = crate::modman::backend::ApplyProgress::new();
+		install_progress.apply = apply_progress.clone();
 		
-		let mut s = Self {
+		let s = Self {
 			// mods_tab: view::mods::Mods::new(),
 			// browser_tab: view::browser::Browser::new(),
 			// settings_tab: view::settings::Settings::new(),
 			// tools_tab: view::tool::Tools::new(),
 			// debug_tab: view::debug::Debug::new(),
 			
+			views: egui_dock::DockState::new(vec![
+				Box::new(view::mods::Mods::new(install_progress.clone(), apply_progress.clone())),
+				Box::new(view::browser::Browser::new(install_progress.clone())),
+				Box::new(view::settings::Settings::new()),
+				Box::new(view::debug::Debug::new()),
+			]),
+			
 			// current_tab: "Mods",
-			current_tab: "Mods".to_string(),
+			// current_tab: "Mods".to_string(),
 			backend_last_error: matches!(backend().get_status(), modman::backend::Status::Error(_)),
 			
-			install_progress: crate::modman::backend::InstallProgress::new(),
-			apply_progress: crate::modman::backend::ApplyProgress::new(),
+			install_progress,
+			apply_progress,
 		};
-		
-		s.install_progress.apply = s.apply_progress.clone();
 		
 		if !s.backend_last_error {
 			let progress = s.install_progress.clone();
@@ -119,7 +122,55 @@ impl Core {
 	}
 	
 	pub fn draw(&mut self, ui: &mut egui::Ui) {
-		ui.heading("Test 🗁");
+		let status = backend().get_status();
+		match status {
+			modman::backend::Status::Ok => {
+				if self.backend_last_error {
+					let progress = self.install_progress.clone();
+					std::thread::spawn(move || {
+						backend().apply_services();
+						remote::check_updates(progress);
+					});
+					
+					// self.mods_tab.refresh();
+				}
+				
+				self.backend_last_error = false;
+			}
+			
+			modman::backend::Status::Error(_) => self.backend_last_error = true,
+		}
+		
+		// ui.horizontal(|ui| {
+		// 	ui.tabs(&["Mods", "Browser", "Settings", "Tools", "Debug"], &mut self.current_tab);
+		// 	let offset = ui.available_size()[0] - 210.0;
+		// 	ui.add_space(offset);
+		// 	ui.set_width(210.0);
+		// 	ui.colored([0, 0, 0, 255], [254, 210, 0, 255], |ui| {
+		// 		if ui.button("Support me on Buy Me a Coffee").clicked {
+		// 			_ = open::that("https://buymeacoffee.com/sevii77");
+		// 		}
+		// 	});
+		// });
+		
+		// TODO: make fancy
+		if self.install_progress.is_busy() {
+			ui.label(format!("{:.0}% {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()));
+			ui.label(format!("{:.0}% {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()));
+		}
+		
+		if self.apply_progress.is_busy() {
+			ui.label(format!("{:.0}% {}", self.apply_progress.mods.get() * 100.0, self.apply_progress.mods.get_msg()));
+			ui.label(format!("{:.0}% {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()));
+		}
+		
+		egui_dock::DockArea::new(&mut self.views)
+			.id(egui::Id::new("tabs"))
+			.style(egui_dock::Style::from_egui(ui.style().as_ref()))
+			.draggable_tabs(false)
+			.show_close_buttons(false)
+			.tab_context_menus(false)
+			.show_inside(ui, &mut view::Viewer);
 	}
 	
 	// pub fn draw(&mut self, ui: &mut renderer::Ui) {

@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 use serde::{Deserialize, Serialize};
-use crate::{modman::{settings::Value as SettingsValue, meta::OptionSettings, Path}, ui_ext::EnumTools};
+use crate::{modman::{settings::Value as SettingsValue, meta::OptionSettings, Path}, EnumTools};
 
 #[derive(Debug)]
 pub enum CompositeError {

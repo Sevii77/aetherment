@@ -2,7 +2,7 @@
 // https://gist.github.com/mkalte666/f9a982be0ac0276080d3434ab9ea4655
 
 use std::hash::Hash;
-use egui::{CursorIcon, Id, Layout, Pos2, Rect, Rounding, Sense, Ui, Vec2};
+use egui::{CursorIcon, Id, Pos2, Rect, Rounding, Sense, Ui, Vec2};
 
 /// An axis that a Splitter can use
 #[derive(Copy, Clone, Debug)]
@@ -115,7 +115,8 @@ impl Splitter {
 		};
 		
 		let child_rect_a = Rect::from_min_size(ui.next_widget_position(), child_size_a);
-		let mut ui_a = ui.child_ui(child_rect_a, Layout::default(), None);
+		// let mut ui_a = ui.child_ui(child_rect_a, Layout::default(), None);
+		let mut ui_a = ui.new_child(egui::UiBuilder::new().max_rect(child_rect_a));
 		ui_a.set_clip_rect(child_rect_a);
 		
 		let sep_rect = match data.axis {
@@ -161,7 +162,8 @@ impl Splitter {
 				Rect::from_min_size(Pos2::new(sep_rect.min.x, sep_rect.max.y), child_size_b)
 			}
 		};
-		let mut ui_b = ui.child_ui(child_rect_b, Layout::default(), None);
+		// let mut ui_b = ui.child_ui(child_rect_b, Layout::default(), None);
+		let mut ui_b = ui.new_child(egui::UiBuilder::new().max_rect(child_rect_b));
 		ui_b.set_clip_rect(child_rect_b);
 		
 		add_contents(&mut ui_a, &mut ui_b);

@@ -66,11 +66,11 @@ impl Mods {
 }
 
 impl super::View for Mods {
-	fn name(&self) -> &'static str {
+	fn title(&self) -> &'static str {
 		"Mods"
 	}
 
-	fn render(&mut self, ui: &mut egui::Ui) {
+	fn ui(&mut self, ui: &mut egui::Ui) {
 		let backend = crate::backend();
 		let config = crate::config();
 		config.mark_for_changes();
@@ -83,7 +83,8 @@ impl super::View for Mods {
 		crate::ui_ext::Splitter::new("splitter", crate::ui_ext::SplitterAxis::Horizontal)
 			.default_pos(0.3)
 			.show(ui, |ui_left, ui_right| {
-			egui::ScrollArea::vertical().id_salt("left").auto_shrink(false).show(ui_left, |ui| {
+			let h = ui_left.available_height() - 20.0;
+			egui::ScrollArea::vertical().id_salt("left").auto_shrink(false).max_height(h).show(ui_left, |ui| {
 				ui.combo(self.collections.get(&self.active_collection).map_or("Invalid Collection", |v| v.as_str()), "", |ui| {
 					for (id, name) in &self.collections {
 						if ui.selectable_label(self.active_collection == *id, name).clicked {
@@ -153,6 +154,10 @@ impl super::View for Mods {
 					}
 				}
 			});
+			
+			if ui_left.add(egui::Button::new(egui::RichText::new("Support me on Buy Me a Coffee").color(egui::Color32::from_rgb(0, 0, 0))).fill(egui::Color32::from_rgb(254, 210, 0))).clicked {
+				ui_left.ctx().open_url(egui::OpenUrl::new_tab("https://buymeacoffee.com/sevii77"));
+			}
 			
 			egui::ScrollArea::vertical().id_salt("right").auto_shrink(false).show(ui_right, |ui| {
 				use crate::modman::{meta::OptionSettings, backend::SettingsType};

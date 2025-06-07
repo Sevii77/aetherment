@@ -1,31 +1,31 @@
-pub mod overlay;
+mod tattoo;
 
 pub struct Tools {
-	current_tab: String,
-	
-	overlay_tab: overlay::Overlay,
+	views: egui_dock::DockState<Box<dyn super::View>>,
 }
 
 impl Tools {
 	pub fn new() -> Self {
 		Self {
-			current_tab: "Overlay Creator".to_string(),
-			
-			overlay_tab: overlay::Overlay::new(),
+			views: egui_dock::DockState::new(vec![
+				Box::new(tattoo::Tattoo::new()),
+			]),
 		}
 	}
-	
-	pub fn draw(&mut self, ui: &mut renderer::Ui) {
-		ui.tabs(&["Overlay Creator"], &mut self.current_tab);
-		
-		match self.current_tab.as_str() {
-			"Overlay Creator" => {
-				self.overlay_tab.draw(ui);
-			},
-			
-			_ => {
-				ui.label("Invalid tab");
-			}
-		}
+}
+
+impl super::View for Tools {
+	fn title(&self) -> &'static str {
+		"Tools"
+	}
+
+	fn ui(&mut self, ui: &mut egui::Ui) {
+		egui_dock::DockArea::new(&mut self.views)
+			.id(egui::Id::new("tool_tabs"))
+			.style(egui_dock::Style::from_egui(ui.style().as_ref()))
+			.draggable_tabs(false)
+			.show_close_buttons(false)
+			.tab_context_menus(false)
+			.show_inside(ui, &mut super::Viewer);
 	}
 }

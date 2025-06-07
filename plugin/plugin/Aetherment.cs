@@ -30,11 +30,12 @@ public class Aetherment: IDalamudPlugin {
 	private const string maincommand = "/aetherment";
 	private const string texfindercommand = "/texfinder";
 	
-	private bool open;
+	private bool open = true;
+	private bool reset_cursor = false;
 	
 	internal static nint state;
 	private static string? error;
-	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? titleEntry;
+	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? title_entry;
 	
 	// idfc, entry changed to some other bs that always returns a texture wrap but cant be provided a texture wrap.
 	// i'm not going to dive into the docs to figure out a "proper way"
@@ -190,7 +191,7 @@ public class Aetherment: IDalamudPlugin {
 		// TODO: proper icon
 		var icon_data = new byte[64 * 64 * 4];
 		var icon = new TextureWrap(Textures.CreateFromRaw(new Dalamud.Interface.Textures.RawImageSpecification(64, 64, 28), icon_data, "Aetherment Icon"));
-		titleEntry ??= TitleMenu.AddEntry(1, "Manage Aetherment", icon, OpenConf);
+		title_entry ??= TitleMenu.AddEntry(1, "Manage Aetherment", icon, OpenConf);
 		
 		Commands.AddHandler(maincommand, new CommandInfo(OnCommand) {
 			HelpMessage = "Open Aetherment menu"
@@ -221,9 +222,9 @@ public class Aetherment: IDalamudPlugin {
 		Interface.UiBuilder.Draw -= Draw;
 		Interface.UiBuilder.OpenMainUi -= OpenConf;
 		
-		if(titleEntry != null) {
-			TitleMenu.RemoveEntry(titleEntry);
-			titleEntry = null;
+		if(title_entry != null) {
+			TitleMenu.RemoveEntry(title_entry);
+			title_entry = null;
 		}
 		
 		penumbra.Dispose();
@@ -259,10 +260,13 @@ public class Aetherment: IDalamudPlugin {
 					io.WantTextInput = true;
 				
 				ImGui.InvisibleButton("input_blocker", size);
-				if(ImGui.IsItemHovered())
+				if(ImGui.IsItemHovered()) {
 					io.ConfigFlags = io.ConfigFlags | ImGuiConfigFlags.NoMouseCursorChange;
-				else
+					reset_cursor = true;
+				} else if(reset_cursor) {
 					io.ConfigFlags = io.ConfigFlags & ~ImGuiConfigFlags.NoMouseCursorChange;
+					reset_cursor = false;
+				}
 				
 				nint input_buf_ptr = 0;
 				nint input_buf_len = io.InputQueueCharacters.Size;
@@ -304,8 +308,8 @@ public class Aetherment: IDalamudPlugin {
 				Kill($"Fatal error in draw\n\n{e}", 1);
 			}
 		} else {
-			ImGuiNET.ImGui.Text("Aetherment has encountered an unrecoverable error");
-			ImGuiNET.ImGui.Text(error ?? "No Error");
+			ImGui.Text("Aetherment has encountered an unrecoverable error");
+			ImGui.Text(error ?? "No Error");
 		}
 		ImGui.End();
 		

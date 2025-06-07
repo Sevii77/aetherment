@@ -1,29 +1,76 @@
+#![allow(dead_code)]
+
 use egui::{Response, WidgetText};
+use crate::EnumTools;
 
-#[cfg(any(feature = "plugin", feature = "client"))]
 mod splitter;
-
 pub use splitter::*;
 
-pub trait EnumTools {
-	type Iterator: core::iter::Iterator<Item = Self>;
-	
-	fn to_str(&self) -> &'static str;
-	fn to_string(&self) -> String {self.to_str().to_string()}
-	fn iter() -> Self::Iterator;
-}
-
 pub trait UiExt {
+	fn texture(&mut self, img: egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> egui::Response;
+	fn num_edit<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>) -> egui::Response;
+	fn num_edit_range<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>, range: std::ops::RangeInclusive<Num>) -> egui::Response;
+	fn num_multi_edit<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<egui::WidgetText>) -> egui::Response;
+	fn num_multi_edit_range<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<egui::WidgetText>, range: &[std::ops::RangeInclusive<Num>]) -> egui::Response;
 	fn combo<S: Into<WidgetText>, S2: Into<WidgetText>>(&mut self, preview: S2, label: S, contents: impl FnOnce(&mut egui::Ui));
-	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S) -> Response;
+	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S);
+	fn combo_enum_id<Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, id: impl std::hash::Hash);
 	fn helptext<S: Into<WidgetText>>(&mut self, text: S);
 	fn slider<S: Into<WidgetText>, N: egui::emath::Numeric>(&mut self, value: &mut N, range: std::ops::RangeInclusive<N>, label: S) -> Response;
 	fn get_clipboard(&mut self) -> String;
 	fn set_clipboard<S: Into<String>>(&mut self, text: S);
 }
 
-#[cfg(any(feature = "plugin", feature = "client"))]
 impl UiExt for egui::Ui {
+	fn texture(&mut self, img: egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> egui::Response {
+		let max_size = max_size.into();
+		let uv: egui::Rect = uv.into();
+		let size = img.size_vec2();
+		let width = size.x * (uv.max.x - uv.min.x);
+		let height = size.y * (uv.max.y - uv.min.y);
+		let scale = (max_size.x / width).min(max_size.y / height);
+		// self.add(egui::Image::new(img.id(), egui::vec2(width * scale, height * scale)).uv(uv))
+		self.add(egui::Image::new(&img).uv(uv).max_size(egui::vec2(width * scale, height * scale)))
+	}
+	
+	fn num_edit<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>) -> egui::Response {
+		self.horizontal(|ui| {
+			let resp = ui.add(create_drag(value));
+			ui.label(label.into());
+			resp
+		}).inner
+	}
+	
+	fn num_edit_range<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>, range: std::ops::RangeInclusive<Num>) -> egui::Response {
+		self.horizontal(|ui| {
+			let resp = ui.add(create_drag(value).range(range));
+			ui.label(label.into());
+			resp
+		}).inner
+	}
+	
+	fn num_multi_edit<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<egui::WidgetText>) -> egui::Response {
+		self.horizontal(|ui| {
+			let mut resp = ui.add(create_drag(&mut values[0]));
+			for value in values.iter_mut().skip(1) {
+				resp |= ui.add(create_drag(value));
+			}
+			ui.label(label.into());
+			resp
+		}).inner
+	}
+	
+	fn num_multi_edit_range<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<egui::WidgetText>, range: &[std::ops::RangeInclusive<Num>]) -> egui::Response {
+		self.horizontal(|ui| {
+			let mut resp = ui.add(create_drag(&mut values[0]).range(range[0].clone()));
+			for (i, value) in values.iter_mut().skip(1).enumerate() {
+				resp |= ui.add(create_drag(value).range(range[i].clone()));
+			}
+			ui.label(label.into());
+			resp
+		}).inner
+	}
+	
 	fn combo<S: Into<WidgetText>, S2: Into<WidgetText>>(&mut self, preview: S2, label: S, contents: impl FnOnce(&mut egui::Ui)) {
 		egui::ComboBox::from_label(label)
 			.height(300.0)
@@ -31,30 +78,32 @@ impl UiExt for egui::Ui {
 			.show_ui(self, contents);
 	}
 	
-	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S) -> Response {
-		let resp = egui::ComboBox::from_label(label)
+	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S) {
+		egui::ComboBox::from_label(label)
 			.height(300.0)
 			.selected_text(val.to_str())
 			.show_ui(self, |ui| {
-				let mut resp = None::<Response>;
 				for item in Enum::iter() {
 					let name = item.to_str();
-					let r = ui.selectable_value(val, item, name);
-					if let Some(r2) = resp.as_mut()  {
-						resp = Some(r2.union(r));
-					} else {
-						resp = Some(r);
-					}
+					ui.selectable_value(val, item, name);
 				}
-				
-				resp
 			});
-		
-		resp.inner.unwrap().unwrap_or_else(|| resp.response)
+	}
+	
+	fn combo_enum_id<Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, id: impl std::hash::Hash) {
+		egui::ComboBox::from_id_salt(id)
+			.height(300.0)
+			.selected_text(val.to_str())
+			.show_ui(self, |ui| {
+				for item in Enum::iter() {
+					let name = item.to_str();
+					ui.selectable_value(val, item, name);
+				}
+			});
 	}
 	
 	fn helptext<S: Into<WidgetText>>(&mut self, text: S) {
-		self.label("❓").on_hover_text(text);
+		self.label("(❓)").on_hover_text(text);
 	}
 	
 	fn slider<S: Into<WidgetText>, N: egui::emath::Numeric>(&mut self, value: &mut N, range: std::ops::RangeInclusive<N>, label: S) -> Response {
@@ -69,5 +118,15 @@ impl UiExt for egui::Ui {
 	
 	fn set_clipboard<S: Into<String>>(&mut self, text: S) {
 		self.ctx().copy_text(text.into());
+	}
+}
+
+fn create_drag<Num: egui::emath::Numeric>(value: &mut Num) -> egui::DragValue {
+	if Num::INTEGRAL {
+		egui::DragValue::new(value)
+	} else {
+		egui::DragValue::new(value)
+			.max_decimals(3)
+			.speed(0.01)
 	}
 }

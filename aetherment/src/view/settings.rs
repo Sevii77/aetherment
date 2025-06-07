@@ -1,4 +1,4 @@
-#[cfg(not(feature = "plugin"))] use crate::render_helper::UiExt;
+#[cfg(not(feature = "plugin"))] use crate::ui_ext::UiExt;
 
 pub struct Settings {
 	
@@ -13,11 +13,11 @@ impl Settings {
 }
 
 impl super::View for Settings {
-	fn name(&self) -> &'static str {
+	fn title(&self) -> &'static str {
 		"Settings"
 	}
-
-	fn render(&mut self, ui: &mut egui::Ui) {
+	
+	fn ui(&mut self, ui: &mut egui::Ui) {
 		let config_manager = crate::config();
 		config_manager.mark_for_changes();
 		let config = &mut config_manager.config;

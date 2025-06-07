@@ -68,11 +68,11 @@ impl Browser {
 }
 
 impl super::View for Browser {
-	fn name(&self) -> &'static str {
+	fn title(&self) -> &'static str {
 		"Browser"
 	}
-
-	fn render(&mut self, ui: &mut egui::Ui) {
+	
+	fn ui(&mut self, ui: &mut egui::Ui) {
 		let is_busy = *self.busy.read().unwrap();
 		match self.mods.lock().unwrap().deref_mut() {
 			BrowseResult::Mods(mods) => {

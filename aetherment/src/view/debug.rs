@@ -13,11 +13,11 @@ impl Debug {
 }
 
 impl super::View for Debug {
-	fn name(&self) -> &'static str {
+	fn title(&self) -> &'static str {
 		"Debug"
 	}
-
-	fn render(&mut self, ui: &mut egui::Ui) {
+	
+	fn ui(&mut self, ui: &mut egui::Ui) {
 		ui.heading("UiColor Replacements");
 		for ((theme_color, index), [r, g, b]) in crate::service::uicolor::get_colors() {
 			ui.horizontal(|ui| {ui.push_id(index, |ui| {

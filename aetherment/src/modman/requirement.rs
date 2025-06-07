@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-#[cfg(any(feature = "plugin", feature = "client"))] use crate::ui_ext::EnumTools;
+use crate::EnumTools;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Requirement {

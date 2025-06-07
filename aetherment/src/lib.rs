@@ -140,16 +140,34 @@ impl Core {
 			modman::backend::Status::Error(_) => self.backend_last_error = true,
 		}
 		
-		// TODO: make fancy
-		if self.install_progress.is_busy() {
-			ui.label(format!("{:.0}% {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()));
-			ui.label(format!("{:.0}% {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()));
-		}
+		ui.scope(|ui| {
+			ui.spacing_mut().item_spacing.y = 0.0;
+			let rounding = ui.visuals().widgets.noninteractive.rounding;
+			let top = egui::Rounding{ne: rounding.ne, nw: rounding.nw, ..Default::default()};
+			
+			if self.install_progress.is_busy() {
+				ui.add(egui::ProgressBar::new(self.install_progress.mods.get())
+					.text(format!("{:.0}% Installing {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()))
+					.rounding(top));
+				
+				ui.add(egui::ProgressBar::new(self.install_progress.current_mod.get())
+					.text(format!("{:.0}% Working on {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()))
+					.rounding(egui::Rounding::same(0.0)));
+			}
+			
+			if self.apply_progress.is_busy() {
+				ui.add(egui::ProgressBar::new(self.apply_progress.mods.get())
+					.text(format!("{:.0}% Applying {}", self.apply_progress.mods.get() * 100.0, self.apply_progress.mods.get_msg()))
+					.rounding(if self.install_progress.is_busy() {egui::Rounding::same(0.0)} else {top}));
+				
+				ui.add(egui::ProgressBar::new(self.apply_progress.current_mod.get())
+					.text(format!("{:.0}% Working on {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()))
+					.rounding(egui::Rounding::same(0.0)));
+			}
+		});
 		
-		if self.apply_progress.is_busy() {
-			ui.label(format!("{:.0}% {}", self.apply_progress.mods.get() * 100.0, self.apply_progress.mods.get_msg()));
-			ui.label(format!("{:.0}% {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()));
-		}
+		let spacing = ui.spacing().item_spacing.y;
+		ui.add_space(-spacing);
 		
 		// TODO: disable mods and browser tab if backend error
 		egui_dock::DockArea::new(&mut self.views)

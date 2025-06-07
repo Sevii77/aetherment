@@ -105,7 +105,12 @@ impl super::View for Mods {
 				if let Some(picker) = &mut self.import_picker {
 					match picker.show(&ui.ctx()).state() {
 						egui_file::State::Selected => {
-							backend.install_mods_path(self.install_progress.clone(), picker.selection().into_iter().map(|v| v.to_path_buf()).collect());
+							let progress = self.install_progress.clone();
+							let paths = picker.selection().into_iter().map(|v| v.to_path_buf()).collect();
+							std::thread::spawn(move || {
+								crate::backend().install_mods_path(progress, paths);
+							});
+							
 							config.config.file_dialog_path = picker.directory().to_path_buf();
 							self.import_picker = None;
 						}

@@ -139,10 +139,10 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 			}
 		});
 		
+		let renderer = renderer::Renderer::new(init.d3d11_device).unwrap();
 		let state = Box::into_raw(Box::new(State {
 			// visible: aetherment::config().config.plugin_open_on_launch,
-			renderer: renderer::Renderer::new(init.d3d11_device).unwrap(),
-			core: aetherment::Core::new(log, backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
+			core: aetherment::Core::new(renderer.egui_ctx(), log, backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
 				// config_dir: std::path::PathBuf::from(funcs.config_dir.to_string()),
 				redraw: Box::new(funcs.redraw),
 				redraw_self: Box::new(funcs.redraw_self),
@@ -205,6 +205,7 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 					(services_funcs.set_ui_colors)(colors.as_ptr(), colors.len());
 				})
 			}),
+			renderer,
 		}));
 		
 		// unsafe{aetherment::service::initialize()};

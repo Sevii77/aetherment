@@ -348,6 +348,8 @@ impl Renderer {
 			self.rt = RenderTarget::new(device, w as u32, h as u32)?;
 		}
 		
+		let primitives = self.handle_egui(device, io.clone(), draw)?;
+		
 		self.d3d11_ctx.ClearRenderTargetView(&self.rt.view, &[0.0, 0.0, 0.0, 0.0]);
 		self.d3d11_ctx.RSSetViewports(Some(&[D3D11_VIEWPORT {
 			TopLeftX: 0.0,
@@ -366,7 +368,43 @@ impl Renderer {
 		self.d3d11_ctx.IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		self.d3d11_ctx.IASetInputLayout(Some(&self.layout));
 		
-		self.draw_egui(device, io, draw)?;
+		for prim in primitives {
+			self.d3d11_ctx.RSSetScissorRects(Some(&[windows::Win32::Foundation::RECT {
+				left: prim.clip_rect.left() as i32,
+				top: prim.clip_rect.top() as i32,
+				right: prim.clip_rect.right() as i32,
+				bottom: prim.clip_rect.bottom() as i32,
+			}]));
+			
+			match prim.primitive {
+				egui::epaint::Primitive::Callback(_) => {}
+				egui::epaint::Primitive::Mesh(mesh) => {
+					if let egui::TextureId::Managed(id) = mesh.texture_id {
+						if let Some(tex) = self.textures.get(&id) {
+							self.d3d11_ctx.PSSetSamplers(0, Some(&[Some(tex.sampler.clone())]));
+							self.d3d11_ctx.PSSetShaderResources(0, Some(&[Some(tex.sview.clone())]));
+						}
+					}
+					
+					let vertices = mesh.vertices.into_iter().map(|v| [
+						v.pos.x / io.width * 2.0 - 1.0, 1.0 - v.pos.y / io.height * 2.0,
+						v.uv.x, v.uv.y,
+						v.color.r() as f32 / 255.0, v.color.g() as f32 / 255.0, v.color.b() as f32 / 255.0, v.color.a() as f32 / 255.0,
+					]).collect::<Vec<_>>();
+					let mut data = D3D11_MAPPED_SUBRESOURCE::default();
+					self.d3d11_ctx.Map(&self.vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, Some(&mut data))?;
+					core::ptr::copy_nonoverlapping(vertices.as_ptr(), data.pData as _, vertices.len());
+					self.d3d11_ctx.IASetVertexBuffers(0, 1, Some(&Some(self.vertex_buffer.clone())), Some(&(8 * 4)), Some(&0));
+					
+					let mut data = D3D11_MAPPED_SUBRESOURCE::default();
+					self.d3d11_ctx.Map(&self.index_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, Some(&mut data))?;
+					core::ptr::copy_nonoverlapping(mesh.indices.as_ptr(), data.pData as _, mesh.indices.len());
+					self.d3d11_ctx.IASetIndexBuffer(&self.index_buffer, DXGI_FORMAT_R32_UINT, 0);
+					
+					self.d3d11_ctx.DrawIndexed(mesh.indices.len() as u32, 0, 0);
+				}
+			}
+		}
 		
 		let mut cmdlist = None;
 		self.d3d11_ctx.FinishCommandList(true, Some(&mut cmdlist))?;
@@ -377,7 +415,11 @@ impl Renderer {
 		Ok(self.rt.view_ptr() as _)
 	}}
 	
-	fn draw_egui(&mut self, device: &ID3D11Device, io: crate::Io, draw: impl FnMut(&egui::Context)) -> Result<(), Error> {
+	pub fn egui_ctx(&self) -> egui::Context {
+		self.egui_ctx.clone()
+	}
+	
+	fn handle_egui(&mut self, device: &ID3D11Device, io: crate::Io, draw: impl FnMut(&egui::Context)) -> Result<Vec<egui::ClippedPrimitive>, Error> {
 		let modifiers = egui::Modifiers {
 			alt: io.mods & 0b001 != 0,
 			ctrl: io.mods & 0b010 != 0,
@@ -472,6 +514,11 @@ impl Renderer {
 			..Default::default()
 		};
 		
+		self.egui_ctx.options_mut(|v| v.line_scroll_speed = 80.0);
+		self.egui_ctx.all_styles_mut(|v| {
+			v.url_in_tooltip = true;
+			v.visuals.slider_trailing_fill = true;
+		});
 		let out = self.egui_ctx.run(input, draw);
 		
 		if io.mods & 0b1_00000000 != 0 && self.egui_ctx.wants_keyboard_input() {
@@ -546,51 +593,11 @@ impl Renderer {
 			self.textures.remove(&id);
 		}
 		
-		for prim in self.egui_ctx.tessellate(out.shapes, 1.0) {
-			unsafe{self.d3d11_ctx.RSSetScissorRects(Some(&[windows::Win32::Foundation::RECT {
-				left: prim.clip_rect.left() as i32,
-				top: prim.clip_rect.top() as i32,
-				right: prim.clip_rect.right() as i32,
-				bottom: prim.clip_rect.bottom() as i32,
-			}]))};
-			
-			match prim.primitive {
-				egui::epaint::Primitive::Callback(_) => {}
-				egui::epaint::Primitive::Mesh(mesh) => {
-					unsafe {
-						if let egui::TextureId::Managed(id) = mesh.texture_id {
-							if let Some(tex) = self.textures.get(&id) {
-								self.d3d11_ctx.PSSetSamplers(0, Some(&[Some(tex.sampler.clone())]));
-								self.d3d11_ctx.PSSetShaderResources(0, Some(&[Some(tex.sview.clone())]));
-							}
-						}
-						
-						let vertices = mesh.vertices.into_iter().map(|v| [
-							v.pos.x / io.width * 2.0 - 1.0, 1.0 - v.pos.y / io.height * 2.0,
-							v.uv.x, v.uv.y,
-							v.color.r() as f32 / 255.0, v.color.g() as f32 / 255.0, v.color.b() as f32 / 255.0, v.color.a() as f32 / 255.0,
-						]).collect::<Vec<_>>();
-						let mut data = D3D11_MAPPED_SUBRESOURCE::default();
-						self.d3d11_ctx.Map(&self.vertex_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, Some(&mut data))?;
-						core::ptr::copy_nonoverlapping(vertices.as_ptr(), data.pData as _, vertices.len());
-						self.d3d11_ctx.IASetVertexBuffers(0, 1, Some(&Some(self.vertex_buffer.clone())), Some(&(8 * 4)), Some(&0));
-						
-						let mut data = D3D11_MAPPED_SUBRESOURCE::default();
-						self.d3d11_ctx.Map(&self.index_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, Some(&mut data))?;
-						core::ptr::copy_nonoverlapping(mesh.indices.as_ptr(), data.pData as _, mesh.indices.len());
-						self.d3d11_ctx.IASetIndexBuffer(&self.index_buffer, DXGI_FORMAT_R32_UINT, 0);
-						
-						self.d3d11_ctx.DrawIndexed(mesh.indices.len() as u32, 0, 0);
-					}
-				}
-			}
-		}
-		
 		self.last_io = io;
 		self.last_io_keys = io_keys;
 		self.last_cursor_icon = out.platform_output.cursor_icon;
 		
-		Ok(())
+		Ok(self.egui_ctx.tessellate(out.shapes, 1.0))
 	}
 }
 

@@ -11,6 +11,8 @@ egui = "0.29.0"
 egui_dock = "0.14"
 egui_file = "0.19.0"
 egui_dnd = "0.10.0"
+egui_extras = {version = "0.29.1", features = ["image", "http"]}
+egui_commonmark = {version = "0.18.0", default-features = false}
 
 serde = {version = "1.0.171", features = ["derive"]}
 serde_json = "1.0.103"
@@ -25,7 +27,8 @@ clipboard = "0.5.0"
 # retour = {version = "0.3.1"}
 # retour = {version = "0.3.0", features = ["static-detour"]}
 
-image = "0.24.2"
+mime_guess2 = "=2.0.5"
+image = {version = "0.25.6", default-features = false, features = ["png", "jpeg", "gif"]}
 zip = {version = "0.6.6", features = ["deflate"]}
 flate2 = "1.0.26"
 blake3 = "1.3.1"

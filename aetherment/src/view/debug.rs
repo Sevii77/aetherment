@@ -1,6 +1,10 @@
+use crate::ui_ext::UiExt;
+
 pub struct Debug {
 	new_uicolor_theme: bool,
 	new_uicolor_index: u32,
+	
+	userspace_loaders: bool,
 }
 
 impl Debug {
@@ -8,6 +12,8 @@ impl Debug {
 		Self {
 			new_uicolor_theme: true,
 			new_uicolor_index: 1,
+			
+			userspace_loaders: false,
 		}
 	}
 }
@@ -57,5 +63,39 @@ impl super::View for Debug {
 		ui.add_space(16.0);
 		ui.heading("Ui Inspection");
 		ui.ctx().clone().inspection_ui(ui);
+		
+		ui.add_space(16.0);
+		ui.heading("Loaders");
+		ui.checkbox(&mut self.userspace_loaders, "Show userspace");
+		
+		let draw_loaders = |ui: &mut egui::Ui| {
+			let loaders = ui.ctx().loaders();
+			ui.label("Texture");
+			ui.indent("texture", |ui| {
+				for loader in loaders.texture.lock().iter() {
+					ui.label(loader.id());
+				}
+			});
+			
+			ui.label("Image");
+			ui.indent("image", |ui| {
+				for loader in loaders.image.lock().iter() {
+					ui.label(loader.id());
+				}
+			});
+			
+			ui.label("Byte");
+			ui.indent("byte", |ui| {
+				for loader in loaders.bytes.lock().iter() {
+					ui.label(loader.id());
+				}
+			});
+		};
+		
+		if self.userspace_loaders {
+			ui.userspace_loaders(draw_loaders);
+		} else {
+			draw_loaders(ui);
+		}
 	}
 }

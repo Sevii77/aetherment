@@ -186,6 +186,7 @@ impl super::Backend for Penumbra {
 					_ = std::fs::create_dir(&aeth_dir);
 					let files_dir = mod_dir.join("files");
 					_ = std::fs::create_dir(&files_dir);
+					let assets_dir = mod_dir.join("assets");
 					File::create(aeth_dir.join("meta.json"))?.write_all(&meta_buf)?;
 					// buf.clear();
 					
@@ -234,38 +235,53 @@ impl super::Backend for Penumbra {
 						let mut f = pack.by_index(i)?;
 						if f.is_dir() {continue};
 						let Some(name) = f.enclosed_name() else {continue};
-						let Ok(name) = name.strip_prefix("files/") else {continue};
-						if name.components().count() > 1 {continue};
-						let name = name.to_owned();
-						let hash = name.to_string_lossy().to_string();
-						let ext = if let Some(p) = hash.find(".") {&hash[p + 1..]} else {""};
-						
-						let org_paths = remap_rev.get(&hash).ok_or("Remap does not contain hash")?;
-						let is_direct = org_paths.iter().any(|v| direct_files.contains(v.as_str()));
-						if is_direct {
-							let mut buf = Vec::new();
-							f.read_to_end(&mut buf)?;
+						match name.components().next().unwrap().as_os_str().to_str().unwrap() {
+							"assets" => {
+								let Ok(name) = name.strip_prefix("assets/") else {continue};
+								let path = assets_dir.join(name);
+								_ = std::fs::create_dir_all(&path.parent().unwrap());
+								let mut buf = Vec::new();
+								f.read_to_end(&mut buf)?;
+								std::fs::write(path, &buf)?;
+							}
 							
-							let mut write_org = false;
-							for org_path in org_paths {
-								if org_path.starts_with("ui/") {
-									let hashed_path = crate::hash_str(blake3::hash(org_path.as_bytes()));
-									let new_name = format!("{hashed_path}.{ext}");
-									// std::io::copy(&mut f, &mut File::create(files_dir.join(&new_name))?)?;
-									std::fs::write(files_dir.join(&new_name), &buf)?;
-									remap.insert(org_path.to_owned(), new_name);
+							"files" => {
+								let Ok(name) = name.strip_prefix("files/") else {continue};
+								if name.components().count() > 1 {continue};
+								let name = name.to_owned();
+								let hash = name.to_string_lossy().to_string();
+								let ext = if let Some(p) = hash.find(".") {&hash[p + 1..]} else {""};
+								
+								let org_paths = remap_rev.get(&hash).ok_or("Remap does not contain hash")?;
+								let is_direct = org_paths.iter().any(|v| direct_files.contains(v.as_str()));
+								if is_direct {
+									let mut buf = Vec::new();
+									f.read_to_end(&mut buf)?;
+									
+									let mut write_org = false;
+									for org_path in org_paths {
+										if org_path.starts_with("ui/") {
+											let hashed_path = crate::hash_str(blake3::hash(org_path.as_bytes()));
+											let new_name = format!("{hashed_path}.{ext}");
+											// std::io::copy(&mut f, &mut File::create(files_dir.join(&new_name))?)?;
+											std::fs::write(files_dir.join(&new_name), &buf)?;
+											remap.insert(org_path.to_owned(), new_name);
+										} else {
+											write_org = true;
+										}
+									}
+									
+									if write_org {
+										// std::io::copy(&mut f, &mut File::create(files_dir.join(name))?)?;
+										std::fs::write(files_dir.join(&name), &buf)?;
+									}
 								} else {
-									write_org = true;
+									compdata_used = true;
+									compdata.raw_copy_file(f)?;
 								}
 							}
 							
-							if write_org {
-								// std::io::copy(&mut f, &mut File::create(files_dir.join(name))?)?;
-								std::fs::write(files_dir.join(&name), &buf)?;
-							}
-						} else {
-							compdata_used = true;
-							compdata.raw_copy_file(f)?;
+							_ => {}
 						}
 					}
 					
@@ -357,6 +373,16 @@ impl super::Backend for Penumbra {
 	
 	fn get_mod_meta(&self, mod_id: &str) -> Option<&meta::Meta> {
 		self.mod_infos.get(mod_id).map(|m| &m.meta)
+	}
+	
+	fn get_mod_asset(&self, mod_id: &str, path: &str) -> std::io::Result<Vec<u8>> {
+		let assets_dir = std::fs::canonicalize(root_path().join(mod_id).join("assets"))?;
+		let file_path = std::fs::canonicalize(assets_dir.join(path))?;
+		if !file_path.starts_with(&assets_dir) {
+			return Err(std::io::ErrorKind::InvalidInput.into());
+		}
+		
+		std::fs::read(file_path)
 	}
 	
 	fn get_mod_enabled(&self, mod_id: &str, collection_id: &str) -> bool {

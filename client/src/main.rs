@@ -43,7 +43,9 @@ fn main() {
 	
 	eframe::run_native("Aetherment", options, Box::new(|cc| {
 		let _backend = cc.wgpu_render_state.as_ref().unwrap().adapter.get_info().backend;
-		Ok(Box::new(CoreWrapper(aetherment::Core::new(log,
+		Ok(Box::new(CoreWrapper(aetherment::Core::new(
+			cc.egui_ctx.clone(),
+			log,
 			aetherment::modman::backend::BackendInitializers::None,
 			aetherment::modman::requirement::RequirementInitializers {
 				ui_resolution: Box::new(|| 255),

@@ -320,6 +320,14 @@ impl<W: Write + Seek> ModPack<W> {
 		}
 	}
 	
+	pub fn add_asset(&mut self, path: &str, data: &[u8]) -> Result<(), crate::resource_loader::BacktraceError> {
+		let name = format!("assets/{path}");
+		self.writer.start_file(name, self.options)?;
+		self.writer.write_all(data)?;
+		
+		Ok(())
+	}
+	
 	pub fn add_file(&mut self, path: &str, data: &[u8]) -> Result<(), crate::resource_loader::BacktraceError> {
 		let hash = blake3::hash(data);
 		let hash_str = crate::hash_str(hash);
@@ -402,6 +410,29 @@ pub fn create_mod(mod_path: &std::path::Path, settings: ModCreationSettings) -> 
 		writer.add_file(real_path, &buf)?;
 		buf.clear();
 	}
+	
+	fn add_assets(modpack: &mut ModPack<std::io::BufWriter<std::fs::File>>, root: &std::path::Path, path: &str) -> Result<(), crate::resource_loader::BacktraceError> {
+		let Ok(iter) = std::fs::read_dir(root.join(path)) else {
+			return Ok(())
+		};
+		
+		for entry in iter {
+			if let Ok(entry) = entry {
+				let entry_path = entry.path();
+				if entry_path.is_file() {
+					if let Ok(data) = std::fs::read(entry_path) {
+						modpack.add_asset(&format!("{path}{}", entry.file_name().to_string_lossy()), &data)?;
+					}
+				} else if entry_path.is_dir() {
+					add_assets(modpack, root, &format!("{path}{}/", entry.file_name().to_string_lossy()))?;
+				}
+			}
+		}
+		
+		Ok(())
+	}
+	
+	add_assets(&mut writer, &mod_path.join("assets"), "")?;
 	
 	writer.finalize()?;
 	

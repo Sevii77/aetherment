@@ -156,6 +156,7 @@ pub trait Backend {
 	
 	fn load_mods(&mut self);
 	fn get_mod_meta(&self, mod_id: &str) -> Option<&crate::modman::meta::Meta>;
+	fn get_mod_asset(&self, mod_id: &str, path: &str) -> std::io::Result<Vec<u8>>;
 	// fn get_mod_settings(&self, mod_id: &str, collection_id: &str) -> Option<crate::modman::settings::Settings>;
 	
 	fn get_mod_enabled(&self, mod_id: &str, collection_id: &str) -> bool;

@@ -29,6 +29,7 @@ impl Backend for Dummy {
 	
 	fn load_mods(&mut self) {}
 	fn get_mod_meta(&self, _mod_id: &str) -> Option<&crate::modman::meta::Meta> {None}
+	fn get_mod_asset(&self, _mod_id: &str, _path: &str) -> std::io::Result<Vec<u8>> {Err(std::io::ErrorKind::Unsupported.into())}
 	// fn get_mod_settings(&self, _mod_id: &str, _collection_id: &str) -> Option<crate::modman::settings::Settings> {None}
 	
 	fn get_mod_enabled(&self, _mod_id: &str, _collection_id: &str) -> bool {false}

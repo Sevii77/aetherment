@@ -3,6 +3,8 @@
 use egui::{Response, WidgetText};
 use crate::EnumTools;
 
+mod asset_loader;
+pub use asset_loader::*;
 mod splitter;
 pub use splitter::*;
 
@@ -19,6 +21,8 @@ pub trait UiExt {
 	fn slider<S: Into<WidgetText>, N: egui::emath::Numeric>(&mut self, value: &mut N, range: std::ops::RangeInclusive<N>, label: S) -> Response;
 	fn get_clipboard(&mut self) -> String;
 	fn set_clipboard<S: Into<String>>(&mut self, text: S);
+	fn userspace_loaders(&mut self, contents: impl FnOnce(&mut egui::Ui));
+	fn free_textures(&mut self, prefix: &str);
 }
 
 impl UiExt for egui::Ui {
@@ -103,7 +107,9 @@ impl UiExt for egui::Ui {
 	}
 	
 	fn helptext<S: Into<WidgetText>>(&mut self, text: S) {
-		self.label("(❓)").on_hover_text(text);
+		self.label("(❓)")
+			.on_hover_cursor(egui::CursorIcon::Help)
+			.on_hover_text(text);
 	}
 	
 	fn slider<S: Into<WidgetText>, N: egui::emath::Numeric>(&mut self, value: &mut N, range: std::ops::RangeInclusive<N>, label: S) -> Response {
@@ -118,6 +124,36 @@ impl UiExt for egui::Ui {
 	
 	fn set_clipboard<S: Into<String>>(&mut self, text: S) {
 		self.ctx().copy_text(text.into());
+	}
+	
+	fn userspace_loaders(&mut self, contents: impl FnOnce(&mut egui::Ui)) {
+		let loaders = self.ctx().loaders();
+		
+		let byte = loaders.bytes.lock().clone();
+		loaders.bytes.lock().retain(|v| v.id() == "aetherment::AssetLoader");
+		
+		contents(self);
+		
+		*loaders.bytes.lock() = byte;
+	}
+	
+	fn free_textures(&mut self, prefix: &str) {
+		let ctx = self.ctx();
+		let man = ctx.tex_manager();
+		let man = man.read();
+		
+		let mut free = Vec::new();
+		for (_, meta) in man.allocated() {
+			if meta.name.starts_with(prefix) {
+				free.push(meta.name.clone());
+			}
+		}
+		
+		drop(man);
+		
+		for uri in free {
+			ctx.forget_image(&uri);
+		}
 	}
 }
 

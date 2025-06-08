@@ -76,7 +76,10 @@ pub struct Core {
 
 #[cfg(any(feature = "plugin", feature = "client"))]
 impl Core {
-	pub fn new(log: fn(log::LogType, &str), backend_initializers: modman::backend::BackendInitializers, requirement_initializers: modman::requirement::RequirementInitializers, optional_initializers: modman::meta::OptionalInitializers, services_initializers: service::ServicesInitializers) -> Self {
+	pub fn new(ui_ctx: egui::Context, log: fn(log::LogType, &str), backend_initializers: modman::backend::BackendInitializers, requirement_initializers: modman::requirement::RequirementInitializers, optional_initializers: modman::meta::OptionalInitializers, services_initializers: service::ServicesInitializers) -> Self {
+		ui_ctx.add_bytes_loader(std::sync::Arc::new(ui_ext::AssetLoader::default()));
+		egui_extras::install_image_loaders(&ui_ctx);
+		
 		unsafe {
 			log::LOG = log;
 			// BACKEND = Some(std::sync::Mutex::new(modman::backend::new_backend(backend_initializers)));

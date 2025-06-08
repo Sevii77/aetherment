@@ -61,8 +61,9 @@ impl super::super::View for Tattoo {
 	fn ui(&mut self, ui: &mut egui::Ui) {
 		let meta = &mut self.meta;
 		
-		ui.label("What is this (❓)")
-			.on_hover_text("\
+		ui.horizontal(|ui| {
+			ui.label("What is this");
+			ui.helptext("\
 This tool allows you to easily create tattoo mods from transparent files.
 Simply click the button for the body type (you add files for multiple
 body types) and select the transparent file. Afterwards export the mod.
@@ -71,6 +72,7 @@ Afterwards set the priority above your body mods and Aetherment will
 automatically overlay the tattoo on your body. Changing your body texture
 will be reflected after hitting apply, and you can stack multiple overlay
 mods ontop of one another (multiple tattoos for example).");
+		});
 		
 		ui.add_space(10.0);
 		

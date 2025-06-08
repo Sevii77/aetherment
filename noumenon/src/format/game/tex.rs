@@ -133,9 +133,9 @@ impl image::GenericImageView for Tex {
 		(self.header.width as u32, self.header.height as u32)
 	}
 	
-	fn bounds(&self) -> (u32, u32, u32, u32) {
-		(0, 0, self.header.width as u32, self.header.height as u32)
-	}
+	// fn bounds(&self) -> (u32, u32, u32, u32) {
+	// 	(0, 0, self.header.width as u32, self.header.height as u32)
+	// }
 	
 	fn get_pixel(&self, x: u32, y: u32) -> Self::Pixel {
 		let offset = (self.width() * y * 4 + x * 4) as usize;
@@ -298,7 +298,7 @@ impl Dds for Tex {
 impl Png for Tex {
 	fn read<T>(reader: &mut T) -> Result<Self, Error> where
 	T: Read + Seek {
-		let img = image::io::Reader::with_format(BufReader::new(reader), image::ImageFormat::Png)
+		let img = image::ImageReader::with_format(BufReader::new(reader), image::ImageFormat::Png)
 			.decode()?;
 		
 		Ok(Tex {
@@ -331,7 +331,7 @@ impl Png for Tex {
 				// .collect::<Vec<u8>>(),
 			self.header.width as u32,
 			self.header.height as u32,
-			ColorType::Rgba8
+			ColorType::Rgba8.into()
 		)?;
 		
 		Ok(())
@@ -341,7 +341,7 @@ impl Png for Tex {
 impl Tiff for Tex {
 	fn read<T>(reader: &mut T) -> Result<Self, Error> where
 	T: Read + Seek {
-		let img = image::io::Reader::with_format(BufReader::new(reader), image::ImageFormat::Tiff)
+		let img = image::ImageReader::with_format(BufReader::new(reader), image::ImageFormat::Tiff)
 			.decode()?;
 		
 		Ok(Tex {
@@ -374,7 +374,7 @@ impl Tiff for Tex {
 				// .collect::<Vec<u8>>(),
 			self.header.width as u32,
 			self.header.height as u32,
-			ColorType::Rgba8
+			ColorType::Rgba8.into()
 		)?;
 		
 		Ok(())
@@ -384,7 +384,7 @@ impl Tiff for Tex {
 impl Tga for Tex {
 	fn read<T>(reader: &mut T) -> Result<Self, Error> where 
 	T: Read + Seek {
-		let img = image::io::Reader::with_format(BufReader::new(reader), image::ImageFormat::Tga)
+		let img = image::ImageReader::with_format(BufReader::new(reader), image::ImageFormat::Tga)
 			.decode()?;
 		
 		Ok(Tex {
@@ -409,7 +409,7 @@ impl Tga for Tex {
 			&self.data[0..(self.header.width as usize * self.header.height as usize * 4)],
 			self.header.width as u32,
 			self.header.height as u32,
-			ColorType::Rgba8
+			ColorType::Rgba8.into()
 		)?;
 		
 		Ok(())

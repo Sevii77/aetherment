@@ -19,6 +19,7 @@ pub struct Mods {
 	// mod_settings: HashMap<String, HashMap<String, Settings>>,
 	mod_settings: HashMap<String, Settings>,
 	mod_settings_remote: HashMap<String, crate::remote::settings::Settings>,
+	markdown_cache: egui_commonmark::CommonMarkCache,
 }
 
 impl Mods {
@@ -40,6 +41,7 @@ impl Mods {
 			collections: HashMap::new(),
 			mod_settings: HashMap::new(),
 			mod_settings_remote: HashMap::new(),
+			markdown_cache: Default::default(),
 		};
 		
 		s.refresh();
@@ -153,6 +155,7 @@ impl super::View for Mods {
 					if let Some(meta) = backend.get_mod_meta(m) {
 						ui.push_id(m, |ui| {
 							if ui.selectable_label(self.selected_mod == *m, &meta.name).clicked {
+								ui.free_textures(&format!("aetherment://{}/", self.selected_mod));
 								self.selected_mod = m.clone();
 							}
 						});
@@ -195,7 +198,7 @@ impl super::View for Mods {
 				ui.add_space(16.0);
 				
 				if !meta.description.is_empty() {
-					ui.label(&meta.description);
+					draw_description(ui, &self.selected_mod, &meta.description, &mut self.markdown_cache);
 					ui.add_space(16.0);
 				}
 				
@@ -370,7 +373,7 @@ impl super::View for Mods {
 					if grouped_options.contains(option.name.as_str()) {continue}
 					if categories.len() > 1 && cur_category != self.selected_category_tab {continue}
 					
-					changed |= draw_option(ui, meta, settings, option, &option.name, &option.description);
+					changed |= draw_option(ui, &self.selected_mod, meta, settings, option, &option.name, &option.description, &mut self.markdown_cache);
 				}
 				
 				// ui.enabled(!is_busy, |ui| {
@@ -404,7 +407,26 @@ impl super::View for Mods {
 	}
 }
 
-fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &mut crate::modman::settings::CollectionSettings, option: &crate::modman::meta::Option, name: &str, desc: &str) -> bool {
+fn draw_description(ui: &mut egui::Ui, mod_id: &str, text: &str, md_cache: &mut egui_commonmark::CommonMarkCache) {
+	if text.starts_with("[md]") {
+		ui.userspace_loaders(|ui| {
+			egui_commonmark::CommonMarkViewer::new()
+				.default_implicit_uri_scheme(format!("aetherment://{}/", mod_id))
+				// .max_image_width(width)
+				.show(ui, md_cache, &text[4..]);
+		});
+	} else {
+		ui.label(text);
+	}
+}
+
+fn draw_help(ui: &mut egui::Ui, mod_id: &str, text: &str, md_cache: &mut egui_commonmark::CommonMarkCache) {
+	ui.label("(❓)")
+		.on_hover_cursor(egui::CursorIcon::Help)
+		.on_hover_ui(|ui| draw_description(ui, mod_id, text, md_cache));
+}
+
+fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta, settings: &mut crate::modman::settings::CollectionSettings, option: &crate::modman::meta::Option, name: &str, desc: &str, md_cache: &mut egui_commonmark::CommonMarkCache) -> bool {
 	use crate::modman::{meta::OptionSettings, settings::Value::*};
 	
 	let mut changed = false;
@@ -428,7 +450,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 				});
 				
 				if !desc.is_empty() {
-					ui.helptext(&*desc);
+					draw_help(ui, mod_id, &*desc, md_cache);
 				}
 			});
 			
@@ -440,7 +462,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 						crate::modman::meta::ValueGroupedOptionEntryType::Option(v) => {
 							if let Some(first) = v.options.first() {
 								if let Some(opt) = meta.options.options_iter().find(|x| x.name == *first) {
-									if draw_option(ui, meta, settings, opt, &v.name, &v.description) {
+									if draw_option(ui, mod_id, meta, settings, opt, &v.name, &v.description, md_cache) {
 										let val = settings.get(first).unwrap().clone();
 										for name in v.options.iter() {
 											if let Some(opt) = meta.options.options_iter().find(|x| x.name == *name) {
@@ -466,14 +488,14 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 						ui.horizontal(|ui| {
 							changed |= ui.selectable_value(val, i as u32, &sub.name).clicked;
 							if !sub.description.is_empty() {
-								ui.helptext(&sub.description);
+								draw_help(ui, mod_id, &sub.description, md_cache);
 							}
 						});
 					}
 				});
 				
 				if !desc.is_empty() {
-					ui.helptext(&*desc);
+					draw_help(ui, mod_id, &*desc, md_cache);
 				}
 			});
 		}
@@ -483,7 +505,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 			ui.horizontal(|ui| {
 				ui.label(name);
 				if !desc.is_empty() {
-					ui.helptext(&*desc);
+					draw_help(ui, mod_id, &*desc, md_cache);
 				}
 			});
 			
@@ -497,7 +519,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 						}
 						
 						if !sub.description.is_empty() {
-							ui.helptext(&sub.description);
+							draw_help(ui, mod_id, &sub.description, md_cache);
 						}
 					});
 				}
@@ -511,7 +533,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 				ui.label(name);
 				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
 				if !desc.is_empty() {
-					ui.helptext(&*desc);
+					draw_help(ui, mod_id, &*desc, md_cache);
 				}
 			});
 		}
@@ -524,7 +546,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 				ui.label(name);
 				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
 				if !desc.is_empty() {
-					ui.helptext(&*desc);
+					draw_help(ui, mod_id, &*desc, md_cache);
 				}
 			});
 		}
@@ -534,7 +556,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 			changed |= ui.slider(val, o.min..=o.max, name).changed;
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
-				ui.helptext(&*desc);
+				draw_help(ui, mod_id, &*desc, md_cache);
 			}
 		}
 		
@@ -543,7 +565,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 			changed |= ui.slider(val, o.min..=o.max, name).changed;
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
-				ui.helptext(&*desc);
+				draw_help(ui, mod_id, &*desc, md_cache);
 			}
 		}
 		
@@ -552,7 +574,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 			changed |= ui.slider(val, o.min..=o.max, name).changed;
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
-				ui.helptext(&*desc);
+				draw_help(ui, mod_id, &*desc, md_cache);
 			}
 		}
 		
@@ -566,7 +588,7 @@ fn draw_option(ui: &mut egui::Ui, meta: &crate::modman::meta::Meta, settings: &m
 				});
 				
 				if !desc.is_empty() {
-					ui.helptext(&*desc);
+					draw_help(ui, mod_id, &*desc, md_cache);
 				}
 			});
 		}

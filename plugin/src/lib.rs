@@ -261,6 +261,11 @@ pub extern "C" fn draw(state: *mut State, d3d11_device: usize, io: Io) -> usize 
 }
 
 #[no_mangle]
+pub extern "C" fn config_plugin_open_on_launch(_state: *mut State) -> u8 {
+	aetherment::config().config.plugin_open_on_launch as u8
+}
+
+#[no_mangle]
 pub extern "C" fn backend_penumbraipc_modchanged(typ: u8, collection_id: FfiString, mod_id: FfiString) {
 	aetherment::modman::backend::penumbra_ipc::subscriber_modchanged(typ, &collection_id.to_string(), &mod_id.to_string());
 }

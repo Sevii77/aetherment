@@ -30,7 +30,7 @@ public class Aetherment: IDalamudPlugin {
 	private const string maincommand = "/aetherment";
 	private const string texfindercommand = "/texfinder";
 	
-	private bool open = true;
+	private bool open = false;
 	private bool reset_cursor = false;
 	
 	internal static nint state;
@@ -182,6 +182,7 @@ public class Aetherment: IDalamudPlugin {
 		
 		try {
 			state = Native.initialize(init);
+			open = Native.config_plugin_open_on_launch(state) != 0;
 		} catch(Exception e) {
 			Kill($"{e.GetBaseException().Message}\n\n{e}", 2);
 		}

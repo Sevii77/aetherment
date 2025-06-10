@@ -103,6 +103,7 @@ impl Core {
 				Box::new(view::browser::Browser::new(install_progress.clone())),
 				Box::new(view::settings::Settings::new()),
 				Box::new(view::tool::Tools::new()),
+				Box::new(view::explorer::Explorer::new()),
 				Box::new(view::debug::Debug::new()),
 			]),
 			

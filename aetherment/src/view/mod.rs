@@ -2,6 +2,7 @@ pub mod mods;
 pub mod browser;
 pub mod settings;
 pub mod tool;
+pub mod explorer;
 pub mod debug;
 
 pub trait View {

@@ -23,6 +23,8 @@ pub trait UiExt {
 	fn set_clipboard<S: Into<String>>(&mut self, text: S);
 	fn userspace_loaders(&mut self, contents: impl FnOnce(&mut egui::Ui));
 	fn free_textures(&mut self, prefix: &str);
+	fn filled_reserved_vertical(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui));
+	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui));
 }
 
 impl UiExt for egui::Ui {
@@ -154,6 +156,44 @@ impl UiExt for egui::Ui {
 		for uri in free {
 			ctx.forget_image(&uri);
 		}
+	}
+	
+	fn filled_reserved_vertical(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui)) {
+		let id = self.id().with(id);
+		let reserved_size = self.data(|v| v.get_temp(id).unwrap_or(0.0));
+		
+		let mut rect = self.available_rect_before_wrap();
+		rect.max.y -= reserved_size;
+		self.allocate_rect(rect, egui::Sense::hover());
+		
+		let mut ui_filled = self.new_child(egui::UiBuilder::new().max_rect(rect));
+		ui_filled.set_clip_rect(rect);
+		
+		let mut ui_reserved = self.new_child(egui::UiBuilder::new());
+		
+		contents(&mut ui_filled, &mut ui_reserved);
+		
+		let reserved_size = ui_reserved.min_rect().height();
+		self.data_mut(|v| v.insert_temp(id, reserved_size));
+	}
+	
+	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui)) {
+		let id = self.id().with(id);
+		let reserved_size = self.data(|v| v.get_temp(id).unwrap_or(0.0));
+		
+		let mut rect = self.available_rect_before_wrap();
+		rect.max.x -= reserved_size;
+		self.allocate_rect(rect, egui::Sense::hover());
+		
+		let mut ui_filled = self.new_child(egui::UiBuilder::new().max_rect(rect));
+		ui_filled.set_clip_rect(rect);
+		
+		let mut ui_reserved = self.new_child(egui::UiBuilder::new());
+		
+		contents(&mut ui_filled, &mut ui_reserved);
+		
+		let reserved_size = ui_reserved.min_rect().width();
+		self.data_mut(|v| v.insert_temp(id, reserved_size));
 	}
 }
 

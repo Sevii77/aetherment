@@ -142,7 +142,6 @@ pub trait Backend {
 				_ = pack.seek(std::io::SeekFrom::Start(0));
 				Some((meta.name, pack))
 			}).collect())
-		
 	}
 	fn install_mods(&mut self, progress: InstallProgress, files: Vec<(String, std::fs::File)>);
 	

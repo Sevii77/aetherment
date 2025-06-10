@@ -18,7 +18,7 @@ impl super::View for Tools {
 	fn title(&self) -> &'static str {
 		"Tools"
 	}
-
+	
 	fn ui(&mut self, ui: &mut egui::Ui) {
 		egui_dock::DockArea::new(&mut self.views)
 			.id(egui::Id::new("tool_tabs"))

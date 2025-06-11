@@ -30,7 +30,8 @@ jobs:
           - build: plugin
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            toolchain: nightly-2024-01-25-x86_64-pc-windows-msvc
+            # toolchain: nightly-2024-01-25-x86_64-pc-windows-msvc
+            toolchain: stable
     
     steps:
       - name: Checkout
@@ -88,7 +89,7 @@ jobs:
         if: matrix.build == 'plugin'
         run: |
           dotnet build ./plugin/plugin/Aetherment.csproj -c Release
-          cargo +nightly-2024-01-25 build --lib --release --target x86_64-pc-windows-msvc --manifest-path=./plugin/Cargo.toml
+          cargo build --lib --release --target x86_64-pc-windows-msvc --manifest-path=./plugin/Cargo.toml
       
       - name: Archive Plugin
         shell: bash
@@ -98,7 +99,7 @@ jobs:
           mkdir "$dirname"
           releasedir="./target/x86_64-pc-windows-msvc/release"
           # zip $dirname.zip "$releasedir/Aetherment.json" "$releasedir/Aetherment.dll" "$releasedir/aetherment_core.dll"
-          7z a $dirname.zip "$releasedir/Aetherment.json" "$releasedir/Aetherment.dll" "$releasedir/aetherment_core.dll"
+          7z a $dirname.zip "$releasedir/Aetherment.json" "$releasedir/Aetherment.dll" "$releasedir/aetherment_core.dll" "./lib/bcryptprimitives.dll"
           echo "ASSET=$dirname.zip" >> $GITHUB_ENV
       
       - name: Release Plugin

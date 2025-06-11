@@ -37,11 +37,11 @@ impl egui_dock::TabViewer for Viewer {
 	fn add_popup(&mut self, ui: &mut egui::Ui, surface: egui_dock::SurfaceIndex, node: egui_dock::NodeIndex) {
 		ui.set_min_width(150.0);
 		
-		if ui.selectable_label(false, "Add Tree").clicked {
+		if ui.selectable_label(false, "Add Tree").clicked() {
 			self.0  = Some((TabType::Tree, (surface, node)));
 		}
 		
-		if ui.selectable_label(false, "Add Resource View").clicked {
+		if ui.selectable_label(false, "Add Resource View").clicked() {
 			self.0  = Some((TabType::Resource, (surface, node)));
 		}
 	}
@@ -60,7 +60,9 @@ impl Explorer {
 		};
 		
 		s.add_tab(Box::new(tree::Tree::new()), None, None);
-		s.add_tab(Box::new(resource::Resource::new("ui/uld/logo_sqex_hr1.tex")), Some(0.2), None);
+		s.add_tab(Box::new(resource::Resource::new("common/graphics/texture/-mogu_anime_en.tex")), Some(0.2), None);
+		s.add_tab(Box::new(resource::Resource::new("common/graphics/texture/-caustics.tex")), None, None);
+		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/obj/body/b0001/texture/c0201b0001_base.tex")), None, None);
 		
 		s
 	}

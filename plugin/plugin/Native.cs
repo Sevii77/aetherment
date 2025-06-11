@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Runtime.Loader;
 using static Aetherment.Aetherment;
 
 namespace Aetherment;
@@ -54,6 +55,23 @@ namespace Aetherment;
 // }
 
 public static class Native {
+	private static nint bcryptprimitives_handle = 0;
+	
+	static Native() {
+		if(Dalamud.Utility.Util.IsWine()) {
+			var path = Path.Join(Interface.AssemblyLocation.DirectoryName, "bcryptprimitives.dll");
+			bcryptprimitives_handle = NativeLibrary.Load(path);
+		}
+	}
+	
+	public static void Free() {
+		if(bcryptprimitives_handle != 0)
+			FreeLibrary(bcryptprimitives_handle);
+	}
+	
+	[DllImport("Kernel32.dll")] private static extern nint LoadLibrary(string path);
+	[DllImport("Kernel32.dll")] private static extern byte FreeLibrary(nint module);
+	
 	[DllImport("aetherment_core.dll")] public static extern unsafe nint initialize(Initializers data);
 	[DllImport("aetherment_core.dll")] public static extern unsafe void destroy(nint state);
 	[DllImport("aetherment_core.dll")] public static extern unsafe byte command(nint state, FFI.Str args);

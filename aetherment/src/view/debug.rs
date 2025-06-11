@@ -27,7 +27,7 @@ impl super::View for Debug {
 		ui.heading("UiColor Replacements");
 		for ((theme_color, index), [r, g, b]) in crate::service::uicolor::get_colors() {
 			ui.horizontal(|ui| {ui.push_id(index, |ui| {
-				if ui.button("x").clicked {
+				if ui.button("x").clicked() {
 					crate::service::uicolor::remove_color(theme_color, index);
 				}
 				
@@ -41,7 +41,7 @@ impl super::View for Debug {
 		}
 		
 		ui.horizontal(|ui| {
-			if ui.button("+").clicked {
+			if ui.button("+").clicked() {
 				crate::service::uicolor::set_color(self.new_uicolor_theme, self.new_uicolor_index, [255, 255, 255]);
 			}
 			

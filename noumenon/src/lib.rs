@@ -30,40 +30,44 @@ pub enum Convert {
 impl Convert {
 	pub fn from_ext<R>(ext: &str, reader: &mut R) -> Result<Self, Error> where
 	R: std::io::Read + std::io::Seek {
-		if format::game::mtrl::EXT.contains(&ext) {return Ok(Self::Mtrl(format::game::Mtrl::read(reader)?))}
+		use format::{game::*, external::*};
 		
-		if format::game::tex::EXT.contains(&ext) {return Ok(Self::Tex(format::game::Tex::read(reader)?))}
-		if format::external::dds::EXT.contains(&ext) {return Ok(Self::Tex(<format::game::Tex as format::external::Dds>::read(reader)?))}
-		if format::external::png::EXT.contains(&ext) {return Ok(Self::Tex(<format::game::Tex as format::external::Png>::read(reader)?))}
-		if format::external::tiff::EXT.contains(&ext) {return Ok(Self::Tex(<format::game::Tex as format::external::Tiff>::read(reader)?))}
-		if format::external::tga::EXT.contains(&ext) {return Ok(Self::Tex(<format::game::Tex as format::external::Tga>::read(reader)?))}
+		if mtrl::EXT.contains(&ext) {return Ok(Self::Mtrl(<Mtrl as Bytes<mtrl::Error>>::read(reader)?))}
 		
-		if format::game::uld::EXT.contains(&ext) {return Ok(Self::Uld(format::game::Uld::read(reader)?))}
+		if tex::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Bytes<tex::Error>>::read(reader)?))}
+		if dds::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Dds<tex::Error>>::read(reader)?))}
+		if png::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Png<tex::Error>>::read(reader)?))}
+		if tiff::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Tiff<tex::Error>>::read(reader)?))}
+		if tga::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Tga<tex::Error>>::read(reader)?))}
+		
+		if uld::EXT.contains(&ext) {return Ok(Self::Uld(<Uld as Bytes<uld::Error>>::read(reader)?))}
 		
 		Err(Error::InvalidFormatFrom(ext.to_string()))
 	}
 	
 	pub fn convert<W>(&self, ext: &str, writer: &mut W) -> Result<(), Error> where
 	W: std::io::Write + std::io::Seek {
+		use format::{game::*, external::*};
+		
 		match self {
 			Convert::Mtrl(v) => {
-				if format::game::mtrl::EXT.contains(&ext) {return format::game::Mtrl::write(v, writer)}
+				if mtrl::EXT.contains(&ext) {return Ok(<Mtrl as Bytes<mtrl::Error>>::write(v, writer)?)}
 				
 				Err(Error::InvalidFormatTo(ext.to_string()))
 			}
 			
 			Convert::Tex(v) => {
-				if format::game::tex::EXT.contains(&ext) {return format::game::Tex::write(v, writer)}
-				if format::external::dds::EXT.contains(&ext) {return <format::game::Tex as format::external::Dds>::write(v, writer)}
-				if format::external::png::EXT.contains(&ext) {return <format::game::Tex as format::external::Png>::write(v, writer)}
-				if format::external::tiff::EXT.contains(&ext) {return <format::game::Tex as format::external::Tiff>::write(v, writer)}
-				if format::external::tga::EXT.contains(&ext) {return <format::game::Tex as format::external::Tga>::write(v, writer)}
+				if tex::EXT.contains(&ext) {return Ok(<Tex as Bytes<tex::Error>>::write(v, writer)?)}
+				if dds::EXT.contains(&ext) {return Ok(<Tex as Dds<tex::Error>>::write(v, writer)?)}
+				if png::EXT.contains(&ext) {return Ok(<Tex as Png<tex::Error>>::write(v, writer)?)}
+				if tiff::EXT.contains(&ext) {return Ok(<Tex as Tiff<tex::Error>>::write(v, writer)?)}
+				if tga::EXT.contains(&ext) {return Ok(<Tex as Tga<tex::Error>>::write(v, writer)?)}
 				
 				Err(Error::InvalidFormatTo(ext.to_string()))
 			}
 			
 			Convert::Uld(v) => {
-				if format::game::uld::EXT.contains(&ext) {return format::game::Uld::write(v, writer)}
+				if uld::EXT.contains(&ext) {return Ok(<Uld as Bytes<uld::Error>>::write(v, writer)?)}
 				
 				Err(Error::InvalidFormatTo(ext.to_string()))
 			}
@@ -120,88 +124,26 @@ impl std::error::Error for SizeError {
 
 // ----------
 
-// pub type Error = Box<dyn std::error::Error>;
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
-	Str(&'static str),
-	Io(std::io::Error),
-	Binrw(binrw::Error),
-	Image(image::ImageError),
-	Size(SizeError),
-	Utf8(std::str::Utf8Error),
+	#[error("Mtrl error {0:?}")]
+	Mtrl(#[from] format::game::mtrl::Error),
+	#[error("Tex error {0:?}")]
+	Tex(#[from] format::game::tex::Error),
+	#[error("Uld error {0:?}")]
+	Uld(#[from] format::game::uld::Error),
+	
+	#[error("Invalid format to convert from {0:?}")]
 	InvalidFormatFrom(String),
+	#[error("Invalid format to convert to {0:?}")]
 	InvalidFormatTo(String),
-}
-
-impl std::fmt::Display for Error {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		match self {
-			Self::Str(err) => f.write_str(err),
-			Self::Io(err) => write!(f, "{:?}", err),
-			Self::Binrw(err) => write!(f, "{:?}", err),
-			Self::Image(err) => write!(f, "{:?}", err),
-			Self::Size(err) => write!(f, "{:?}", err),
-			Self::Utf8(err) => write!(f, "{:?}", err),
-			Self::InvalidFormatFrom(ext) => write!(f, "Invalid format to convert from {:?}", ext),
-			Self::InvalidFormatTo(ext) => write!(f, "Invalid format to convert to {:?}", ext),
-		}
-	}
-}
-
-impl std::error::Error for Error {
-	fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-		match self {
-			Self::Io(err) => err.source(),
-			Self::Binrw(err) => err.source(),
-			Self::Image(err) => err.source(),
-			Self::Size(err) => err.source(),
-			Self::Utf8(err) => err.source(),
-			_ => None,
-		}
-	}
-}
-
-impl From<&'static str> for Error {
-	fn from(err: &'static str) -> Self {
-		Self::Str(err)
-	}
-}
-
-impl From<std::io::Error> for Error {
-	fn from(err: std::io::Error) -> Self {
-		Self::Io(err)
-	}
-}
-
-impl From<binrw::Error> for Error {
-	fn from(err: binrw::Error) -> Self {
-		Self::Binrw(err)
-	}
-}
-
-impl From<image::ImageError> for Error {
-	fn from(err: image::ImageError) -> Self {
-		Self::Image(err)
-	}
-}
-
-impl From<SizeError> for Error {
-	fn from(err: SizeError) -> Self {
-		Self::Size(err)
-	}
-}
-
-impl From<std::str::Utf8Error> for Error {
-	fn from(err: std::str::Utf8Error) -> Self {
-		Self::Utf8(err)
-	}
 }
 
 // ----------
 
 struct VoidReader;
 impl ironworks::file::File for VoidReader {
-	fn read(_data: impl ironworks::FileStream) -> format::game::Result<Self> {
+	fn read(_data: impl ironworks::FileStream) -> Result<Self, ironworks::Error> {
 		Ok(VoidReader)
 	}
 }
@@ -240,6 +182,7 @@ P: AsRef<Path> {
 		}
 	} else {
 		// super basic windows autodetect
+		#[cfg(target_family = "windows")]
 		for drive_letter in 'A'..'Z' {
 			for path in [":/SquareEnix/FINAL FANTASY XIV - A Realm Reborn",
 			":/Program Files (x86)/FINAL FANTASY XIV - A Realm Reborn",

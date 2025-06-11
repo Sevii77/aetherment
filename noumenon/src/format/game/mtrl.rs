@@ -1,13 +1,21 @@
 #![allow(dead_code)]
 
-// TODO: rewrite the reader/writer to use Binread/Binwrite
+// TODO: rewrite this all, this is all from pre-dawntrail and horribly outdated
 
 use std::{io::{Read, Seek, Write}, collections::BTreeMap};
 use binrw::{binrw, BinRead, BinWrite};
 use half::f16;
-use crate::{Error, NullReader, format::game::Result};
+use crate::NullReader;
 
 pub const EXT: &'static [&'static str] = &["mtrl"];
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+	#[error("{0:?}")] Binrw(#[from] binrw::Error),
+	#[error("{0:?}")] Utf8(#[from] std::str::Utf8Error),
+	#[error("{0:?}")] Io(#[from] std::io::Error),
+	#[error("Material has an invalid shader")] InvalidShader
+}
 
 #[derive(Clone, Debug)]
 pub struct ShaderParams {
@@ -980,13 +988,13 @@ pub struct Mtrl {
 }
 
 impl ironworks::file::File for Mtrl {
-	fn read(mut data: impl ironworks::FileStream) -> Result<Self> {
-		Ok(Mtrl::read(&mut data).unwrap())
+	fn read(mut data: impl ironworks::FileStream) -> Result<Self, ironworks::Error> {
+		Ok(<Mtrl as crate::format::external::Bytes<Error>>::read(&mut data).unwrap())
 	}
 }
 
-impl Mtrl {
-	pub fn read<T>(reader: &mut T) -> Result<Self, Error> where
+impl crate::format::external::Bytes<Error> for Mtrl {
+	fn read<T>(reader: &mut T) -> Result<Self, Error> where
 	T: Read + Seek {
 		let data = <Data as BinRead>::read(reader)?;
 		
@@ -1040,7 +1048,7 @@ impl Mtrl {
 				Some(datas)
 			} else {None},
 			shader: {
-				let mut shader = Shader::new(&data.strings[data.shader_offset as usize..].null_terminated()?).ok_or("Invalid shader")?;
+				let mut shader = Shader::new(&data.strings[data.shader_offset as usize..].null_terminated()?).ok_or(Error::InvalidShader)?;
 				let inner = shader.inner_mut();
 				
 				for (typ, offset, size) in data.shader_params {
@@ -1074,7 +1082,7 @@ impl Mtrl {
 		})
 	}
 	
-	pub fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
 	T: Write + Seek {
 		let mut strings = Vec::<u8>::new();
 		

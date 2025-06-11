@@ -1,6 +1,6 @@
 use std::{fmt::Debug, io::{Read, Seek, SeekFrom, Write}};
 use binrw::{binrw, BinRead, BinWrite};
-use crate::{Error, NullReader, NullWriter};
+use crate::{NullReader, NullWriter};
 
 mod component;
 pub use component::*;
@@ -10,6 +10,8 @@ mod node;
 pub use node::*;
 
 pub const EXT: &'static [&'static str] = &["uld"];
+
+pub type Error = binrw::Error;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -32,27 +34,6 @@ pub struct Uld {
 	pub second_header: AtkHeader,
 	pub widget_header: ListHeader,
 	pub widgets: Vec<WidgetData>,
-}
-
-// used to load from spack using ironworks
-impl ironworks::file::File for Uld {
-	fn read(mut data: impl ironworks::FileStream) -> super::Result<Self> {
-		Uld::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
-	}
-}
-
-impl Uld {
-	pub fn read<T>(reader: &mut T) -> Result<Self, Error>
-	where T: Read + Seek {
-		Ok(Uld::read_le(reader)?)
-	}
-	
-	pub fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
-	T: Write + Seek {
-		self.write_le(writer)?;
-		
-		Ok(())
-	}
 }
 
 impl BinRead for Uld {
@@ -198,6 +179,26 @@ impl BinWrite for Uld {
 		writer.seek(SeekFrom::Start(secondary_pos))?;
 		second_header.write_options(writer, endian, ())?;
 		writer.seek(SeekFrom::Start(pos))?;
+		
+		Ok(())
+	}
+}
+
+impl ironworks::file::File for Uld {
+	fn read(mut data: impl ironworks::FileStream) -> Result<Self, ironworks::Error> {
+		Uld::read_le(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
+	}
+}
+
+impl crate::format::external::Bytes<Error> for Uld {
+	fn read<T>(reader: &mut T) -> Result<Self, Error>
+	where T: Read + Seek {
+		Ok(Uld::read_le(reader)?)
+	}
+	
+	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	T: Write + Seek {
+		self.write_le(writer)?;
 		
 		Ok(())
 	}

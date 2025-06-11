@@ -82,20 +82,18 @@ impl super::View for Mods {
 		}
 		self.last_was_busy = is_busy;
 		
-		crate::ui_ext::Splitter::new("splitter", crate::ui_ext::SplitterAxis::Horizontal)
-			.default_pos(0.3)
-			.show(ui, |ui_left, ui_right| {
+		ui.splitter("splitter", crate::ui_ext::SplitterAxis::Horizontal, 0.3, |ui_left, ui_right| {
 			let h = ui_left.available_height() - 20.0;
 			egui::ScrollArea::vertical().id_salt("left").auto_shrink(false).max_height(h).show(ui_left, |ui| {
 				ui.combo(self.collections.get(&self.active_collection).map_or("Invalid Collection", |v| v.as_str()), "", |ui| {
 					for (id, name) in &self.collections {
-						if ui.selectable_label(self.active_collection == *id, name).clicked {
+						if ui.selectable_label(self.active_collection == *id, name).clicked() {
 							self.active_collection = id.clone();
 						}
 					}
 				});
 				
-				if ui.button("Import Mods").clicked && self.import_picker.is_none() {
+				if ui.button("Import Mods").clicked() && self.import_picker.is_none() {
 					let mut dialog = egui_file::FileDialog::open_file(Some(config.config.file_dialog_path.clone()))
 						.title("Import Mods")
 						.multi_select(true)
@@ -105,7 +103,7 @@ impl super::View for Mods {
 				}
 				
 				if let Some(picker) = &mut self.import_picker {
-					match picker.show(&ui.ctx()).state() {
+					match picker.show(ui.ctx()).state() {
 						egui_file::State::Selected => {
 							let progress = self.install_progress.clone();
 							let paths = picker.selection().into_iter().map(|v| v.to_path_buf()).collect();
@@ -126,14 +124,14 @@ impl super::View for Mods {
 					}
 				}
 				
-				// if !is_busy && ui.button("Update Mods").clicked {
+				// if !is_busy && ui.button("Update Mods").clicked() {
 				// 	let progress = install_progress.clone();
 				// 	std::thread::spawn(move || {
 				// 		crate::remote::check_updates(progress);
 				// 	});
 				// }
 				
-				if !is_busy && ui.button("Reload Mods").clicked {
+				if !is_busy && ui.button("Reload Mods").clicked() {
 					self.refresh();
 				}
 				
@@ -142,7 +140,7 @@ impl super::View for Mods {
 				let queue_size = backend.apply_queue_size();
 				ui.add_enabled_ui(!is_busy && queue_size > 0 , |ui| {
 					ui.label(format!("{queue_size} mods have changes that might require an apply"));
-					if ui.button("Apply").clicked {
+					if ui.button("Apply").clicked() {
 						backend.finalize_apply(self.apply_progress.clone());
 					}
 				});
@@ -154,7 +152,7 @@ impl super::View for Mods {
 				for m in &self.mods {
 					if let Some(meta) = backend.get_mod_meta(m) {
 						ui.push_id(m, |ui| {
-							if ui.selectable_label(self.selected_mod == *m, &meta.name).clicked {
+							if ui.selectable_label(self.selected_mod == *m, &meta.name).clicked() {
 								ui.free_textures(&format!("aetherment://{}/", self.selected_mod));
 								self.selected_mod = m.clone();
 							}
@@ -163,7 +161,7 @@ impl super::View for Mods {
 				}
 			});
 			
-			if ui_left.add(egui::Button::new(egui::RichText::new("Support me on Buy Me a Coffee").color(egui::Color32::from_rgb(0, 0, 0))).fill(egui::Color32::from_rgb(254, 210, 0))).clicked {
+			if ui_left.add(egui::Button::new(egui::RichText::new("Support me on Buy Me a Coffee").color(egui::Color32::from_rgb(0, 0, 0))).fill(egui::Color32::from_rgb(254, 210, 0))).clicked() {
 				ui_left.ctx().open_url(egui::OpenUrl::new_tab("https://buymeacoffee.com/sevii77"));
 			}
 			
@@ -202,7 +200,7 @@ impl super::View for Mods {
 					ui.add_space(16.0);
 				}
 				
-				if !remote_settings.origin.is_empty() && ui.checkbox(&mut remote_settings.auto_update, "Auto Update").changed {
+				if !remote_settings.origin.is_empty() && ui.checkbox(&mut remote_settings.auto_update, "Auto Update").changed() {
 					remote_settings.save(&self.selected_mod);
 				}
 				
@@ -242,13 +240,13 @@ impl super::View for Mods {
 					};
 					
 					if meta.presets.len() == 0 {
-						if ui.selectable_label("Default" == selected_preset, "Default").clicked {
+						if ui.selectable_label("Default" == selected_preset, "Default").clicked() {
 							set_settings(&HashMap::new());
 						}
 					}
 					
 					for p in &meta.presets {
-						if ui.selectable_label(p.name == selected_preset, &p.name).clicked {
+						if ui.selectable_label(p.name == selected_preset, &p.name).clicked() {
 							set_settings(&p.settings);
 						}
 					}
@@ -258,13 +256,13 @@ impl super::View for Mods {
 						ui.horizontal(|ui| {
 							ui.push_id(i, |ui| {
 								let resp = ui.button("🗑");
-								if resp.clicked {
+								if resp.clicked() {
 									delete = Some(i);
 								}
 								resp.on_hover_text("Delete");
 								
 								let resp = ui.button("📋");
-								if resp.clicked {
+								if resp.clicked() {
 									if let Ok(json) = serde_json::to_vec(p) {
 										log!("copied {}", base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, &json));
 										ui.set_clipboard(base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, json));
@@ -272,7 +270,7 @@ impl super::View for Mods {
 								}
 								resp.on_hover_text("Copy to clipboard");
 								
-								if ui.selectable_label(p.name == selected_preset, &p.name).clicked {
+								if ui.selectable_label(p.name == selected_preset, &p.name).clicked() {
 									set_settings(&p.settings);
 								}
 							});
@@ -285,7 +283,7 @@ impl super::View for Mods {
 					}
 					
 					ui.horizontal(|ui| {
-						if ui.button("+").clicked && self.new_preset_name.len() > 0 && self.new_preset_name != "Custom" && self.new_preset_name != "Default" {
+						if ui.button("+").clicked() && self.new_preset_name.len() > 0 && self.new_preset_name != "Custom" && self.new_preset_name != "Default" {
 							let preset = crate::modman::settings::Preset {
 								name: self.new_preset_name.clone(),
 								settings: settings.iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect()
@@ -303,7 +301,7 @@ impl super::View for Mods {
 						ui.text_edit_singleline(&mut self.new_preset_name)
 					});
 					
-					if ui.button("Import preset from clipboard").clicked {'import: {
+					if ui.button("Import preset from clipboard").clicked() {'import: {
 						let json = match base64::Engine::decode(&base64::prelude::BASE64_STANDARD_NO_PAD, ui.get_clipboard().trim().trim_end_matches(|v| v == '=')) {
 							Ok(v) => v,
 							Err(err) => {log!(err, "Error importing preset ({err:?})"); break 'import}
@@ -377,7 +375,7 @@ impl super::View for Mods {
 				}
 				
 				// ui.enabled(!is_busy, |ui| {
-				// 	if ui.button("Apply").clicked {
+				// 	if ui.button("Apply").clicked() {
 				// 		backend.apply_mod_settings(&self.selected_mod, &self.active_collection, SettingsType::Some(settings.clone()));
 				// 		backend.finalize_apply(apply_progress.clone())
 				// 	}
@@ -386,7 +384,7 @@ impl super::View for Mods {
 				ui.add_space(32.0);
 				if let Some(style) = &meta.plugin_settings.dalamud {
 					ui.horizontal(|ui| {
-						if ui.button("Set Dalamud Style").clicked {
+						if ui.button("Set Dalamud Style").clicked() {
 							let gamma = 1.2 - (self.gamma as f32 / 250.0);
 							style.apply(&meta.name, meta, settings, gamma);
 						}
@@ -441,7 +439,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 				ui.combo(selected.map_or("Invalid", |v| &v.name), name, |ui| {
 					for (i, sub) in o.options.iter().enumerate() {
 						ui.horizontal(|ui| {
-							changed |= ui.selectable_value(val, i as u32, &sub.name).clicked;
+							changed |= ui.selectable_value(val, i as u32, &sub.name).clicked();
 							if !sub.description.is_empty() {
 								ui.helptext(&sub.description);
 							}
@@ -486,7 +484,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 				ui.combo(o.options.get(*val as usize).map_or("Invalid", |v| &v.name), name, |ui| {
 					for (i, sub) in o.options.iter().enumerate() {
 						ui.horizontal(|ui| {
-							changed |= ui.selectable_value(val, i as u32, &sub.name).clicked;
+							changed |= ui.selectable_value(val, i as u32, &sub.name).clicked();
 							if !sub.description.is_empty() {
 								draw_help(ui, mod_id, &sub.description, md_cache);
 							}
@@ -513,7 +511,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 				for (i, sub) in o.options.iter().enumerate() {
 					ui.horizontal(|ui| {
 						let mut toggled = *val & (1 << i) != 0;
-						if ui.checkbox(&mut toggled, &sub.name).changed {
+						if ui.checkbox(&mut toggled, &sub.name).changed() {
 							*val ^= 1 << i;
 							changed = true;
 						}
@@ -529,7 +527,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 		Rgb(val) => {
 			let OptionSettings::Rgb(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			ui.horizontal(|ui| {
-				changed |= ui.color_edit_button_rgb(val).changed;
+				changed |= ui.color_edit_button_rgb(val).changed();
 				ui.label(name);
 				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
 				if !desc.is_empty() {
@@ -542,7 +540,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 			let OptionSettings::Rgba(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			ui.horizontal(|ui| {
 				// changed |= ui.color_edit_rgba(name, val).changed;
-				changed |= ui.color_edit_button_rgba_unmultiplied(val).changed;
+				changed |= ui.color_edit_button_rgba_unmultiplied(val).changed();
 				ui.label(name);
 				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
 				if !desc.is_empty() {
@@ -553,7 +551,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 		
 		Grayscale(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(val, o.min..=o.max, name).changed;
+			changed |= ui.slider(val, o.min..=o.max, name).changed();
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
 				draw_help(ui, mod_id, &*desc, md_cache);
@@ -562,7 +560,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 		
 		Opacity(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(val, o.min..=o.max, name).changed;
+			changed |= ui.slider(val, o.min..=o.max, name).changed();
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
 				draw_help(ui, mod_id, &*desc, md_cache);
@@ -571,7 +569,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 		
 		Mask(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(val, o.min..=o.max, name).changed;
+			changed |= ui.slider(val, o.min..=o.max, name).changed();
 			*val = val.clamp(o.min, o.max);
 			if !desc.is_empty() {
 				draw_help(ui, mod_id, &*desc, md_cache);
@@ -583,7 +581,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 			ui.horizontal(|ui| {
 				ui.combo(o.options.get(*val as usize).map_or("Invalid", |v| &v.0), name, |ui| {
 					for (i, (name, _)) in o.options.iter().enumerate() {
-						changed |= ui.selectable_value(val, i as u32, name).clicked;
+						changed |= ui.selectable_value(val, i as u32, name).clicked();
 					}
 				});
 				

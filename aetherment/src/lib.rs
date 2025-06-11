@@ -1,4 +1,3 @@
-#![cfg_attr(feature = "plugin", feature(lazy_cell))]
 #![allow(static_mut_refs)]
 
 #[macro_use]
@@ -146,27 +145,27 @@ impl Core {
 		
 		ui.scope(|ui| {
 			ui.spacing_mut().item_spacing.y = 0.0;
-			let rounding = ui.visuals().widgets.noninteractive.rounding;
-			let top = egui::Rounding{ne: rounding.ne, nw: rounding.nw, ..Default::default()};
+			let rounding = ui.visuals().widgets.noninteractive.corner_radius;
+			let top = egui::CornerRadius{ne: rounding.ne, nw: rounding.nw, ..Default::default()};
 			
 			if self.install_progress.is_busy() {
 				ui.add(egui::ProgressBar::new(self.install_progress.mods.get())
 					.text(format!("{:.0}% Installing {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()))
-					.rounding(top));
+					.corner_radius(top));
 				
 				ui.add(egui::ProgressBar::new(self.install_progress.current_mod.get())
 					.text(format!("{:.0}% Working on {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()))
-					.rounding(egui::Rounding::same(0.0)));
+					.corner_radius(egui::CornerRadius::same(0)));
 			}
 			
 			if self.apply_progress.is_busy() {
 				ui.add(egui::ProgressBar::new(self.apply_progress.mods.get())
 					.text(format!("{:.0}% Applying {}", self.apply_progress.mods.get() * 100.0, self.apply_progress.mods.get_msg()))
-					.rounding(if self.install_progress.is_busy() {egui::Rounding::same(0.0)} else {top}));
+					.corner_radius(if self.install_progress.is_busy() {egui::CornerRadius::same(0)} else {top}));
 				
 				ui.add(egui::ProgressBar::new(self.apply_progress.current_mod.get())
 					.text(format!("{:.0}% Working on {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()))
-					.rounding(egui::Rounding::same(0.0)));
+					.corner_radius(egui::CornerRadius::same(0)));
 			}
 		});
 		

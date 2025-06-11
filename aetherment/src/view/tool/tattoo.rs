@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use noumenon::format::game::Tex;
+use noumenon::format::{external::Bytes, game::Tex};
 use crate::{modman::{composite::tex::{self as comp, Tex as Comp}, meta, Path}, ui_ext::UiExt};
 
 // #[derive(Debug)]
@@ -14,8 +14,8 @@ impl TFile {
 	fn new(tex: Tex, ctx: &egui::Context, hash: String, composites: HashMap<String, Comp>) -> Self {
 		use image::EncodableLayout;
 		
-		let (w, h) = (tex.header.width, tex.header.height);
-		let img: image::ImageBuffer<image::Rgba<u8>, _> = image::ImageBuffer::from_vec(w as u32, h as u32, tex.data.clone()).unwrap();
+		let (w, h) = (tex.width, tex.height);
+		let img: image::ImageBuffer<image::Rgba<u8>, _> = image::ImageBuffer::from_vec(w as u32, h as u32, tex.slice(0, 0).pixels.to_vec()).unwrap();
 		let scale = (512.0 / w as f32).min(512.0 / h as f32);
 		let (w2, h2) = ((w as f32 * scale) as u32, (h as f32 * scale) as u32);
 		let img = image::imageops::resize(&img, w2, h2, image::imageops::FilterType::Nearest);
@@ -312,8 +312,8 @@ mods ontop of one another (multiple tattoos for example).");
 fn preview_button(ui: &mut egui::Ui, label: &str, preview: Option<&TFile>) -> egui::Response {
 	if let Some(preview) = preview {
 		ui.button(format!("{label} ✔")).on_hover_ui_at_pointer(|ui| {
-			let w = preview.tex.header.width as f32;
-			let h = preview.tex.header.height as f32;
+			let w = preview.tex.width as f32;
+			let h = preview.tex.height as f32;
 			let w = 400.0 * (w / h).min(1.0);
 			let h = 400.0 * (h / w).min(1.0);
 			ui.add(egui::Image::new(&preview.img).max_size(egui::vec2(w, h)));

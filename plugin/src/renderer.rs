@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use windows::{core::{Interface, PCSTR}, Win32::{Graphics::{Direct3D::{Fxc::D3DCompile, *}, Direct3D11::*, Dxgi::Common::*}}};
+use windows::{core::{Interface, PCSTR}, Win32::Graphics::{Direct3D::{Fxc::D3DCompile, *}, Direct3D11::*, Dxgi::Common::*}};
 
 pub type Error = Box<dyn std::error::Error>;
 
@@ -525,13 +525,16 @@ impl Renderer {
 			unsafe{*(io.set_keyboard_focus as *mut u8) = 1};
 		}
 		
-		if !out.platform_output.copied_text.is_empty() {
-			_ = clipboard_win::set_clipboard_string(&out.platform_output.copied_text);
-		}
-		
-		if let Some(hypr) = out.platform_output.open_url {
-			if hypr.url.starts_with("http://") || hypr.url.starts_with("https://") {
-				_ = opener::open(&hypr.url);
+		for cmd in out.platform_output.commands {
+			match cmd {
+				egui::OutputCommand::OpenUrl(hypr) =>
+					if hypr.url.starts_with("http://") || hypr.url.starts_with("https://") {_ = opener::open(&hypr.url);}
+				
+				egui::OutputCommand::CopyText(text) =>
+					_ = clipboard_win::set_clipboard_string(&text),
+				
+				egui::OutputCommand::CopyImage(_img) => {} // TODO
+					// _ = clipboard_win::set_clipboard(clipboard_win::formats::CF_TIFF.into(), data)
 			}
 		}
 		

@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use noumenon::format::external::Bytes;
 use serde::{Deserialize, Serialize};
 use crate::{modman::{settings::Value as SettingsValue, meta::OptionSettings, Path}, EnumTools};
 
@@ -37,8 +38,8 @@ impl Tex {
 		
 		let layer = layers.next().ok_or(CompositeError::NoFirstLayer)?;
 		let tex = &textures_handler(&layer.path).ok_or(CompositeError::NoFileResolverReturn{layer: 0})?;
-		let (width, height) = (tex.header.width as u32, tex.header.height as u32);
-		let mut data = tex.data.clone();
+		let (width, height) = (tex.width as u32, tex.height as u32);
+		let mut data = tex.slice(0, 0).pixels.to_vec();
 		
 		let apply_modifiers = |layer: &Layer, data: &mut [u8]| -> Result<(), ModifierError> {
 			for modifier in layer.modifiers.iter().rev() {
@@ -46,7 +47,7 @@ impl Tex {
 					Modifier::AlphaMask{path, cull_point} => {
 						let cull_point = cull_point.get_value(settings).ok_or(ModifierError::CullPoint)?;
 						let tex = &textures_handler(path).ok_or(ModifierError::NoFileResolverReturn)?;
-						let (w, h) = (tex.header.width as u32, tex.header.height as u32);
+						let (w, h) = (tex.width as u32, tex.height as u32);
 						let mask_data = get_resized(tex, w, h, width, height);
 						
 						for (pixel, mask_pixel) in data.chunks_exact_mut(4).zip(mask_data.chunks_exact(4)) {
@@ -62,7 +63,7 @@ impl Tex {
 					Modifier::AlphaMaskAlphaStretch{path, cull_point} => {
 						let cull_point = cull_point.get_value(settings).ok_or(ModifierError::CullPoint)?;
 						let tex = &textures_handler(path).ok_or(ModifierError::NoFileResolverReturn)?;
-						let (w, h) = (tex.header.width as u32, tex.header.height as u32);
+						let (w, h) = (tex.width as u32, tex.height as u32);
 						let mask_data = get_resized(tex, w, h, width, height);
 						
 						let mut lowest = 255;
@@ -105,7 +106,7 @@ impl Tex {
 		
 		for (i, layer) in layers.enumerate() {
 			let tex = &textures_handler(&layer.path).ok_or(CompositeError::NoFileResolverReturn{layer: i + 1})?;
-			let (w, h) = (tex.header.width as u32, tex.header.height as u32);
+			let (w, h) = (tex.width as u32, tex.height as u32);
 			let mut layer_data = get_resized(tex, w, h, width, height);
 			
 			apply_modifiers(layer, &mut layer_data).map_err(|modifier| CompositeError::Modifier{layer: i + 1, modifier})?;
@@ -243,19 +244,9 @@ impl super::Composite for Tex {
 		let (width, height, pixels) = self.composite_raw(settings, textures_handler)?;
 		
 		let mut data = std::io::Cursor::new(Vec::new());
-		noumenon::format::game::Tex {
-			header: noumenon::format::game::tex::Header {
-				flags: 0x00800000,
-				format: noumenon::format::game::tex::Format::A8R8G8B8,
-				width: width as u16,
-				height: height as u16,
-				depths: 0,
-				mip_levels: 1,
-				lod_offsets: [0, 1, 2],
-				mip_offsets: [80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-			},
-			data: pixels,
-		}.write(&mut data)?;
+		noumenon::format::game::Tex::new(width, height, pixels)
+			.write(&mut data)
+			.map_err(|err| noumenon::Error::Tex(err))?;
 		
 		Ok(data.into_inner())
 	}
@@ -263,9 +254,10 @@ impl super::Composite for Tex {
 
 fn get_resized(tex: &noumenon::format::game::Tex, width: u32, height: u32, target_width: u32, target_height: u32) -> Vec<u8> {
 	if width != target_width || height != target_height {
-		image::imageops::resize(tex, target_width, target_height, image::imageops::FilterType::Nearest).into_vec()
+		let img: image::ImageBuffer<image::Rgba<u8>, _> = image::ImageBuffer::from_vec(width, height, tex.slice(0, 0).pixels.to_vec()).unwrap();
+		image::imageops::resize(&img, target_width, target_height, image::imageops::FilterType::Nearest).into_vec()
 	} else {
-		tex.data.clone()
+		tex.slice(0, 0).pixels.to_vec()
 	}
 }
 

@@ -1,8 +1,8 @@
-pub struct Error {
+pub struct ErrorView {
 	error: crate::resource_loader::BacktraceError
 }
 
-impl Error {
+impl ErrorView {
 	pub fn new(error: crate::resource_loader::BacktraceError) -> Self {
 		Self {
 			error,
@@ -10,9 +10,13 @@ impl Error {
 	}
 }
 
-impl super::ResourceView for Error {
+impl super::ResourceView for ErrorView {
 	fn title(&self) -> String {
 		"Error".to_string()
+	}
+	
+	fn has_changes(&self) -> bool {
+		false
 	}
 	
 	fn ui(&mut self, ui: &mut egui::Ui) {

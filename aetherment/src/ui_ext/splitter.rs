@@ -2,7 +2,7 @@
 // https://gist.github.com/mkalte666/f9a982be0ac0276080d3434ab9ea4655
 
 use std::hash::Hash;
-use egui::{CursorIcon, Id, Pos2, Rect, Rounding, Sense, Ui, Vec2};
+use egui::{CornerRadius, CursorIcon, Id, Pos2, Rect, Sense, Ui, Vec2};
 
 /// An axis that a Splitter can use
 #[derive(Copy, Clone, Debug)]
@@ -150,7 +150,7 @@ impl Splitter {
 		};
 		ui.painter().rect_filled(
 			sep_draw_rect,
-			Rounding::ZERO,
+			CornerRadius::ZERO,
 			ui.style().visuals.noninteractive().bg_stroke.color,
 		);
 		

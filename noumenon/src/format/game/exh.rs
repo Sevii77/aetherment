@@ -2,7 +2,8 @@
 
 use std::io::{Read, Seek, Write};
 use binrw::{binrw, BinRead, BinWrite};
-use crate::Error;
+
+pub type Error = binrw::Error;
 
 #[binrw]
 #[brw(big, magic = b"EXHF")]
@@ -29,18 +30,18 @@ pub struct Exh {
 }
 
 impl ironworks::file::File for Exh {
-	fn read(mut data: impl ironworks::FileStream) -> super::Result<Self> {
-		Exh::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
+	fn read(mut data: impl ironworks::FileStream) -> Result<Self, ironworks::Error> {
+		<Exh as crate::format::external::Bytes<Error>>::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
 	}
 }
 
-impl Exh {
-	pub fn read<T>(reader: &mut T) -> Result<Self, Error>
+impl crate::format::external::Bytes<Error> for Exh {
+	fn read<T>(reader: &mut T) -> Result<Self, Error>
 	where T: Read + Seek {
 		Ok(Exh::read_be(reader)?)
 	}
 	
-	pub fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
 	T: Write + Seek {
 		self.write_be(writer)?;
 		

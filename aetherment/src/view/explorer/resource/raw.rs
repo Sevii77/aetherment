@@ -1,13 +1,13 @@
 use std::rc::Rc;
 
-pub struct Raw {
+pub struct RawView {
 	data: Vec<u8>,
 	text: Option<Rc<str>>,
 	len: usize,
 	scroll: usize,
 }
 
-impl Raw {
+impl RawView {
 	pub fn new(path: &super::Path) -> Result<Self, crate::resource_loader::BacktraceError> {
 		let data = super::read_file(path)?;
 		let mut text = None;
@@ -26,9 +26,7 @@ impl Raw {
 			scroll: 0,
 		})
 	}
-}
-
-impl Raw {
+	
 	fn ui_text(&mut self, ui: &mut egui::Ui) {
 		egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
 			let Some(text) = &self.text else {return};
@@ -76,13 +74,17 @@ impl Raw {
 	}
 }
 
-impl super::ResourceView for Raw {
+impl super::ResourceView for RawView {
 	fn title(&self) -> String {
 		if self.text.is_some() {
 			"Text".to_string()
 		} else {
 			"Binary".to_string()
 		}
+	}
+	
+	fn has_changes(&self) -> bool {
+		false
 	}
 	
 	fn ui(&mut self, ui: &mut egui::Ui) {

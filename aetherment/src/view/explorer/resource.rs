@@ -3,6 +3,7 @@ use crate::ui_ext::UiExt;
 
 mod error;
 mod raw;
+mod tex;
 
 pub enum Path {
 	Game(String),
@@ -34,6 +35,7 @@ pub fn read_file(path: &Path) -> Result<Vec<u8>, crate::resource_loader::Backtra
 
 pub trait ResourceView {
 	fn title(&self) -> String;
+	fn has_changes(&self) -> bool;
 	fn ui(&mut self, ui: &mut egui::Ui);
 }
 
@@ -57,7 +59,11 @@ impl Resource {
 
 impl super::ExplorerView for Resource {
 	fn title(&self) -> String {
-		format!("{} - {}", self.resource.title(), self.path)
+		format!("{} - {}{}",
+			self.resource.title(),
+			self.path.split("/").last().unwrap(),
+			if self.resource.has_changes() {" *"} else {""}
+		)
 	}
 	
 	fn ui(&mut self, ui: &mut egui::Ui) {
@@ -68,7 +74,7 @@ impl super::ExplorerView for Resource {
 				.desired_width(f32::INFINITY)
 				.ui(ui_reserved);
 			
-			if resp.changed {
+			if resp.changed() {
 				self.changed = true;
 			}
 			
@@ -95,7 +101,8 @@ fn load_resource_view(path: &str) -> Box<dyn ResourceView> {
 		Path::Game(path.to_string())
 	};
 	
-	match path.ext() {
-		_ => raw::Raw::new(&path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::Error::new(err)), |v| Box::new(v))
+	match path.ext().as_str() {
+		"tex" | "atex" => tex::TexView::new(&path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
+		_ => raw::RawView::new(&path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
 	}
 }

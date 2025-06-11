@@ -85,7 +85,7 @@ impl super::View for Browser {
 						});
 						ui.label(&m.description);
 						ui.horizontal(|ui| {
-							if !is_busy && ui.button("Install").clicked {
+							if !is_busy && ui.button("Install").clicked() {
 								self.download_mod(m.id.clone(), m.versions[*selected_version].clone(), self.install_progress.clone());
 							}
 							
@@ -106,7 +106,7 @@ impl super::View for Browser {
 			}
 		}
 		
-		if !is_busy && ui.button("Refresh").clicked {
+		if !is_busy && ui.button("Refresh").clicked() {
 			self.load_mods();
 		}
 	}

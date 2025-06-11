@@ -21,6 +21,6 @@ features = [
 aetherment = {path = "../aetherment", features = ["plugin"]}
 
 naga = {version = "24.0.0", features = ["wgsl-in", "hlsl-out"]}
-egui = "0.29.0"
+egui = "0.31"
 clipboard-win = "5.4.0"
 opener = "0.8.2"

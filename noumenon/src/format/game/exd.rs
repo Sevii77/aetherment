@@ -1,6 +1,7 @@
 use std::{io::{Read, Seek, Write}, ops::{Deref, DerefMut}};
 use binrw::{binrw, BinRead, BinWrite};
-use crate::Error;
+
+pub type Error = binrw::Error;
 
 #[binrw]
 #[brw(big, magic = b"EXDF")]
@@ -17,25 +18,7 @@ pub struct Exd {
 	data: Vec<u8>,
 }
 
-impl ironworks::file::File for Exd {
-	fn read(mut data: impl ironworks::FileStream) -> super::Result<Self> {
-		Exd::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
-	}
-}
-
 impl Exd {
-	pub fn read<T>(reader: &mut T) -> Result<Self, Error>
-	where T: Read + Seek {
-		Ok(Exd::read_be(reader)?)
-	}
-	
-	pub fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
-	T: Write + Seek {
-		self.write_be(writer)?;
-		
-		Ok(())
-	}
-	
 	pub fn get_row_mut(&mut self, row: u32, sub_row: u32) -> Option<&mut [u8]> {
 		let row_offset = self.rows.iter().find_map(|(id, offset)| if row == *id {Some(*offset)} else {None})?;
 		let data_offset = 4 + 2 + 2 + 4 + 20 + (8 * self.rows.len());
@@ -91,6 +74,26 @@ impl Exd {
 		}
 		
 		Some(fields)
+	}
+}
+
+impl ironworks::file::File for Exd {
+	fn read(mut data: impl ironworks::FileStream) -> Result<Self, ironworks::Error> {
+		<Exd as crate::format::external::Bytes<Error>>::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
+	}
+}
+
+impl crate::format::external::Bytes<Error> for Exd {
+	fn read<T>(reader: &mut T) -> Result<Self, Error>
+	where T: Read + Seek {
+		Ok(Exd::read_be(reader)?)
+	}
+	
+	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	T: Write + Seek {
+		self.write_be(writer)?;
+		
+		Ok(())
 	}
 }
 

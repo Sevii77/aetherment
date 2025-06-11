@@ -7,15 +7,14 @@ edition = "2021"
 half = "2.1.0"
 binrw = "0.14.0"
 time = "0.3.28"
+thiserror = "2.0.12"
 
 image = {version = "0.25.6", default-features = false, features = ["png", "tiff", "tga"]}
-squish = "2.0.0-beta1"
-# TODO: encoding support, got trouble crosscompiling it linux>windows
-image_dds = {version = "0.5.1", default-features = false, features = ["ddsfile", "image", "strum"]}
+image_dds = {version = "0.7.2", default-features = false, features = ["ddsfile", "encode", "strum"]}
 
 # gltf = "1.3.0"
 # gltf-json = {version = "0.15.2", features = ["names"]}
-fbxcel = {version = "0.9.0", features = ["writer", "tree"]}
+# fbxcel = {version = "0.9.0", features = ["writer", "tree"]}
 
 ironworks = {git = "https://github.com/ackwell/ironworks", rev = "302ca433950df0668bf5a91c22d4268f6815c07a", features = ["sqpack"]}
 # ironworks = {git = "https://github.com/Sevii77/ironworks", rev = "a2fb90fdc556b44167cba861c59bd02d010d09f6", features = ["sqpack"]}

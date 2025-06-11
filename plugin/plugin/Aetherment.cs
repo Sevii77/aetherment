@@ -239,7 +239,7 @@ public class Aetherment: IDalamudPlugin {
 		// 	watcher.Dispose();
 		state = 0;
 		
-		// Native.Free();
+		Native.Free();
 	}
 	
 	private void OpenConf() {

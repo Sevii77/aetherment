@@ -9,7 +9,7 @@ mod splitter;
 pub use splitter::*;
 
 pub trait UiExt {
-	fn texture(&mut self, img: egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> egui::Response;
+	fn texture(&mut self, img: &egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> egui::Response;
 	fn num_edit<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>) -> egui::Response;
 	fn num_edit_range<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>, range: std::ops::RangeInclusive<Num>) -> egui::Response;
 	fn num_multi_edit<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<egui::WidgetText>) -> egui::Response;
@@ -25,18 +25,18 @@ pub trait UiExt {
 	fn free_textures(&mut self, prefix: &str);
 	fn filled_reserved_vertical(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui));
 	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui));
+	fn splitter(&mut self, id: impl std::hash::Hash, axis: SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui));
 }
 
 impl UiExt for egui::Ui {
-	fn texture(&mut self, img: egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> egui::Response {
+	fn texture(&mut self, img: &egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> egui::Response {
 		let max_size = max_size.into();
 		let uv: egui::Rect = uv.into();
 		let size = img.size_vec2();
 		let width = size.x * (uv.max.x - uv.min.x);
 		let height = size.y * (uv.max.y - uv.min.y);
 		let scale = (max_size.x / width).min(max_size.y / height);
-		// self.add(egui::Image::new(img.id(), egui::vec2(width * scale, height * scale)).uv(uv))
-		self.add(egui::Image::new(&img).uv(uv).max_size(egui::vec2(width * scale, height * scale)))
+		self.add(egui::Image::new(img).uv(uv).fit_to_exact_size(egui::vec2(width * scale, height * scale)))
 	}
 	
 	fn num_edit<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>) -> egui::Response {
@@ -181,19 +181,29 @@ impl UiExt for egui::Ui {
 		let id = self.id().with(id);
 		let reserved_size = self.data(|v| v.get_temp(id).unwrap_or(0.0));
 		
+		let layout = egui::Layout::top_down(egui::Align::Min);
 		let mut rect = self.available_rect_before_wrap();
 		rect.max.x -= reserved_size;
-		self.allocate_rect(rect, egui::Sense::hover());
 		
-		let mut ui_filled = self.new_child(egui::UiBuilder::new().max_rect(rect));
-		ui_filled.set_clip_rect(rect);
-		
-		let mut ui_reserved = self.new_child(egui::UiBuilder::new());
-		
-		contents(&mut ui_filled, &mut ui_reserved);
-		
-		let reserved_size = ui_reserved.min_rect().width();
-		self.data_mut(|v| v.insert_temp(id, reserved_size));
+		self.horizontal(|ui| {
+			ui.allocate_rect(rect, egui::Sense::hover());
+			
+			let mut ui_filled = ui.new_child(egui::UiBuilder::new().layout(layout).max_rect(rect));
+			ui_filled.set_clip_rect(rect);
+			
+			let mut ui_reserved = ui.new_child(egui::UiBuilder::new().layout(layout));
+			
+			contents(&mut ui_filled, &mut ui_reserved);
+			
+			let reserved_size = ui_reserved.min_rect().width();
+			ui.data_mut(|v| v.insert_temp(id, reserved_size));
+		});
+	}
+	
+	fn splitter(&mut self, id: impl std::hash::Hash, axis: splitter::SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui)) {
+		Splitter::new(self.id().with(id), axis)
+			.default_pos(default_pos)
+			.show(self, contents);
 	}
 }
 

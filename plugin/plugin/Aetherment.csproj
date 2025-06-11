@@ -37,8 +37,8 @@
 	</PropertyGroup>
 	
 	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
-		<OutputPath Condition="'$(Configuration)' == 'Debug'">../../target/x86_64-pc-windows-gnu/debug</OutputPath>
-		<OutputPath Condition="'$(Configuration)' == 'Release'">../../target/x86_64-pc-windows-gnu/release</OutputPath>
+		<OutputPath Condition="'$(Configuration)' == 'Debug'">../../target/x86_64-pc-windows-msvc/debug</OutputPath>
+		<OutputPath Condition="'$(Configuration)' == 'Release'">../../target/x86_64-pc-windows-msvc/release</OutputPath>
 		<DalamudLibPath>$(HOME)/.xlcore/dalamud/Hooks/dev/</DalamudLibPath>
 	</PropertyGroup>
 	

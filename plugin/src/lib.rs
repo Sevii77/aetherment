@@ -244,12 +244,12 @@ pub extern "C" fn draw(state: *mut State, d3d11_device: usize, io: Io) -> usize 
 	
 	match state.renderer.draw(d3d11_device, io, |ctx| {
 		egui::CentralPanel::default().frame(egui::Frame {
-			inner_margin: egui::Margin::same(0.0),
-			outer_margin: egui::Margin::same(0.0),
+			inner_margin: egui::Margin::same(0),
+			outer_margin: egui::Margin::same(0),
 			shadow: egui::epaint::Shadow::NONE,
 			fill: egui::Color32::TRANSPARENT,
 			stroke: egui::Stroke::NONE,
-			rounding: egui::Rounding::ZERO,
+			corner_radius: egui::CornerRadius::ZERO,
 		}).show(ctx, |ui| {state.core.draw(ui)});
 	}) {
 		Ok(v) => v,

@@ -149,7 +149,7 @@ impl Tex {
 	
 	pub fn new(width: u32, height: u32, pixels: impl Into<Vec<u8>>) -> Self {
 		let pixels = pixels.into();
-		assert!(width * height * 4 < pixels.len() as u32, "Pixel buffer was too small");
+		assert!(width * height * 4 <= pixels.len() as u32, "Pixel buffer was too small");
 		
 		Tex {
 			flags: 0x00800000,

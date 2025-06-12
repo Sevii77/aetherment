@@ -102,7 +102,7 @@ mods ontop of one another (multiple tattoos for example).");
 			ui.add(egui::Checkbox::without_text(&mut checked));
 			
 			if let Some(color) = &mut self.color {
-				ui.color_edit_button_rgba_unmultiplied(color);
+				ui.color_edit(color);
 				ui.label("Default");
 				
 				if !checked {

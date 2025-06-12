@@ -1,3 +1,4 @@
+mod workspace;
 mod tree;
 mod resource;
 
@@ -105,6 +106,8 @@ impl super::View for Explorer {
 			.style(egui_dock::Style::from_egui(ui.style().as_ref()))
 			.show_add_buttons(true)
 			.show_add_popup(true)
+			.show_leaf_close_all_buttons(false)
+			.show_leaf_collapse_buttons(false)
 			.show_inside(ui, &mut viewer);
 		
 		match viewer.0 {

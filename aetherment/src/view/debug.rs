@@ -32,7 +32,7 @@ impl super::View for Debug {
 				}
 				
 				let mut clr = [r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0];
-				if ui.color_edit_button_rgb(&mut clr).changed() {
+				if ui.color_edit(&mut clr).changed() {
 					crate::service::uicolor::set_color(theme_color, index, [(clr[0] * 255.0) as u8, (clr[1] * 255.0) as u8, (clr[2] * 255.0) as u8]);
 				}
 				

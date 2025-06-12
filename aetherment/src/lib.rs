@@ -178,6 +178,8 @@ impl Core {
 			.style(egui_dock::Style::from_egui(ui.style().as_ref()))
 			.draggable_tabs(false)
 			.show_close_buttons(false)
+			.show_leaf_close_all_buttons(false)
+			.show_leaf_collapse_buttons(false)
 			.tab_context_menus(false)
 			.show_inside(ui, &mut view::Viewer);
 	}

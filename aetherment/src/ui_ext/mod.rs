@@ -1,34 +1,37 @@
 #![allow(dead_code)]
 
-use egui::{Response, WidgetText};
+use egui::{Response, Ui, WidgetText};
 use crate::EnumTools;
 
 mod asset_loader;
 pub use asset_loader::*;
 mod splitter;
 pub use splitter::*;
+mod coloredit;
+pub use coloredit::ColorEditValue;
 
 pub trait UiExt {
-	fn texture(&mut self, img: &egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> egui::Response;
-	fn num_edit<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>) -> egui::Response;
-	fn num_edit_range<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<egui::WidgetText>, range: std::ops::RangeInclusive<Num>) -> egui::Response;
-	fn num_multi_edit<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<egui::WidgetText>) -> egui::Response;
-	fn num_multi_edit_range<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<egui::WidgetText>, range: &[std::ops::RangeInclusive<Num>]) -> egui::Response;
-	fn combo<S: Into<WidgetText>, S2: Into<WidgetText>>(&mut self, preview: S2, label: S, contents: impl FnOnce(&mut egui::Ui));
+	fn texture(&mut self, img: &egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> Response;
+	fn num_edit<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<WidgetText>) -> Response;
+	fn num_edit_range<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<WidgetText>, range: std::ops::RangeInclusive<Num>) -> egui::Response;
+	fn num_multi_edit<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<WidgetText>) -> Response;
+	fn num_multi_edit_range<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<WidgetText>, range: &[std::ops::RangeInclusive<Num>]) -> egui::Response;
+	fn combo<S: Into<WidgetText>, S2: Into<WidgetText>>(&mut self, preview: S2, label: S, contents: impl FnOnce(&mut Ui));
 	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S);
 	fn combo_enum_id<Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, id: impl std::hash::Hash);
 	fn helptext<S: Into<WidgetText>>(&mut self, text: S);
 	fn slider<S: Into<WidgetText>, N: egui::emath::Numeric>(&mut self, value: &mut N, range: std::ops::RangeInclusive<N>, label: S) -> Response;
 	fn get_clipboard(&mut self) -> String;
 	fn set_clipboard<S: Into<String>>(&mut self, text: S);
-	fn userspace_loaders(&mut self, contents: impl FnOnce(&mut egui::Ui));
+	fn userspace_loaders(&mut self, contents: impl FnOnce(&mut Ui));
 	fn free_textures(&mut self, prefix: &str);
-	fn filled_reserved_vertical(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui));
-	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui));
-	fn splitter(&mut self, id: impl std::hash::Hash, axis: SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui));
+	fn filled_reserved_vertical(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui, &mut Ui));
+	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui, &mut Ui));
+	fn splitter(&mut self, id: impl std::hash::Hash, axis: SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut Ui, &mut Ui));
+	fn color_edit(&mut self, color: &mut impl ColorEditValue) -> Response;
 }
 
-impl UiExt for egui::Ui {
+impl UiExt for Ui {
 	fn texture(&mut self, img: &egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> egui::Response {
 		let max_size = max_size.into();
 		let uv: egui::Rect = uv.into();
@@ -77,7 +80,7 @@ impl UiExt for egui::Ui {
 		}).inner
 	}
 	
-	fn combo<S: Into<WidgetText>, S2: Into<WidgetText>>(&mut self, preview: S2, label: S, contents: impl FnOnce(&mut egui::Ui)) {
+	fn combo<S: Into<WidgetText>, S2: Into<WidgetText>>(&mut self, preview: S2, label: S, contents: impl FnOnce(&mut Ui)) {
 		egui::ComboBox::from_label(label)
 			.height(300.0)
 			.selected_text(preview)
@@ -128,7 +131,7 @@ impl UiExt for egui::Ui {
 		self.ctx().copy_text(text.into());
 	}
 	
-	fn userspace_loaders(&mut self, contents: impl FnOnce(&mut egui::Ui)) {
+	fn userspace_loaders(&mut self, contents: impl FnOnce(&mut Ui)) {
 		let loaders = self.ctx().loaders();
 		
 		let byte = loaders.bytes.lock().clone();
@@ -158,7 +161,7 @@ impl UiExt for egui::Ui {
 		}
 	}
 	
-	fn filled_reserved_vertical(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui)) {
+	fn filled_reserved_vertical(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui, &mut Ui)) {
 		let id = self.id().with(id);
 		let reserved_size = self.data(|v| v.get_temp(id).unwrap_or(0.0));
 		
@@ -177,7 +180,7 @@ impl UiExt for egui::Ui {
 		self.data_mut(|v| v.insert_temp(id, reserved_size));
 	}
 	
-	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui)) {
+	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui, &mut Ui)) {
 		let id = self.id().with(id);
 		let reserved_size = self.data(|v| v.get_temp(id).unwrap_or(0.0));
 		
@@ -200,10 +203,14 @@ impl UiExt for egui::Ui {
 		});
 	}
 	
-	fn splitter(&mut self, id: impl std::hash::Hash, axis: splitter::SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut egui::Ui, &mut egui::Ui)) {
+	fn splitter(&mut self, id: impl std::hash::Hash, axis: splitter::SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut Ui, &mut Ui)) {
 		Splitter::new(self.id().with(id), axis)
 			.default_pos(default_pos)
 			.show(self, contents);
+	}
+	
+	fn color_edit(&mut self, color: &mut impl ColorEditValue) -> Response {
+		coloredit::color_edit(self, color)
 	}
 }
 

@@ -527,7 +527,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 		Rgb(val) => {
 			let OptionSettings::Rgb(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			ui.horizontal(|ui| {
-				changed |= ui.color_edit_button_rgb(val).changed();
+				changed |= ui.color_edit(val).changed();
 				ui.label(name);
 				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
 				if !desc.is_empty() {
@@ -539,8 +539,7 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 		Rgba(val) => {
 			let OptionSettings::Rgba(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
 			ui.horizontal(|ui| {
-				// changed |= ui.color_edit_rgba(name, val).changed;
-				changed |= ui.color_edit_button_rgba_unmultiplied(val).changed();
+				changed |= ui.color_edit(val).changed();
 				ui.label(name);
 				for (i, v) in val.iter_mut().enumerate() {*v = v.clamp(o.min[i], o.max[i])}
 				if !desc.is_empty() {

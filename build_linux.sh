@@ -7,12 +7,12 @@ elif [ "$1" = "client" ]; then
 elif [ "$1" = "plugin" ] && [ "$2" = "release" ]; then
 	echo "plugin release"
 	cargo xwin build --lib --release --target x86_64-pc-windows-msvc --manifest-path=./plugin/Cargo.toml
-	cp ./lib/bcryptprimitives.dll ./target/x86_64-pc-windows-msvc/release/bcryptprimitives.dll
+	# cp ./lib/bcryptprimitives.dll ./target/x86_64-pc-windows-msvc/release/bcryptprimitives.dll
 	dotnet build ./plugin/plugin/Aetherment.csproj -c Release
 elif [ "$1" = "plugin" ]; then
 	echo "plugin dev"
 	cargo xwin build --lib --target x86_64-pc-windows-msvc --manifest-path=./plugin/Cargo.toml
-	cp ./lib/bcryptprimitives.dll ./target/x86_64-pc-windows-msvc/debug/bcryptprimitives.dll
+	# cp ./lib/bcryptprimitives.dll ./target/x86_64-pc-windows-msvc/debug/bcryptprimitives.dll
 	dotnet build ./plugin/plugin/Aetherment.csproj -c Debug
 else
 	echo "invalid target"

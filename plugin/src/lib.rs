@@ -93,7 +93,7 @@ pub struct Io {
 	pub mods: u32,
 	pub input_buf_ptr: usize,
 	pub input_buf_len: usize,
-	
+	pub ui_scale: f32,
 	pub set_keyboard_focus: usize,
 }
 

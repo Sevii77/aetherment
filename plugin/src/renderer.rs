@@ -370,10 +370,10 @@ impl Renderer {
 		
 		for prim in primitives {
 			self.d3d11_ctx.RSSetScissorRects(Some(&[windows::Win32::Foundation::RECT {
-				left: prim.clip_rect.left() as i32,
-				top: prim.clip_rect.top() as i32,
-				right: prim.clip_rect.right() as i32,
-				bottom: prim.clip_rect.bottom() as i32,
+				left: (prim.clip_rect.left() * io.ui_scale) as i32,
+				top: (prim.clip_rect.top() * io.ui_scale) as i32,
+				right: (prim.clip_rect.right() * io.ui_scale) as i32,
+				bottom: (prim.clip_rect.bottom() * io.ui_scale) as i32,
 			}]));
 			
 			match prim.primitive {
@@ -387,7 +387,7 @@ impl Renderer {
 					}
 					
 					let vertices = mesh.vertices.into_iter().map(|v| [
-						v.pos.x / io.width * 2.0 - 1.0, 1.0 - v.pos.y / io.height * 2.0,
+						v.pos.x * io.ui_scale / io.width * 2.0 - 1.0, 1.0 - v.pos.y * io.ui_scale / io.height * 2.0,
 						v.uv.x, v.uv.y,
 						v.color.r() as f32 / 255.0, v.color.g() as f32 / 255.0, v.color.b() as f32 / 255.0, v.color.a() as f32 / 255.0,
 					]).collect::<Vec<_>>();
@@ -430,7 +430,7 @@ impl Renderer {
 		
 		let mut events = Vec::new();
 		if self.last_io.mouse_x != io.mouse_x || self.last_io.mouse_y != io.mouse_y {
-			events.push(egui::Event::PointerMoved(egui::pos2(io.mouse_x, io.mouse_y)));
+			events.push(egui::Event::PointerMoved(egui::pos2(io.mouse_x / io.ui_scale, io.mouse_y / io.ui_scale)));
 		}
 		
 		if self.last_io.wheel_x != io.wheel_x || self.last_io.wheel_y != io.wheel_y {
@@ -445,7 +445,7 @@ impl Renderer {
 			let mask = 0b00001000 << i;
 			if self.last_io.mods & mask != io.mods & mask {
 				events.push(egui::Event::PointerButton {
-					pos: egui::pos2(io.mouse_x, io.mouse_y),
+					pos: egui::pos2(io.mouse_x / io.ui_scale, io.mouse_y / io.ui_scale),
 					button: unsafe{std::mem::transmute(i as u8)},
 					pressed: io.mods & mask != 0,
 					modifiers,
@@ -503,7 +503,7 @@ impl Renderer {
 		let input = egui::RawInput {
 			screen_rect: Some(egui::Rect {
 				min: egui::pos2(0.0, 0.0),
-				max: egui::pos2(io.width, io.height),
+				max: egui::pos2(io.width / io.ui_scale, io.height / io.ui_scale),
 			}),
 			max_texture_side: Some(2048),
 			time: Some(std::time::Instant::now().duration_since(self.start).as_secs_f64()),
@@ -514,6 +514,7 @@ impl Renderer {
 			..Default::default()
 		};
 		
+		self.egui_ctx.set_zoom_factor(io.ui_scale);
 		self.egui_ctx.options_mut(|v| v.line_scroll_speed = 80.0);
 		self.egui_ctx.all_styles_mut(|v| {
 			v.url_in_tooltip = true;

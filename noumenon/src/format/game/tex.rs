@@ -100,6 +100,38 @@ impl Format {
 		
 		surface.encode((*self).into(), image_dds::Quality::Normal, image_dds::Mipmaps::Disabled).unwrap().data
 	}
+	
+	pub fn bits_per_pixel(&self) -> usize {
+		match self {
+			Format::L8           => 8,
+			Format::A4R4G4B4     => 16,
+			Format::A1R5G5B5     => 16,
+			Format::A8R8G8B8     => 32,
+			Format::X8R8G8B8     => 32,
+			Format::R32          => 32,
+			Format::R16G16       => 32,
+			Format::R32G32       => 64,
+			Format::A16B16G16R16 => 64,
+			Format::A32B32G32R32 => 128,
+			Format::Bc1          => 4,
+			Format::Bc2          => 8,
+			Format::Bc3          => 8,
+			Format::Bc5          => 8,
+			Format::Bc7          => 8,
+		}
+	}
+	
+	pub fn is_block(&self) -> bool {
+		match self {
+			Format::Bc1 |
+			Format::Bc2 |
+			Format::Bc3 |
+			Format::Bc5 |
+			Format::Bc7 => true,
+			
+			_ => false,
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -183,16 +215,16 @@ impl BinRead for Tex {
 		let mut pixels = Vec::new();
 		for mip_level in 0..mip_levels as usize {
 			let offset = mip_offsets[mip_level] as usize - 80;
-			let next_offset = mip_offsets.get(mip_level + 1).map(|v| if *v == 0 {data.len()} else {*v as usize - 80}).unwrap_or(data.len());
 			let factor = 2u32.pow(mip_level as u32);
 			let width = width / factor;
 			let height = height / factor;
 			let depth = if depth == 1 {depth} else {depth / factor};
-			if width == 0 || height == 0 || depth == 0 {
+			let seg_size = width as usize * height as usize * depth as usize * format.bits_per_pixel() / 8;
+			if if format.is_block() {width < 4 || height < 4} else {width == 0 || height == 0} || depth == 0 || offset + seg_size > data.len() {
 				mip_levels = mip_level as u32;
 				break;
 			};
-			pixels.extend(format.convert_from(width, height, depth, &data[offset..next_offset]));
+			pixels.extend(format.convert_from(width, height, depth, &data[offset..offset + seg_size]));
 		}
 		
 		Ok(Self {

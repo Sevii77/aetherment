@@ -126,7 +126,7 @@ public class Aetherment: IDalamudPlugin {
 		public uint mods;
 		public nint input_buf_ptr;
 		public nint input_buf_len;
-		
+		public float ui_scale;
 		public byte* set_keyboard_focus;
 	}
 	
@@ -302,7 +302,9 @@ public class Aetherment: IDalamudPlugin {
 							input_buf_ptr = input_buf_ptr,
 							input_buf_len = input_buf_len,
 							
-							set_keyboard_focus = &set_keyboard_focus
+							ui_scale = Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale,
+							
+							set_keyboard_focus = &set_keyboard_focus,
 						});
 					}
 					

@@ -19,7 +19,7 @@ impl super::View for Tools {
 		"Tools"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui) {
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer) {
 		egui_dock::DockArea::new(&mut self.views)
 			.id(egui::Id::new("tool_tabs"))
 			.style(egui_dock::Style::from_egui(ui.style().as_ref()))
@@ -28,6 +28,6 @@ impl super::View for Tools {
 			.show_leaf_close_all_buttons(false)
 			.show_leaf_collapse_buttons(false)
 			.tab_context_menus(false)
-			.show_inside(ui, &mut super::Viewer);
+			.show_inside(ui, &mut super::Viewer{renderer});
 	}
 }

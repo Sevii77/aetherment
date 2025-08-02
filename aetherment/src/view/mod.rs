@@ -7,11 +7,14 @@ pub mod debug;
 
 pub trait View {
 	fn title(&self) -> &'static str;
-	fn ui(&mut self, ui: &mut egui::Ui);
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer);
 }
 
-pub struct Viewer;
-impl egui_dock::TabViewer for Viewer {
+pub struct Viewer<'r> {
+	pub renderer: &'r crate::Renderer,
+}
+
+impl<'r> egui_dock::TabViewer for Viewer<'r> {
 	type Tab = Box<dyn View>;
 	
 	fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
@@ -19,6 +22,6 @@ impl egui_dock::TabViewer for Viewer {
 	}
 	
 	fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-		tab.ui(ui);
+		tab.ui(ui, self.renderer);
 	}
 }

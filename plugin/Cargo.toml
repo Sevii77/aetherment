@@ -18,8 +18,10 @@ features = [
 ]
 
 [dependencies]
+renderer = {path = "../renderer", features = ["d3d11"]}
 aetherment = {path = "../aetherment", features = ["plugin"]}
 
+log = "0.4.27"
 naga = {version = "24.0.0", features = ["wgsl-in", "hlsl-out"]}
 egui = "0.31"
 clipboard-win = "5.4.0"

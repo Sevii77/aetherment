@@ -379,10 +379,18 @@ impl Renderer {
 			match prim.primitive {
 				egui::epaint::Primitive::Callback(_) => {}
 				egui::epaint::Primitive::Mesh(mesh) => {
-					if let egui::TextureId::Managed(id) = mesh.texture_id {
-						if let Some(tex) = self.textures.get(&id) {
-							self.d3d11_ctx.PSSetSamplers(0, Some(&[Some(tex.sampler.clone())]));
-							self.d3d11_ctx.PSSetShaderResources(0, Some(&[Some(tex.sview.clone())]));
+					match mesh.texture_id {
+						egui::TextureId::Managed(id) => {
+							if let Some(tex) = self.textures.get(&id) {
+								self.d3d11_ctx.PSSetSamplers(1, Some(&[Some(tex.sampler.clone())]));
+								self.d3d11_ctx.PSSetShaderResources(0, Some(&[Some(tex.sview.clone())]));
+							}
+						}
+						
+						egui::TextureId::User(ptr) => {
+							let ptr = ptr as _;
+							let view = ID3D11ShaderResourceView::from_raw_borrowed(&ptr).unwrap();
+							self.d3d11_ctx.PSSetShaderResources(0, Some(&[Some(view.clone())]));
 						}
 					}
 					

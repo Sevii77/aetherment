@@ -99,7 +99,7 @@ impl super::View for Explorer {
 		"Explorer"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
 		let mut viewer = Viewer(None);
 		egui_dock::DockArea::new(&mut self.views)
 			.id(egui::Id::new("explorer_tabs"))

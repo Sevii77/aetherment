@@ -1,0 +1,139 @@
+use crate::{renderer::*, vertex, Vertex};
+
+pub struct Mesh {
+	matrix: glam::Mat4,
+	material: &'static str,
+	vertex_buffer: Box<dyn Buffer>,
+	index_buffer: Box<dyn Buffer>,
+	index_count: u32,
+	shader_resources: Vec<ShaderResource>,
+}
+
+impl Mesh {
+	pub fn new(renderer: &Box<dyn Renderer>, vertices: &[Vertex], indices: &[u16]) -> Self {
+		let vertex_buffer = renderer.create_buffer(size_of_val(vertices), BufferUsage::COPY_DST | BufferUsage::VERTEX);
+		vertex_buffer.set_data(&bytemuck::cast_slice(vertices));
+		
+		let index_buffer = renderer.create_buffer(size_of_val(indices), BufferUsage::COPY_DST | BufferUsage::INDEX);
+		index_buffer.set_data(&bytemuck::cast_slice(indices));
+		
+		Self {
+			matrix: glam::Mat4::IDENTITY,
+			material: "3dmesh_lit",
+			vertex_buffer,
+			index_buffer,
+			index_count: indices.len() as u32,
+			shader_resources: vec![
+				ShaderResource::Texture(renderer.create_texture_initialized(1, 1, TextureFormat::Rgba8Unorm, TextureUsage::TEXTURE_BINDING, &[255; 4])),
+				ShaderResource::Sampler(renderer.create_sampler(SamplerAddress::Repeat, SamplerAddress::Repeat, SamplerFilter::Linear, SamplerFilter::Linear)),
+				ShaderResource::Texture(renderer.create_texture_initialized(1, 1, TextureFormat::Rgba8Unorm, TextureUsage::TEXTURE_BINDING, &[128, 128, 255, 255])),
+				ShaderResource::Sampler(renderer.create_sampler(SamplerAddress::Repeat, SamplerAddress::Repeat, SamplerFilter::Linear, SamplerFilter::Linear)),
+			]
+		}
+	}
+	
+	pub fn new_test_cube(renderer: &Box<dyn Renderer>) -> Self {
+		let vertices = &mut [
+			vertex(glam::vec3(-1.0, -1.0,  1.0), glam::vec3( 0.0,  0.0,  1.0), glam::vec4(1.0, 0.0, 0.0, 1.0), glam::vec2(0.0, 0.0)),
+			vertex(glam::vec3( 1.0, -1.0,  1.0), glam::vec3( 0.0,  0.0,  1.0), glam::vec4(1.0, 0.0, 0.0, 1.0), glam::vec2(1.0, 0.0)),
+			vertex(glam::vec3( 1.0,  1.0,  1.0), glam::vec3( 0.0,  0.0,  1.0), glam::vec4(1.0, 0.0, 0.0, 1.0), glam::vec2(1.0, 1.0)),
+			vertex(glam::vec3(-1.0,  1.0,  1.0), glam::vec3( 0.0,  0.0,  1.0), glam::vec4(1.0, 0.0, 0.0, 1.0), glam::vec2(0.0, 1.0)),
+			
+			vertex(glam::vec3(-1.0,  1.0, -1.0), glam::vec3( 0.0,  0.0, -1.0), glam::vec4(0.0, 1.0, 0.0, 1.0), glam::vec2(1.0, 0.0)),
+			vertex(glam::vec3( 1.0,  1.0, -1.0), glam::vec3( 0.0,  0.0, -1.0), glam::vec4(0.0, 1.0, 0.0, 1.0), glam::vec2(0.0, 0.0)),
+			vertex(glam::vec3( 1.0, -1.0, -1.0), glam::vec3( 0.0,  0.0, -1.0), glam::vec4(0.0, 1.0, 0.0, 1.0), glam::vec2(0.0, 1.0)),
+			vertex(glam::vec3(-1.0, -1.0, -1.0), glam::vec3( 0.0,  0.0, -1.0), glam::vec4(0.0, 1.0, 0.0, 1.0), glam::vec2(1.0, 1.0)),
+			
+			vertex(glam::vec3( 1.0, -1.0, -1.0), glam::vec3( 1.0,  0.0,  0.0), glam::vec4(0.0, 0.0, 1.0, 1.0), glam::vec2(0.0, 0.0)),
+			vertex(glam::vec3( 1.0,  1.0, -1.0), glam::vec3( 1.0,  0.0,  0.0), glam::vec4(0.0, 0.0, 1.0, 1.0), glam::vec2(1.0, 0.0)),
+			vertex(glam::vec3( 1.0,  1.0,  1.0), glam::vec3( 1.0,  0.0,  0.0), glam::vec4(0.0, 0.0, 1.0, 1.0), glam::vec2(1.0, 1.0)),
+			vertex(glam::vec3( 1.0, -1.0,  1.0), glam::vec3( 1.0,  0.0,  0.0), glam::vec4(0.0, 0.0, 1.0, 1.0), glam::vec2(0.0, 1.0)),
+			
+			vertex(glam::vec3(-1.0, -1.0,  1.0), glam::vec3(-1.0,  0.0,  0.0), glam::vec4(1.0, 1.0, 0.0, 1.0), glam::vec2(1.0, 0.0)),
+			vertex(glam::vec3(-1.0,  1.0,  1.0), glam::vec3(-1.0,  0.0,  0.0), glam::vec4(1.0, 1.0, 0.0, 1.0), glam::vec2(0.0, 0.0)),
+			vertex(glam::vec3(-1.0,  1.0, -1.0), glam::vec3(-1.0,  0.0,  0.0), glam::vec4(1.0, 1.0, 0.0, 1.0), glam::vec2(0.0, 1.0)),
+			vertex(glam::vec3(-1.0, -1.0, -1.0), glam::vec3(-1.0,  0.0,  0.0), glam::vec4(1.0, 1.0, 0.0, 1.0), glam::vec2(1.0, 1.0)),
+			
+			vertex(glam::vec3( 1.0,  1.0, -1.0), glam::vec3( 0.0,  1.0,  0.0), glam::vec4(0.0, 1.0, 1.0, 1.0), glam::vec2(1.0, 0.0)),
+			vertex(glam::vec3(-1.0,  1.0, -1.0), glam::vec3( 0.0,  1.0,  0.0), glam::vec4(0.0, 1.0, 1.0, 1.0), glam::vec2(0.0, 0.0)),
+			vertex(glam::vec3(-1.0,  1.0,  1.0), glam::vec3( 0.0,  1.0,  0.0), glam::vec4(0.0, 1.0, 1.0, 1.0), glam::vec2(0.0, 1.0)),
+			vertex(glam::vec3( 1.0,  1.0,  1.0), glam::vec3( 0.0,  1.0,  0.0), glam::vec4(0.0, 1.0, 1.0, 1.0), glam::vec2(1.0, 1.0)),
+			
+			vertex(glam::vec3( 1.0, -1.0,  1.0), glam::vec3( 0.0, -1.0,  0.0), glam::vec4(1.0, 0.0, 1.0, 1.0), glam::vec2(0.0, 0.0)),
+			vertex(glam::vec3(-1.0, -1.0,  1.0), glam::vec3( 0.0, -1.0,  0.0), glam::vec4(1.0, 0.0, 1.0, 1.0), glam::vec2(1.0, 0.0)),
+			vertex(glam::vec3(-1.0, -1.0, -1.0), glam::vec3( 0.0, -1.0,  0.0), glam::vec4(1.0, 0.0, 1.0, 1.0), glam::vec2(1.0, 1.0)),
+			vertex(glam::vec3( 1.0, -1.0, -1.0), glam::vec3( 0.0, -1.0,  0.0), glam::vec4(1.0, 0.0, 1.0, 1.0), glam::vec2(0.0, 1.0)),
+		];
+		
+		let indices = &[
+			0, 1, 2, 2, 3, 0,
+			4, 5, 6, 6, 7, 4,
+			8, 9, 10, 10, 11, 8,
+			12, 13, 14, 14, 15, 12,
+			16, 17, 18, 18, 19, 16,
+			20, 21, 22, 22, 23, 20,
+		];
+		
+		crate::calculate_tangents(vertices, indices);
+		
+		Self::new(renderer, vertices, indices)
+	}
+	
+	pub(crate) fn create_material(renderer: &Box<dyn Renderer>) -> (&'static str, Box<dyn Material>) {
+		(
+			"3dmesh_lit",
+			renderer.create_material(include_str!("./mesh.wgsl"), &[
+				MaterialBind {
+					stage: MaterialBindStage::FRAGMENT,
+					typ: MaterialBindType::Texture,
+				},
+				MaterialBind {
+					stage: MaterialBindStage::FRAGMENT,
+					typ: MaterialBindType::Sampler,
+				},
+				MaterialBind {
+					stage: MaterialBindStage::FRAGMENT,
+					typ: MaterialBindType::Texture,
+				},
+				MaterialBind {
+					stage: MaterialBindStage::FRAGMENT,
+					typ: MaterialBindType::Sampler,
+				},
+			])
+		)
+	}
+}
+
+impl super::Object for Mesh {
+	fn get_matrix(&self) -> &glam::Mat4 {
+		&self.matrix
+	}
+	
+	fn get_matrix_mut(&mut self) -> &mut glam::Mat4 {
+		&mut self.matrix
+	}
+	
+	fn get_material_id(&self) -> &str {
+		&self.material
+	}
+	
+	fn get_index_buffer(&self) -> &Box<dyn Buffer> {
+		&self.index_buffer
+	}
+	
+	fn get_vertex_buffer(&self) -> &Box<dyn Buffer> {
+		&self.vertex_buffer
+	}
+	
+	fn get_index_count(&self) -> u32 {
+		self.index_count
+	}
+	
+	fn get_shader_resources(&self) -> &[ShaderResource] {
+		&self.shader_resources
+	}
+	
+	fn get_shader_resources_mut(&mut self) -> &mut [ShaderResource] {
+		&mut self.shader_resources
+	}
+}

@@ -58,7 +58,7 @@ impl super::super::View for Tattoo {
 		"Tattoo Overlay Creator"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
 		let meta = &mut self.meta;
 		
 		ui.horizontal(|ui| {

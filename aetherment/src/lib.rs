@@ -2,7 +2,6 @@
 
 #[macro_use]
 mod log;
-pub use log::LogType;
 
 mod resource_loader;
 mod config;
@@ -43,6 +42,8 @@ pub fn noumenon() -> Option<&'static noumenon::Noumenon> {
 	unsafe{NOUMENON.get_or_insert_with(|| noumenon::get_noumenon(config().config.game_install.as_ref())).as_ref()}
 }
 
+pub type Renderer = Box<dyn renderer::Renderer>;
+
 pub trait EnumTools {
 	type Iterator: core::iter::Iterator<Item = Self>;
 	
@@ -75,12 +76,16 @@ pub struct Core {
 
 #[cfg(any(feature = "plugin", feature = "client"))]
 impl Core {
-	pub fn new(ui_ctx: egui::Context, log: fn(log::LogType, &str), backend_initializers: modman::backend::BackendInitializers, requirement_initializers: modman::requirement::RequirementInitializers, optional_initializers: modman::meta::OptionalInitializers, services_initializers: service::ServicesInitializers) -> Self {
+	pub fn new(
+	ui_ctx: egui::Context,
+	backend_initializers: modman::backend::BackendInitializers,
+	requirement_initializers: modman::requirement::RequirementInitializers,
+	optional_initializers: modman::meta::OptionalInitializers,
+	services_initializers: service::ServicesInitializers) -> Self {
 		ui_ctx.add_bytes_loader(std::sync::Arc::new(ui_ext::AssetLoader::default()));
 		egui_extras::install_image_loaders(&ui_ctx);
 		
 		unsafe {
-			log::LOG = log;
 			// BACKEND = Some(std::sync::Mutex::new(modman::backend::new_backend(backend_initializers)));
 			BACKEND = Some(modman::backend::new_backend(backend_initializers));
 			modman::requirement::initialize(requirement_initializers);
@@ -123,7 +128,7 @@ impl Core {
 		s
 	}
 	
-	pub fn draw(&mut self, ui: &mut egui::Ui) {
+	pub fn draw(&mut self, ui: &mut egui::Ui, renderer: &Box<dyn renderer::Renderer>,) {
 		let status = backend().get_status();
 		match status {
 			modman::backend::Status::Ok => {
@@ -181,6 +186,6 @@ impl Core {
 			.show_leaf_close_all_buttons(false)
 			.show_leaf_collapse_buttons(false)
 			.tab_context_menus(false)
-			.show_inside(ui, &mut view::Viewer);
+			.show_inside(ui, &mut view::Viewer{renderer: renderer});
 	}
 }

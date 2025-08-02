@@ -6,7 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+renderer = {path = "../renderer", features = ["wgpu"]}
 aetherment = {path = "../aetherment", features = ["client"]}
+
+log = "0.4.27"
 eframe = {version = "0.31", features = ["wgpu"]}
 clap = "4.5.4"
 dirs = "5.0.1"

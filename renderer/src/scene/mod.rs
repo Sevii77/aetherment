@@ -21,7 +21,8 @@ impl Scene {
 			render_target: renderer.create_texture(render_width, render_height, TextureFormat::Rgba8Unorm, TextureUsage::RENDER_TARGET | TextureUsage::TEXTURE_BINDING),
 			depth_buffer: renderer.create_texture(render_width, render_height, TextureFormat::Depth32Float, TextureUsage::DEPTH_STENCIL | TextureUsage::TEXTURE_BINDING),
 			materials: HashMap::from([
-				Mesh::create_material(renderer)
+				Skybox::create_material(renderer),
+				Mesh::create_material(renderer),
 			]),
 			objects: Vec::new(),
 		}

@@ -289,9 +289,12 @@ impl super::Renderer for D3d11Renderer {
 				}, None, Some(&mut uniform_buffer)).unwrap();
 				let uniform_buffer = uniform_buffer.unwrap();
 				
+				let proj = camera.proj_matrix(render_target.width as f32 / render_target.height as f32);
 				let uniform_data = super::Uniform {
-					camera_view: camera.view.inverse(),
-					camera_proj: camera.proj_matrix(render_target.width as f32 / render_target.height as f32),
+					camera_view: camera.view,
+					camera_view_inv: camera.view.inverse(),
+					camera_proj: proj,
+					camera_proj_inv: proj.inverse(),
 					object: *obj.get_matrix(),
 				};
 				
@@ -301,20 +304,35 @@ impl super::Renderer for D3d11Renderer {
 				
 				self.context.VSSetShader(Some(&material.vs), None);
 				self.context.PSSetShader(Some(&material.ps), None);
-				self.context.VSSetConstantBuffers(0, Some(&[Some(uniform_buffer)]));
+				self.context.VSSetConstantBuffers(0, Some(&[Some(uniform_buffer.clone())]));
+				self.context.PSSetConstantBuffers(0, Some(&[Some(uniform_buffer)]));
 				self.context.IASetInputLayout(Some(&material.layout));
 				
 				for (i, (resource, bind)) in obj.get_shader_resources().iter().zip(&material.binds).enumerate() {
+					let index = i as u32 + 1;
+					
 					match resource {
+						super::ShaderResource::Buffer(buffer) => {
+							let buffer = buffer.as_any().downcast_ref::<D3d11Buffer>().unwrap();
+							
+							if bind.stage.contains(super::MaterialBindStage::VERTEX) {
+								self.context.VSSetConstantBuffers(index, Some(&[Some(buffer.buffer.clone())]));
+							}
+							
+							if bind.stage.contains(super::MaterialBindStage::FRAGMENT) {
+								self.context.PSSetConstantBuffers(index, Some(&[Some(buffer.buffer.clone())]));
+							}
+						}
+						
 						super::ShaderResource::Texture(texture) => {
 							let texture = texture.as_any().downcast_ref::<D3d11Texture>().unwrap();
 							
 							if bind.stage.contains(super::MaterialBindStage::VERTEX) {
-								self.context.VSSetShaderResources(i as u32, Some(&[texture.view.clone()]));
+								self.context.VSSetShaderResources(index, Some(&[texture.view.clone()]));
 							}
 							
 							if bind.stage.contains(super::MaterialBindStage::FRAGMENT) {
-								self.context.PSSetShaderResources(i as u32, Some(&[texture.view.clone()]));
+								self.context.PSSetShaderResources(index, Some(&[texture.view.clone()]));
 							}
 						}
 						
@@ -322,11 +340,11 @@ impl super::Renderer for D3d11Renderer {
 							let sampler = sampler.as_any().downcast_ref::<D3d11Sampler>().unwrap();
 							
 							if bind.stage.contains(super::MaterialBindStage::VERTEX) {
-								self.context.PSSetSamplers(i as u32, Some(&[Some(sampler.sampler.clone())]));
+								self.context.PSSetSamplers(index, Some(&[Some(sampler.sampler.clone())]));
 							}
 							
 							if bind.stage.contains(super::MaterialBindStage::FRAGMENT) {
-								self.context.PSSetSamplers(i as u32, Some(&[Some(sampler.sampler.clone())]));
+								self.context.PSSetSamplers(index, Some(&[Some(sampler.sampler.clone())]));
 							}
 						}
 					}

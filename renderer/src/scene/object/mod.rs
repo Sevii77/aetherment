@@ -3,6 +3,8 @@ use crate::renderer::{Buffer, ShaderResource};
 
 mod mesh;
 pub use mesh::*;
+mod skybox;
+pub use skybox::*;
 
 pub trait Object {
 	fn get_matrix(&self) -> &Mat4;

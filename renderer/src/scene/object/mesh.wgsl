@@ -1,6 +1,8 @@
 struct Uniforms {
 	cam_view: mat4x4f,
+	cam_view_inv: mat4x4f,
 	cam_proj: mat4x4f,
+	cam_proj_inv: mat4x4f,
 	object: mat4x4f,
 };
 
@@ -34,7 +36,7 @@ fn vs_main(in: VInput) -> VOutput {
 	
 	var out: VOutput;
 	out.uv = in.uv;
-	out.position = uniforms.cam_proj * uniforms.cam_view * uniforms.object * vec4f(in.position, 1.0);
+	out.position = uniforms.cam_proj * uniforms.cam_view_inv * uniforms.object * vec4f(in.position, 1.0);
 	out.normal = normalize(rotation * in.normal);
 	out.tangent = normalize(rotation * in.tangent.xyz);
 	out.bitangent = cross(out.normal, out.tangent * in.tangent.w);
@@ -43,11 +45,11 @@ fn vs_main(in: VInput) -> VOutput {
 	return out;
 }
 
-@group(1) @binding(0) var albedo_texture: texture_2d<f32>;
-@group(1) @binding(1) var albedo_sampler: sampler;
+@group(0) @binding(1) var albedo_texture: texture_2d<f32>;
+@group(0) @binding(2) var albedo_sampler: sampler;
 
-@group(1) @binding(2) var normal_texture: texture_2d<f32>;
-@group(1) @binding(3) var normal_sampler: sampler;
+@group(0) @binding(3) var normal_texture: texture_2d<f32>;
+@group(0) @binding(4) var normal_sampler: sampler;
 
 @fragment
 fn fs_main(in: VOutput) -> @location(0) vec4f {

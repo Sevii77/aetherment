@@ -37,6 +37,8 @@ impl super::View for Debug {
 				let normal = image::ImageReader::new(std::io::Cursor::new(include_bytes!("../../debug_normal.png"))).with_guessed_format().unwrap().decode().unwrap().into_bytes();
 				let normal2 = image::ImageReader::new(std::io::Cursor::new(include_bytes!("../../debug_normal2.png"))).with_guessed_format().unwrap().decode().unwrap().into_bytes();
 				
+				scene.add_object(Box::new(renderer::Skybox::simple(renderer)));
+				
 				let id = scene.add_object(Box::new(renderer::Mesh::new_test_cube(renderer)));
 				let obj = scene.get_object_mut(id).unwrap();
 				obj.get_shader_resources_mut()[0] = renderer::renderer::ShaderResource::Texture(
@@ -56,10 +58,10 @@ impl super::View for Debug {
 			
 			let time = ui.ctx().input(|v| v.time) as f32;
 			
-			let obj = scene.get_object_mut(0).unwrap();
+			let obj = scene.get_object_mut(1).unwrap();
 			obj.set_rotation(glam::Quat::from_euler(glam::EulerRot::YXZ, -time, -time * 2.0, -time * 0.5));
 			
-			let obj = scene.get_object_mut(1).unwrap();
+			let obj = scene.get_object_mut(2).unwrap();
 			obj.set_translation(glam::vec3(time.sin() * 3.0, (time + 1.0).sin() * 0.5, time.cos() * 3.0));
 			obj.set_rotation(glam::Quat::from_euler(glam::EulerRot::YXZ, time * 0.7, time * 0.5, time * 0.3));
 			obj.set_scale(glam::vec3(0.5, 0.5, 0.5));

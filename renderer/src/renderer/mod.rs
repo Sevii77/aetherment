@@ -13,7 +13,9 @@ use glam::Mat4;
 #[repr(C)]
 pub(crate) struct Uniform {
 	pub camera_view: Mat4,
+	pub camera_view_inv: Mat4,
 	pub camera_proj: Mat4,
+	pub camera_proj_inv: Mat4,
 	pub object: Mat4,
 }
 
@@ -162,6 +164,7 @@ pub trait Sampler {
 }
 
 pub enum ShaderResource {
+	Buffer(Box<dyn Buffer>),
 	Texture(Box<dyn Texture>),
 	Sampler(Box<dyn Sampler>),
 }

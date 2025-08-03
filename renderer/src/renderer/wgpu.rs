@@ -6,28 +6,11 @@ pub struct WgpuRenderer {
 	texture_register: Box<dyn Fn(&Box<dyn super::Texture>) -> u64>,
 	
 	depth_stencil_state: wgpu::DepthStencilState,
-	basic_bind_group_layout: wgpu::BindGroupLayout,
 	basic_vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
 }
 
 impl WgpuRenderer {
 	pub fn new(device: wgpu::Device, queue: wgpu::Queue, texture_register: Box<dyn Fn(&Box<dyn super::Texture>) -> u64>) -> Self {
-		let basic_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-			label: None,
-			entries: &[
-				wgpu::BindGroupLayoutEntry {
-					binding: 0,
-					visibility: wgpu::ShaderStages::VERTEX,
-					ty: wgpu::BindingType::Buffer {
-						ty: wgpu::BufferBindingType::Uniform,
-						has_dynamic_offset: false,
-						min_binding_size: None,
-					},
-					count: None,
-				}
-			],
-		});
-		
 		let basic_vertex_buffer_layout = wgpu::VertexBufferLayout {
 			array_stride: 64,
 			step_mode: wgpu::VertexStepMode::Vertex,
@@ -74,7 +57,6 @@ impl WgpuRenderer {
 			texture_register,
 			
 			depth_stencil_state,
-			basic_bind_group_layout,
 			basic_vertex_buffer_layout,
 		}
 	}
@@ -82,11 +64,22 @@ impl WgpuRenderer {
 
 impl super::Renderer for WgpuRenderer {
 	fn create_material(&self, shader: &str, binds: &[super::MaterialBind]) -> Box<dyn super::Material> {
-		let bind_group_layout_entries = binds
-			.into_iter()
-			.enumerate()
-			.map(|(i, v)| wgpu::BindGroupLayoutEntry {
-				binding: i as u32,
+		let mut bind_group_layout_entries = vec![
+			wgpu::BindGroupLayoutEntry {
+				binding: 0,
+				visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
+				ty: wgpu::BindingType::Buffer {
+					ty: wgpu::BufferBindingType::Uniform,
+					has_dynamic_offset: false,
+					min_binding_size: None,
+				},
+				count: None,
+			}
+		];
+		
+		for (i, v) in binds.into_iter().enumerate() {
+			bind_group_layout_entries.push(wgpu::BindGroupLayoutEntry {
+				binding: i as u32 + 1,
 				visibility: wgpu::ShaderStages::from_bits_retain(v.stage.bits()),
 				ty: match v.typ {
 					super::MaterialBindType::Buffer =>
@@ -105,8 +98,8 @@ impl super::Renderer for WgpuRenderer {
 						wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering)
 				},
 				count: None,
-			})
-			.collect::<Vec<_>>();
+			});
+		}
 		
 		let bind_group_layout = self.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
 			label: None,
@@ -115,10 +108,7 @@ impl super::Renderer for WgpuRenderer {
 		
 		let pipeline_layout = self.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
 			label: None,
-			bind_group_layouts: &[
-				&self.basic_bind_group_layout,
-				&bind_group_layout
-			],
+			bind_group_layouts: &[&bind_group_layout],
 			push_constant_ranges: &[],
 		});
 		
@@ -177,7 +167,6 @@ impl super::Renderer for WgpuRenderer {
 				super::TextureFormat::Rgba8UnormSrgb => wgpu::TextureFormat::Rgba8UnormSrgb,
 				super::TextureFormat::Depth32Float => wgpu::TextureFormat::Depth32Float,
 			},
-			// usage: wgpu::TextureUsages::from_bits_retain(usage.bits()),
 			usage:
 				if usage.contains(super::TextureUsage::COPY_SRC) {wgpu::TextureUsages::COPY_SRC} else {wgpu::TextureUsages::empty()} |
 				if usage.contains(super::TextureUsage::COPY_DST) {wgpu::TextureUsages::COPY_DST} else {wgpu::TextureUsages::empty()} |
@@ -285,46 +274,45 @@ impl super::Renderer for WgpuRenderer {
 				usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
 				mapped_at_creation: false,
 			});
+			
+			let proj = camera.proj_matrix(render_target.texture.width() as f32 / render_target.texture.height() as f32);
 			self.queue.write_buffer(&uniform_buffer, 0, &bytemuck::cast_slice(&[super::Uniform {
-				camera_view: camera.view.inverse(),
-				camera_proj: camera.proj_matrix(render_target.texture.width() as f32 / render_target.texture.height() as f32),
+				camera_view: camera.view,
+				camera_view_inv: camera.view.inverse(),
+				camera_proj: proj,
+				camera_proj_inv: proj.inverse(),
 				object: *obj.get_matrix(),
 			}]));
 			
-			let basic_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-				label: None,
-				layout: &material.pipeline.get_bind_group_layout(0),
-				entries: &[
-					wgpu::BindGroupEntry {
-						binding: 0,
-						resource: uniform_buffer.as_entire_binding(),
-					}
-				],
-			});
+			let mut bind_group_entries = vec![
+				wgpu::BindGroupEntry {
+					binding: 0,
+					resource: uniform_buffer.as_entire_binding(),
+				}
+			];
 			
-			let custom_bind_group_entries = obj.get_shader_resources()
-				.into_iter()
-				.enumerate()
-				.map(|(i, v)| wgpu::BindGroupEntry {
-					binding: i as u32,
+			for (i, v) in obj.get_shader_resources().into_iter().enumerate() {
+				bind_group_entries.push(wgpu::BindGroupEntry {
+					binding: i as u32 + 1,
 					resource: match v {
+						super::ShaderResource::Buffer(buffer) =>
+							buffer.as_any().downcast_ref::<WgpuBuffer>().unwrap().buffer.as_entire_binding(),
 						super::ShaderResource::Texture(texture) =>
 							wgpu::BindingResource::TextureView(&texture.as_any().downcast_ref::<WgpuTexture>().unwrap().view),
 						super::ShaderResource::Sampler(sampler) =>
 							wgpu::BindingResource::Sampler(&sampler.as_any().downcast_ref::<WgpuSampler>().unwrap().sampler),
 					}
 				})
-				.collect::<Vec<_>>();
+			}
 			
-			let custom_bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+			let bind_group = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
 				label: None,
-				layout: &material.pipeline.get_bind_group_layout(1),
-				entries: &custom_bind_group_entries,
+				layout: &material.pipeline.get_bind_group_layout(0),
+				entries: &bind_group_entries,
 			});
 			
 			rpass.set_pipeline(&material.pipeline);
-			rpass.set_bind_group(0, &basic_bind_group, &[]);
-			rpass.set_bind_group(1, &custom_bind_group, &[]);
+			rpass.set_bind_group(0, &bind_group, &[]);
 			rpass.set_vertex_buffer(0, obj.get_vertex_buffer().as_any().downcast_ref::<WgpuBuffer>().unwrap().buffer.slice(..));
 			rpass.set_index_buffer(obj.get_index_buffer().as_any().downcast_ref::<WgpuBuffer>().unwrap().buffer.slice(..), wgpu::IndexFormat::Uint16);
 			rpass.draw_indexed(0..obj.get_index_count(), 0, 0..1);

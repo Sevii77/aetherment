@@ -17,7 +17,7 @@ pub struct Vertex {
 	color: Vec4,
 }
 
-pub fn vertex(position: Vec3, normal: Vec3, color: Vec4, uv: Vec2) -> Vertex {
+pub const fn vertex(position: Vec3, normal: Vec3, color: Vec4, uv: Vec2) -> Vertex {
 	Vertex {
 		uv,
 		position,

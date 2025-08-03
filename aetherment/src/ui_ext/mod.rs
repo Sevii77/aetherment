@@ -9,6 +9,8 @@ mod splitter;
 pub use splitter::*;
 mod coloredit;
 pub use coloredit::ColorEditValue;
+mod interactable_scene;
+pub use interactable_scene::InteractableScene;
 
 pub trait UiExt {
 	fn texture(&mut self, img: &egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> Response;

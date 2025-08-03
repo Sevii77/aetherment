@@ -1,7 +1,7 @@
-use crate::ui_ext::UiExt;
+use crate::ui_ext::{InteractableScene, UiExt};
 
 pub struct Debug {
-	scene: Option<(renderer::Scene, egui::TextureId)>,
+	scene: Option<InteractableScene>,
 	
 	new_uicolor_theme: bool,
 	new_uicolor_index: u32,
@@ -29,8 +29,8 @@ impl super::View for Debug {
 	
 	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer) {
 		ui.collapsing("3D Renderer", |ui| {
-			let (scene, texture_id) = self.scene.get_or_insert_with(|| {
-				let mut scene = renderer::Scene::new(renderer, 512, 512);
+			let scene = self.scene.get_or_insert_with(|| {
+				let mut scene = InteractableScene::new(renderer);
 				scene.set_clear_color(Some([0.0; 4]));
 				
 				let albedo = image::ImageReader::new(std::io::Cursor::new(include_bytes!("../../debug_albedo.png"))).with_guessed_format().unwrap().decode().unwrap().into_bytes();
@@ -51,8 +51,7 @@ impl super::View for Debug {
 				obj.get_shader_resources_mut()[2] = renderer::renderer::ShaderResource::Texture(
 					renderer.create_texture_initialized(64, 64, renderer::renderer::TextureFormat::Rgba8Unorm, renderer::renderer::TextureUsage::TEXTURE_BINDING, &normal));
 				
-				let texture_id = egui::TextureId::User(renderer.register_texture(scene.get_render_target()));
-				(scene, texture_id)
+				scene
 			});
 			
 			let time = ui.ctx().input(|v| v.time) as f32;
@@ -65,15 +64,7 @@ impl super::View for Debug {
 			obj.set_rotation(glam::Quat::from_euler(glam::EulerRot::YXZ, time * 0.7, time * 0.5, time * 0.3));
 			obj.set_scale(glam::vec3(0.5, 0.5, 0.5));
 			
-			scene.render(renderer, &renderer::Camera::new(glam::vec3(0.0, 2.0, 8.0), glam::Quat::from_euler(glam::EulerRot::YXZ, 0.0, -0.2, 0.0)));
-			
-			let mut drawscene = egui::Mesh::with_texture(*texture_id);
-			let (_, rect) = ui.allocate_space(egui::vec2(512.0, 512.0));
-			drawscene.add_rect_with_uv(
-				rect,
-				egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-				egui::Color32::WHITE);
-			ui.painter().add(drawscene);
+			scene.render(renderer, 512, 512, ui);
 			
 			ui.ctx().request_repaint();
 		});

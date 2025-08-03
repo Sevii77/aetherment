@@ -27,6 +27,13 @@ impl Scene {
 		}
 	}
 	
+	/// Resizes the render target.
+	/// This will make the previous ones invalid!
+	pub fn resize(&mut self, renderer: &Box<dyn Renderer>, render_width: u32, render_height: u32) {
+		self.render_target = renderer.create_texture(render_width, render_height, TextureFormat::Rgba8Unorm, TextureUsage::RENDER_TARGET | TextureUsage::TEXTURE_BINDING);
+		self.depth_buffer = renderer.create_texture(render_width, render_height, TextureFormat::Depth32Float, TextureUsage::DEPTH_STENCIL | TextureUsage::TEXTURE_BINDING);
+	}
+	
 	pub fn set_clear_color(&mut self, color: Option<[f32; 4]>) {
 		self.clear_color = color;
 	}

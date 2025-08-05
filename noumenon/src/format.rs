@@ -25,7 +25,6 @@ pub mod game {
 	pub use exd::Exd;
 	pub mod exh;
 	pub use exh::Exh;
-	
-	// pub mod mdl;
-	// pub use mdl::Mdl;
+	pub mod mdl;
+	pub use mdl::Mdl;
 }

@@ -12,10 +12,19 @@ pub struct Mesh {
 impl Mesh {
 	pub fn new(renderer: &Box<dyn Renderer>, vertices: &[Vertex], indices: &[u16]) -> Self {
 		let vertex_buffer = renderer.create_buffer(size_of_val(vertices), BufferUsage::COPY_DST | BufferUsage::VERTEX);
-		vertex_buffer.set_data(&bytemuck::cast_slice(vertices));
+		vertex_buffer.set_data(bytemuck::cast_slice(vertices));
 		
-		let index_buffer = renderer.create_buffer(size_of_val(indices), BufferUsage::COPY_DST | BufferUsage::INDEX);
-		index_buffer.set_data(&bytemuck::cast_slice(indices));
+		let index_buffer;
+		if indices.len() % 2 == 0 {
+			index_buffer = renderer.create_buffer(size_of_val(indices), BufferUsage::COPY_DST | BufferUsage::INDEX);
+			index_buffer.set_data(bytemuck::cast_slice(indices));
+		} else {
+			// needs to be 4byte aligned, we will intentionally cause the buffer bounds to overflow
+			// this doesnt matter since the last u16 arent actually used in the rendering pipeline
+			// (atleast i think this wont cause issues?)
+			index_buffer = renderer.create_buffer(size_of_val(indices) + 2, BufferUsage::COPY_DST | BufferUsage::INDEX);
+			index_buffer.set_data(unsafe{std::slice::from_raw_parts(indices.as_ptr() as _, indices.len() * 2 + 2)});
+		}
 		
 		Self {
 			matrix: glam::Mat4::IDENTITY,

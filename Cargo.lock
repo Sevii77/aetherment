@@ -2594,6 +2594,8 @@ name = "noumenon"
 version = "0.1.0"
 dependencies = [
  "binrw 0.14.1",
+ "bitflags 2.9.1",
+ "glam",
  "half",
  "image",
  "image_dds",

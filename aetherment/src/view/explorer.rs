@@ -4,7 +4,7 @@ mod resource;
 
 pub trait ExplorerView {
 	fn title(&self) -> String;
-	fn ui(&mut self, ui: &mut egui::Ui);
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer);
 }
 
 enum TabType {
@@ -12,13 +12,23 @@ enum TabType {
 	Resource,
 }
 
+enum Split {
+	None,
+	Horizontal(f32),
+	Vertical(f32),
+}
+
 struct ExplorerTab {
 	id: usize,
 	tab: Box<dyn ExplorerView>,
 }
 
-struct Viewer(Option<(TabType, (egui_dock::SurfaceIndex, egui_dock::NodeIndex))>);
-impl egui_dock::TabViewer for Viewer {
+struct Viewer<'r> {
+	add: Option<(TabType, (egui_dock::SurfaceIndex, egui_dock::NodeIndex))>,
+	renderer: &'r crate::Renderer,
+}
+
+impl<'r> egui_dock::TabViewer for Viewer<'r> {
 	type Tab = ExplorerTab;
 	
 	fn id(&mut self, tab: &mut Self::Tab) -> egui::Id {
@@ -31,7 +41,7 @@ impl egui_dock::TabViewer for Viewer {
 	
 	fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
 		ui.push_id(tab.id, |ui| {
-			tab.tab.ui(ui);
+			tab.tab.ui(ui, self.renderer);
 		});
 	}
 	
@@ -39,11 +49,11 @@ impl egui_dock::TabViewer for Viewer {
 		ui.set_min_width(150.0);
 		
 		if ui.selectable_label(false, "Add Tree").clicked() {
-			self.0  = Some((TabType::Tree, (surface, node)));
+			self.add = Some((TabType::Tree, (surface, node)));
 		}
 		
 		if ui.selectable_label(false, "Add Resource View").clicked() {
-			self.0  = Some((TabType::Resource, (surface, node)));
+			self.add = Some((TabType::Resource, (surface, node)));
 		}
 	}
 }
@@ -60,15 +70,17 @@ impl Explorer {
 			views: egui_dock::DockState::new(Vec::new()),
 		};
 		
-		s.add_tab(Box::new(tree::Tree::new()), None, None);
-		s.add_tab(Box::new(resource::Resource::new("common/graphics/texture/-mogu_anime_en.tex")), Some(0.2), None);
-		s.add_tab(Box::new(resource::Resource::new("common/graphics/texture/-caustics.tex")), None, None);
-		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/obj/body/b0001/texture/c0201b0001_base.tex")), None, None);
+		s.add_tab(Box::new(tree::Tree::new()), Split::None, None);
+		s.add_tab(Box::new(resource::Resource::new("common/graphics/texture/-mogu_anime_en.tex")), Split::Horizontal(0.2), None);
+		s.add_tab(Box::new(resource::Resource::new("common/graphics/texture/-caustics.tex")), Split::None, None);
+		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/obj/body/b0001/texture/c0201b0001_base.tex")), Split::None, None);
+		s.add_tab(Box::new(resource::Resource::new("chara/monster/m8496/obj/body/b0001/model/m8496b0001.mdl")), Split::None, None);
+		s.add_tab(Box::new(resource::Resource::new("chara/monster/m0934/obj/body/b0002/model/m0934b0002.mdl")), Split::Vertical(0.5), None);
 		
 		s
 	}
 	
-	fn add_tab(&mut self, tab: Box<dyn ExplorerView>, split: Option<f32>, surface_node: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex)>) {
+	fn add_tab(&mut self, tab: Box<dyn ExplorerView>, split: Split, surface_node: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex)>) {
 		self.id_counter += 1;
 		let tab = ExplorerTab {
 			id: self.id_counter,
@@ -76,12 +88,16 @@ impl Explorer {
 		};
 		
 		'split: {
-			let Some(fraction) = split else {break 'split};
+			// let Some(fraction) = split else {break 'split};
 			let Some(surface_node) = surface_node.or_else(||
 				self.views.focused_leaf().or_else(||
 					self.views.iter_all_tabs().last().map(|v| v.0))) else {break 'split};
 			
-			self.views.split(surface_node, egui_dock::Split::Right, fraction, egui_dock::Node::leaf(tab));
+			match split {
+				Split::None => break 'split,
+				Split::Horizontal(fraction) => self.views.split(surface_node, egui_dock::Split::Right, fraction, egui_dock::Node::leaf(tab)),
+				Split::Vertical(fraction) => self.views.split(surface_node, egui_dock::Split::Below, fraction, egui_dock::Node::leaf(tab)),
+			};
 			
 			return;
 		}
@@ -99,8 +115,12 @@ impl super::View for Explorer {
 		"Explorer"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
-		let mut viewer = Viewer(None);
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer) {
+		let mut viewer = Viewer {
+			add: None,
+			renderer,
+		};
+		
 		egui_dock::DockArea::new(&mut self.views)
 			.id(egui::Id::new("explorer_tabs"))
 			.style(egui_dock::Style::from_egui(ui.style().as_ref()))
@@ -110,9 +130,9 @@ impl super::View for Explorer {
 			.show_leaf_collapse_buttons(false)
 			.show_inside(ui, &mut viewer);
 		
-		match viewer.0 {
-			Some((TabType::Tree, v)) => self.add_tab(Box::new(tree::Tree::new()), None, Some(v)),
-			Some((TabType::Resource, v)) => self.add_tab(Box::new(resource::Resource::new("ui/uld/logo_sqex_hr1.tex")), None, Some(v)),
+		match viewer.add {
+			Some((TabType::Tree, v)) => self.add_tab(Box::new(tree::Tree::new()), Split::None, Some(v)),
+			Some((TabType::Resource, v)) => self.add_tab(Box::new(resource::Resource::new("ui/uld/logo_sqex_hr1.tex")), Split::None, Some(v)),
 			None => {}
 		}
 	}

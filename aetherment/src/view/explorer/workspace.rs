@@ -26,7 +26,7 @@ impl super::ExplorerView for Workspace {
 		format!("Workspace - {}", self.meta.name)
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
 		let meta = &mut self.meta;
 		let mut changed = false;
 		

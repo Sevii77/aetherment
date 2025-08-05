@@ -87,7 +87,7 @@ impl super::ResourceView for RawView {
 		false
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
 		if self.text.is_some() {
 			self.ui_text(ui);
 		} else {

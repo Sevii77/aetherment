@@ -15,7 +15,7 @@ impl super::ExplorerView for Tree {
 		"Tree".to_string()
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
 		ui.label("Tree here");
 	}
 }

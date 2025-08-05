@@ -8,6 +8,8 @@ half = "2.1.0"
 binrw = "0.14.0"
 time = "0.3.28"
 thiserror = "2.0.12"
+bitflags = "2.9.1"
+glam = "0.30.4"
 
 image = {version = "0.25.6", default-features = false, features = ["png", "tiff", "tga"]}
 image_dds = {version = "0.7.2", default-features = false, features = ["ddsfile", "encode", "strum"]}

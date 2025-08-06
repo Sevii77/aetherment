@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use egui::Widget;
-use crate::modman::meta::Meta;
+use crate::{modman::meta::Meta, ui_ext::UiExt};
 
 pub struct Workspace {
 	pub root: PathBuf,
@@ -32,7 +32,7 @@ impl super::ExplorerView for Workspace {
 		
 		ui.label("Name");
 		changed |= ui.text_edit_singleline(&mut meta.name).changed();
-		ui.add_space(10.0);
+		ui.spacer();
 		
 		ui.label("Description");
 		if meta.description.starts_with("[md]") {
@@ -44,19 +44,19 @@ impl super::ExplorerView for Workspace {
 		} else {
 			changed |= ui.text_edit_multiline(&mut meta.description).changed();
 		}
-		ui.add_space(10.0);
+		ui.spacer();
 		
 		ui.label("Version");
 		changed |= ui.text_edit_singleline(&mut meta.version).changed();
-		ui.add_space(10.0);
+		ui.spacer();
 		
 		ui.label("Author");
 		changed |= ui.text_edit_singleline(&mut meta.author).changed();
-		ui.add_space(10.0);
+		ui.spacer();
 		
 		ui.label("Website");
 		changed |= ui.text_edit_singleline(&mut meta.website).changed();
-		ui.add_space(10.0);
+		ui.spacer();
 		
 		ui.label("Tags");
 		{
@@ -79,7 +79,7 @@ impl super::ExplorerView for Workspace {
 				meta.tags.push(String::new());
 			}
 		}
-		ui.add_space(10.0);
+		ui.spacer();
 		
 		ui.label("Dependencies");
 		{
@@ -102,7 +102,7 @@ impl super::ExplorerView for Workspace {
 				meta.dependencies.push(String::new());
 			}
 		}
-		ui.add_space(10.0);
+		ui.spacer();
 		
 		ui.label("Options");
 		{

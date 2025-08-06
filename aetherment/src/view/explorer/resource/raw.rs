@@ -69,8 +69,10 @@ impl RawView {
 			}
 		}
 		
-		let scroll = cui.ctx().input(|v| v.raw_scroll_delta.y);
-		self.scroll = (self.scroll as f32 - (scroll / 10.0)).clamp(0.0, (self.len / 16) as f32) as usize;
+		if cui.rect_contains_pointer(cui.max_rect()) {
+			let scroll = cui.ctx().input(|v| v.raw_scroll_delta.y);
+			self.scroll = (self.scroll as f32 - (scroll / 10.0)).clamp(0.0, (self.len / 16) as f32) as usize;
+		}
 	}
 }
 

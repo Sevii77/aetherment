@@ -5,6 +5,7 @@ mod error;
 mod raw;
 mod tex;
 mod mdl;
+mod mtrl;
 
 pub enum Path {
 	Game(String),
@@ -105,6 +106,7 @@ fn load_resource_view(path: &str) -> Box<dyn ResourceView> {
 	match path.ext().as_str() {
 		"tex" | "atex" => tex::TexView::new(&path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
 		"mdl" => mdl::MdlView::new(&path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
+		"mtrl" => mtrl::MtrlView::new(&path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
 		_ => raw::RawView::new(&path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
 	}
 }

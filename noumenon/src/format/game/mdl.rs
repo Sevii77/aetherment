@@ -2,7 +2,6 @@
 use std::{collections::HashMap, fmt::Debug, io::{Read, Seek, SeekFrom, Write}};
 use binrw::{binrw, BinRead, BinWrite};
 use glam::Vec4Swizzles;
-
 use crate::NullReader;
 
 pub const EXT: &'static [&'static str] = &["mdl"];
@@ -101,22 +100,17 @@ impl BinRead for Mdl {
 							if decl.stream == 255 {break}
 							if decl.stream != stream {continue}
 							
-							macro_rules! rf {
-								(f16) => {half::f16::from_bits(r!(u16)).to_f32()};
-								($e:ty) => {r!($e) as f32};
-							}
-							
 							let val = match decl.typ {
-								VertexTypeRaw::F32x1 => glam::vec4(rf!(f32), 0.0, 0.0, 0.0),
-								VertexTypeRaw::F32x2 => glam::vec4(rf!(f32), rf!(f32), 0.0, 0.0),
-								VertexTypeRaw::F32x3 => glam::vec4(rf!(f32), rf!(f32), rf!(f32), 0.0),
-								VertexTypeRaw::F32x4 => glam::vec4(rf!(f32), rf!(f32), rf!(f32), rf!(f32)),
-								VertexTypeRaw::U8x4  => glam::vec4(rf!(u8), rf!(u8), rf!(u8), rf!(u8)),
-								VertexTypeRaw::F8x4  => glam::vec4(rf!(u8) / 255.0, rf!(u8) / 255.0, rf!(u8) / 255.0, rf!(u8) / 255.0),
-								VertexTypeRaw::F16x2 => glam::vec4(rf!(f16), rf!(f16), 0.0, 0.0),
-								VertexTypeRaw::F16x4 => glam::vec4(rf!(f16), rf!(f16), rf!(f16), rf!(f16)),
-								VertexTypeRaw::U16x2 => glam::vec4(rf!(u16), rf!(u16), 0.0, 0.0),
-								VertexTypeRaw::U16x4 => glam::vec4(rf!(u16), rf!(u16), rf!(u16), rf!(u16)),
+								VertexTypeRaw::F32x1 => glam::vec4(r!(f32), 0.0, 0.0, 0.0),
+								VertexTypeRaw::F32x2 => glam::vec4(r!(f32), r!(f32), 0.0, 0.0),
+								VertexTypeRaw::F32x3 => glam::vec4(r!(f32), r!(f32), r!(f32), 0.0),
+								VertexTypeRaw::F32x4 => glam::vec4(r!(f32), r!(f32), r!(f32), r!(f32)),
+								VertexTypeRaw::U8x4  => glam::vec4(r!(u8) as f32, r!(u8) as f32, r!(u8) as f32, r!(u8) as f32),
+								VertexTypeRaw::F8x4  => glam::vec4(r!(u8) as f32 / 255.0, r!(u8) as f32 / 255.0, r!(u8) as f32 / 255.0, r!(u8) as f32 / 255.0),
+								VertexTypeRaw::F16x2 => glam::vec4(r!(f16), r!(f16), 0.0, 0.0),
+								VertexTypeRaw::F16x4 => glam::vec4(r!(f16), r!(f16), r!(f16), r!(f16)),
+								VertexTypeRaw::U16x2 => glam::vec4(r!(u16) as f32, r!(u16) as f32, 0.0, 0.0),
+								VertexTypeRaw::U16x4 => glam::vec4(r!(u16) as f32, r!(u16) as f32, r!(u16) as f32, r!(u16) as f32),
 							};
 							
 							match decl.usage {
@@ -260,7 +254,7 @@ impl crate::format::external::Bytes<Error> for Mdl {
 	}
 }
 
-// ---------------------------------------- //
+// ----------
 
 #[derive(Debug, Clone)]
 pub struct Lod {
@@ -309,11 +303,11 @@ pub struct ShapeValue {
 	pub new_vertex: u16,
 }
 
-// ---------------------------------------- //
+// ----------
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct HeaderRaw {
+struct HeaderRaw {
 	pub version: u32,
 	pub stack_size: u32,
 	pub runtime_size: u32,
@@ -331,7 +325,7 @@ pub struct HeaderRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct VertexElementRaw {
+struct VertexElementRaw {
 	pub stream: u8,
 	pub offset: u8,
 	pub typ: VertexTypeRaw,
@@ -344,7 +338,7 @@ pub struct VertexElementRaw {
 #[brw(repr = u8)]
 #[repr(u8)]
 #[derive(Debug, Clone)]
-pub enum VertexTypeRaw {
+enum VertexTypeRaw {
 	F32x1 = 0,
 	F32x2 = 1,
 	F32x3 = 2,
@@ -361,7 +355,7 @@ pub enum VertexTypeRaw {
 #[brw(repr = u8)]
 #[repr(u8)]
 #[derive(Debug, Clone)]
-pub enum VertexUsageRaw {
+enum VertexUsageRaw {
 	Position     = 0,
 	BlendWeights = 1,
 	BlendIndices = 2,
@@ -374,7 +368,7 @@ pub enum VertexUsageRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct ModelHeaderRaw {
+struct ModelHeaderRaw {
 	pub radius: f32,
 	pub mesh_count: u16,
 	pub attribute_count: u16,
@@ -411,7 +405,7 @@ pub struct ModelHeaderRaw {
 bitflags::bitflags! {
 	#[repr(transparent)]
 	#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-	pub struct ModelFlags1Raw: u8 {
+	struct ModelFlags1Raw: u8 {
 		const DUST_OCCLUSION_ENABLED = 0x80;
 		const SNOW_OCCLUSION_ENABLED = 0x40;
 		const RAIN_OCCLUSION_ENABLED = 0x20;
@@ -426,7 +420,7 @@ bitflags::bitflags! {
 bitflags::bitflags! {
 	#[repr(transparent)]
 	#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-	pub struct ModelFlags2Raw: u8 {
+	struct ModelFlags2Raw: u8 {
 		const UNKNOWN2 = 0x80;
 		const BG_UV_SCROLL_ENABLED = 0x40;
 		const FORCE_NON_RESIDENT_ENABLED = 0x20;
@@ -440,7 +434,7 @@ bitflags::bitflags! {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct ElementIdRaw {
+struct ElementIdRaw {
 	pub element_id: u32,
 	pub parent_bone_name: u32,
 	pub translation: [f32; 3],
@@ -449,7 +443,7 @@ pub struct ElementIdRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct LodRaw {
+struct LodRaw {
 	pub mesh_index: u16,
 	pub mesh_count: u16,
 	pub model_lod_range: f32,
@@ -475,7 +469,7 @@ pub struct LodRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct ExtraLodRaw {
+struct ExtraLodRaw {
 	pub lightshaft_mesh_index: u16,
 	pub lightshaft_mesh_count: u16,
 	pub glass_mesh_index: u16,
@@ -500,7 +494,7 @@ pub struct ExtraLodRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct MeshRaw {
+struct MeshRaw {
 	pub vertex_count: u16,
 	pub _padding: u16,
 	pub index_count: u32,
@@ -516,7 +510,7 @@ pub struct MeshRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct TerrainShadowMeshRaw {
+struct TerrainShadowMeshRaw {
 	pub index_count: u32,
 	pub start_index: u32,
 	pub vertex_buffer_offset: u32,
@@ -529,7 +523,7 @@ pub struct TerrainShadowMeshRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct SubmeshRaw {
+struct SubmeshRaw {
 	pub index_offset: u32,
 	pub index_count: u32,
 	pub attribute_index_mask: u32,
@@ -539,7 +533,7 @@ pub struct SubmeshRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct TerrainShadowSubmeshRaw {
+struct TerrainShadowSubmeshRaw {
 	pub index_offset: u32,
 	pub index_count: u32,
 	pub unknown1: u16,
@@ -634,7 +628,7 @@ fn bone_table_writer(bones_all: &Vec<Vec<u16>>, version: u32) -> binrw::BinResul
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct ShapeRaw {
+struct ShapeRaw {
 	pub string_offset: u32,
 	pub mesh_start_index: [u16; 3],
 	pub mesh_count: [u16; 3],
@@ -642,7 +636,7 @@ pub struct ShapeRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct ShapeMeshRaw {
+struct ShapeMeshRaw {
 	pub mesh_index_offset: u32,
 	pub value_count: u32,
 	pub value_offset: u32,
@@ -650,14 +644,14 @@ pub struct ShapeMeshRaw {
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct ShapeValueRaw {
+struct ShapeValueRaw {
 	pub base_indices_index: u16,
 	pub replacing_vertex_index: u16,
 }
 
 #[binrw]
 #[derive(Debug, Clone)]
-pub struct BoundingBoxRaw {
+struct BoundingBoxRaw {
 	pub min: [f32; 4],
 	pub max: [f32; 4],
 }

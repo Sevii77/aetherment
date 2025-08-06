@@ -23,6 +23,10 @@ macro_rules! simple_reader {
 				v
 			}};
 			
+			(f16) => {{
+				half::f16::from_bits(r!(u16)).to_f32()
+			}};
+			
 			($e:ty) => {{
 				<$e>::read_options(reader, endian, ())?
 			}};
@@ -161,8 +165,8 @@ impl std::error::Error for SizeError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-	#[error("Mtrl error {0:?}")]
-	Mtrl(#[from] format::game::mtrl::Error),
+	// #[error("Mtrl error {0:?}")]
+	// Mtrl(#[from] format::game::mtrl::Error),
 	#[error("Tex error {0:?}")]
 	Tex(#[from] format::game::tex::Error),
 	#[error("Uld error {0:?}")]

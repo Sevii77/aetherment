@@ -25,6 +25,22 @@ pub trait ColorEditValue {
 	}
 }
 
+impl ColorEditValue for glam::Vec3 {
+	fn has_alpha(&self) -> bool {
+		false
+	}
+	
+	fn get_srgba(&self) -> [f32; 4] {
+		[self[0], self[1], self[2], 1.0]
+	}
+	
+	fn set_srgba(&mut self, value: [f32; 4]) {
+		self[0] = value[0];
+		self[1] = value[1];
+		self[2] = value[2];
+	}
+}
+
 impl ColorEditValue for [f32; 3] {
 	fn has_alpha(&self) -> bool {
 		false

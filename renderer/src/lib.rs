@@ -10,11 +10,11 @@ pub(crate) type ObjectBuffer = Vec<Option<Box<dyn Object>>>;
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
-	uv: Vec2,
-	position: Vec3,
-	normal: Vec3,
-	tangent: Vec4,
-	color: Vec4,
+	pub uv: Vec2,
+	pub position: Vec3,
+	pub normal: Vec3,
+	pub tangent: Vec4,
+	pub color: Vec4,
 }
 
 pub const fn vertex(position: Vec3, normal: Vec3, color: Vec4, uv: Vec2) -> Vertex {

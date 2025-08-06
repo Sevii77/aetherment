@@ -8,6 +8,7 @@ struct SkyboxColor {
 }
 
 pub struct Skybox {
+	visible: bool,
 	matrix: glam::Mat4,
 	vertex_buffer: Box<dyn Buffer>,
 	index_buffer: Box<dyn Buffer>,
@@ -41,6 +42,7 @@ impl Skybox {
 		color_buffer.set_data(&bytemuck::cast_slice(&[colors_new]));
 		
 		Self {
+			visible: true,
 			matrix: glam::Mat4::IDENTITY,
 			vertex_buffer,
 			index_buffer,
@@ -71,6 +73,14 @@ impl Skybox {
 }
 
 impl super::Object for Skybox {
+	fn as_any(&self) -> &dyn std::any::Any {
+		self
+	}
+	
+	fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+		self
+	}
+	
 	fn get_matrix(&self) -> &glam::Mat4 {
 		&self.matrix
 	}
@@ -101,5 +111,13 @@ impl super::Object for Skybox {
 	
 	fn get_shader_resources_mut(&mut self) -> &mut [ShaderResource] {
 		&mut self.colors
+	}
+	
+	fn get_visible(&self) -> bool {
+		self.visible
+	}
+	
+	fn get_visible_mut(&mut self) -> &mut bool {
+		&mut self.visible
 	}
 }

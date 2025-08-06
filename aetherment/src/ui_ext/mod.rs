@@ -31,6 +31,7 @@ pub trait UiExt {
 	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui, &mut Ui));
 	fn splitter(&mut self, id: impl std::hash::Hash, axis: SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut Ui, &mut Ui));
 	fn color_edit(&mut self, color: &mut impl ColorEditValue) -> Response;
+	fn spacer(&mut self);
 }
 
 impl UiExt for Ui {
@@ -213,6 +214,10 @@ impl UiExt for Ui {
 	
 	fn color_edit(&mut self, color: &mut impl ColorEditValue) -> Response {
 		coloredit::color_edit(self, color)
+	}
+	
+	fn spacer(&mut self) {
+		self.add_space(8.0);
 	}
 }
 

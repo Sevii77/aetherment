@@ -7,6 +7,8 @@ mod skybox;
 pub use skybox::*;
 
 pub trait Object {
+	fn as_any(&self) -> &dyn std::any::Any;
+	fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 	fn get_matrix(&self) -> &Mat4;
 	fn get_matrix_mut(&mut self) -> &mut Mat4;
 	fn get_material_id(&self) -> &str;
@@ -15,6 +17,8 @@ pub trait Object {
 	fn get_index_count(&self) -> u32;
 	fn get_shader_resources(&self) -> &[ShaderResource];
 	fn get_shader_resources_mut(&mut self) -> &mut [ShaderResource];
+	fn get_visible(&self) -> bool;
+	fn get_visible_mut(&mut self) -> &mut bool;
 	
 	fn get_translation(&self) -> Vec3 {
 		self.get_matrix().w_axis.xyz()

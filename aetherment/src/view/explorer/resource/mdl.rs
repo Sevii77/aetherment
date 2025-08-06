@@ -1,10 +1,16 @@
+use std::collections::HashMap;
+
 use glam::Vec4Swizzles;
 use noumenon::format::{external::Bytes, game::Mdl};
-use crate::ui_ext::InteractableScene;
+use crate::ui_ext::{InteractableScene, UiExt};
 
 pub struct MdlView {
+	mdl: Mdl,
 	scene: Option<InteractableScene>,
-	mdl: Mdl
+	lod: usize,
+	objects: HashMap<(usize, usize, usize), usize>,
+	shapes: Vec<(String, bool)>,
+	add_attr: String,
 }
 
 impl MdlView {
@@ -12,8 +18,12 @@ impl MdlView {
 		let data = super::read_file(path)?;
 		
 		Ok(Self {
-			scene: None,
 			mdl: Mdl::read(&mut std::io::Cursor::new(&data))?,
+			scene: None,
+			lod: 0,
+			objects: HashMap::new(),
+			shapes: Vec::new(),
+			add_attr: String::new(),
 		})
 	}
 }
@@ -33,17 +43,132 @@ impl super::ResourceView for MdlView {
 			
 			scene.add_object(Box::new(renderer::Skybox::simple(renderer)));
 			
-			for m in &self.mdl.meshes[0] {
-				let mut vertices = m.vertices.iter().map(|v| renderer::vertex(v.position, v.normal, v.color, v.uv.xy())).collect::<Vec<_>>();
-				renderer::calculate_tangents(&mut vertices, &m.indices);
-				
-				scene.add_object(Box::new(renderer::Mesh::new(renderer, &vertices, &m.indices)));
+			for (lod_index, lod) in self.mdl.lods.iter().enumerate() {
+				for (mesh_index, mesh) in lod.meshes.iter().enumerate() {
+					for (submesh_index, submesh) in mesh.submeshes.iter().enumerate() {
+						let mut vertices = submesh.vertices.iter().map(|v| renderer::vertex(v.position, v.normal, glam::Vec4::ONE, v.uv.xy())).collect::<Vec<_>>();
+						
+						// merge all shape indices so that we can correctly calculate tangents once
+						let mut all_indices = submesh.indices.clone();
+						for shape in &submesh.shapes {
+							let mut indices = submesh.indices.clone();
+							for v in &shape.values {
+								indices[v.index as usize] = v.new_vertex;
+							}
+							all_indices.extend_from_slice(&indices);
+						}
+						renderer::calculate_tangents(&mut vertices, &all_indices);
+						
+						let id = scene.add_object(Box::new(renderer::Mesh::new(renderer, &vertices, &create_indices(submesh, &self.shapes))));
+						if lod_index != self.lod {
+							let obj = scene.get_object_mut(id).unwrap();
+							*obj.get_visible_mut() = false;
+						}
+						
+						self.objects.insert((lod_index, mesh_index, submesh_index), id);
+						
+						for shape in &submesh.shapes {
+							if self.shapes.iter().any(|v| v.0 == shape.name) {continue}
+							self.shapes.push((shape.name.clone(), false));
+						}
+					}
+				}
 			}
 			
 			scene
 		});
 		
-		let size = ui.available_size();
-		scene.render(renderer, size.x as usize, size.y as usize, ui);
+		ui.splitter("splitter", crate::ui_ext::SplitterAxis::Horizontal, 0.8, |ui_left, ui_right| {
+			let ui = ui_left;
+			let size = ui.available_size();
+			scene.render(renderer, size.x as usize, size.y as usize, ui);
+			
+			let ui = ui_right;
+			if self.mdl.lods.len() > 1 {
+				ui.combo(format!("LOD {}", self.lod), "", |ui| {
+					for i in 0..self.mdl.lods.len() {
+						if ui.selectable_label(self.lod == i, format!("LOD {i}")).clicked() {
+							self.lod = i;
+							
+							for ((mesh_lod, _, _), id) in &self.objects {
+								*scene.get_object_mut(*id).unwrap().get_visible_mut() = *mesh_lod == i;
+							}
+						}
+					}
+				});
+			}
+			
+			ui.spacer();
+			
+			let mut update_objects = false;
+			if self.shapes.len() > 0 {
+				ui.label("Shapes");
+				for (name, state) in &mut self.shapes {
+					update_objects |= ui.checkbox(state, &*name).changed();
+				}
+				
+				ui.spacer();
+			}
+			
+			if update_objects {
+				for ((lod_index, mesh_index, submesh_index), obj_id) in &self.objects {
+					let submesh = &self.mdl.lods[*lod_index].meshes[*mesh_index].submeshes[*submesh_index];
+					let obj = scene.get_object_mut(*obj_id).unwrap().as_any_mut().downcast_mut::<renderer::Mesh>().unwrap();
+					obj.set_indices(renderer, &create_indices(submesh, &self.shapes));
+				}
+			}
+			
+			for (mesh_index, mesh) in self.mdl.lods[self.lod].meshes.iter_mut().enumerate() {
+				ui.collapsing(format!("Mesh {mesh_index}"), |ui| {
+					ui.label("Material");
+					ui.text_edit_singleline(&mut mesh.material);
+					
+					for (submesh_index, submesh) in mesh.submeshes.iter_mut().enumerate() {
+						let obj = scene.get_object_mut(self.objects[&(self.lod, mesh_index, submesh_index)]).unwrap();
+						
+						ui.spacer();
+						ui.checkbox(obj.get_visible_mut(), format!("Submesh {submesh_index}"));
+						ui.indent("options", |ui| {
+							ui.label("Attributes");
+							let mut delete = None;
+							for (i, attr) in submesh.attributes.iter().enumerate() {
+								ui.horizontal(|ui| {
+									if ui.button("🗑").clicked() {
+										delete = Some(i);
+									}
+									
+									ui.label(attr);
+								});
+							}
+							
+							if let Some(i) = delete {
+								submesh.attributes.remove(i);
+							}
+							
+							ui.horizontal(|ui| {
+								if ui.button("➕").clicked() {
+									submesh.attributes.push(self.add_attr.clone());
+									self.add_attr.clear();
+								}
+								
+								ui.text_edit_singleline(&mut self.add_attr);
+							});
+						});
+					}
+				});
+			}
+		});
 	}
+}
+
+fn create_indices(submesh: &noumenon::format::game::mdl::Submesh, shape_states: &[(String, bool)]) -> Vec<u16> {
+	let mut indices = submesh.indices.to_vec();
+	for shape in &submesh.shapes {
+		if !shape_states.iter().find_map(|v| if v.0 == shape.name {Some(v.1)} else {None}).unwrap_or(false) {continue}
+		for val in &shape.values {
+			indices[val.index as usize] = val.new_vertex;
+		}
+	}
+	
+	indices
 }

@@ -1,6 +1,41 @@
 use std::{ops::{Deref, DerefMut}, path::{Path, PathBuf}};
 pub use ironworks::file::File;
 
+macro_rules! simple_reader {
+	($y:expr, $z:expr) => {
+		let reader = $y;
+		let endian = $z;
+		
+		macro_rules! r {
+			(move $c:expr) => {{
+				reader.seek_relative($c as i64)?
+			}};
+			
+			(seek $c:expr) => {{
+				reader.seek(SeekFrom::Start($c as u64))?
+			}};
+			
+			(Vec<$e:ty>, $c:expr) => {{
+				let mut v = Vec::with_capacity($c as usize);
+				for _ in 0..$c {
+					v.push(<$e>::read_options(reader, endian, ())?);
+				}
+				v
+			}};
+			
+			($e:ty) => {{
+				<$e>::read_options(reader, endian, ())?
+			}};
+			
+			($f:ident, $a:tt) => {{
+				$f(reader, endian, $a)?
+			}};
+		}
+	};
+}
+
+// ----------
+
 pub mod format;
 
 // ----------

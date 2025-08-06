@@ -1,6 +1,7 @@
 use crate::{renderer::*, vertex, Vertex};
 
 pub struct Mesh {
+	visible: bool,
 	matrix: glam::Mat4,
 	material: &'static str,
 	vertex_buffer: Box<dyn Buffer>,
@@ -11,26 +12,12 @@ pub struct Mesh {
 
 impl Mesh {
 	pub fn new(renderer: &Box<dyn Renderer>, vertices: &[Vertex], indices: &[u16]) -> Self {
-		let vertex_buffer = renderer.create_buffer(size_of_val(vertices), BufferUsage::COPY_DST | BufferUsage::VERTEX);
-		vertex_buffer.set_data(bytemuck::cast_slice(vertices));
-		
-		let index_buffer;
-		if indices.len() % 2 == 0 {
-			index_buffer = renderer.create_buffer(size_of_val(indices), BufferUsage::COPY_DST | BufferUsage::INDEX);
-			index_buffer.set_data(bytemuck::cast_slice(indices));
-		} else {
-			// needs to be 4byte aligned, we will intentionally cause the buffer bounds to overflow
-			// this doesnt matter since the last u16 arent actually used in the rendering pipeline
-			// (atleast i think this wont cause issues?)
-			index_buffer = renderer.create_buffer(size_of_val(indices) + 2, BufferUsage::COPY_DST | BufferUsage::INDEX);
-			index_buffer.set_data(unsafe{std::slice::from_raw_parts(indices.as_ptr() as _, indices.len() * 2 + 2)});
-		}
-		
 		Self {
+			visible: true,
 			matrix: glam::Mat4::IDENTITY,
 			material: "3dmesh_lit",
-			vertex_buffer,
-			index_buffer,
+			vertex_buffer: create_vertex_buffer(renderer, vertices),
+			index_buffer: create_index_buffer(renderer, indices),
 			index_count: indices.len() as u32,
 			shader_resources: vec![
 				ShaderResource::Texture(renderer.create_texture_initialized(1, 1, TextureFormat::Rgba8Unorm, TextureUsage::TEXTURE_BINDING, &[255; 4])),
@@ -111,9 +98,26 @@ impl Mesh {
 			])
 		)
 	}
+	
+	pub fn set_vertices(&mut self, renderer: &Box<dyn Renderer>, vertices: &[Vertex]) {
+		self.vertex_buffer = create_vertex_buffer(renderer, vertices);
+	}
+	
+	pub fn set_indices(&mut self, renderer: &Box<dyn Renderer>, indices: &[u16]) {
+		self.index_buffer = create_index_buffer(renderer, indices);
+		self.index_count = indices.len() as u32;
+	}
 }
 
 impl super::Object for Mesh {
+	fn as_any(&self) -> &dyn std::any::Any {
+		self
+	}
+	
+	fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+		self
+	}
+	
 	fn get_matrix(&self) -> &glam::Mat4 {
 		&self.matrix
 	}
@@ -145,4 +149,34 @@ impl super::Object for Mesh {
 	fn get_shader_resources_mut(&mut self) -> &mut [ShaderResource] {
 		&mut self.shader_resources
 	}
+	
+	fn get_visible(&self) -> bool {
+		self.visible
+	}
+	
+	fn get_visible_mut(&mut self) -> &mut bool {
+		&mut self.visible
+	}
+}
+
+fn create_vertex_buffer(renderer: &Box<dyn Renderer>, vertices: &[Vertex]) -> Box<dyn Buffer> {
+	let vertex_buffer = renderer.create_buffer(size_of_val(vertices), BufferUsage::COPY_DST | BufferUsage::VERTEX);
+	vertex_buffer.set_data(bytemuck::cast_slice(vertices));
+	vertex_buffer
+}
+
+fn create_index_buffer(renderer: &Box<dyn Renderer>, indices: &[u16]) -> Box<dyn Buffer> {
+	let index_buffer;
+	if indices.len() % 2 == 0 {
+		index_buffer = renderer.create_buffer(size_of_val(indices), BufferUsage::COPY_DST | BufferUsage::INDEX);
+		index_buffer.set_data(bytemuck::cast_slice(indices));
+	} else {
+		// needs to be 4byte aligned, we will intentionally cause the buffer bounds to overflow
+		// this doesnt matter since the last u16 arent actually used in the rendering pipeline
+		// (atleast i think this wont cause issues?)
+		index_buffer = renderer.create_buffer(size_of_val(indices) + 2, BufferUsage::COPY_DST | BufferUsage::INDEX);
+		index_buffer.set_data(unsafe{std::slice::from_raw_parts(indices.as_ptr() as _, indices.len() * 2 + 2)});
+	}
+	
+	index_buffer
 }

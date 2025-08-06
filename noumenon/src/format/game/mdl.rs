@@ -1,7 +1,9 @@
 
-use std::{fmt::Debug, io::{Read, Seek, SeekFrom, Write}};
+use std::{collections::HashMap, fmt::Debug, io::{Read, Seek, SeekFrom, Write}};
 use binrw::{binrw, BinRead, BinWrite};
 use glam::Vec4Swizzles;
+
+use crate::NullReader;
 
 pub const EXT: &'static [&'static str] = &["mdl"];
 
@@ -10,67 +12,47 @@ pub type Error = binrw::Error;
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct Mdl {
-	pub meshes: Vec<Vec<Mesh>>,
+	pub lods: Vec<Lod>,
 }
 
 impl BinRead for Mdl {
 	type Args<'a> = ();
 	
 	fn read_options<R: Read + Seek>(reader: &mut R, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<Self> {
-		// let raw = MdlRaw::read_options(reader, endian, ())?;
-		
-		// let data_pos = raw.header.runtime_size as usize + size_of::<HeaderRaw>() + raw.header.stack_size as usize;
-		// let runtime_padding = data_pos as i64 - reader.stream_position()? as i64;
-		// reader.seek_relative(runtime_padding)?;
-		
-		// println!("{:#?}", raw.vertex_declerations);
-		
-		macro_rules! r {
-			($c:literal) => {{
-				reader.seek_relative($c / 8)?
-			}};
-			
-			(Vec<$e:tt>, $c:expr) => {{
-				let mut v = Vec::with_capacity($c as usize);
-				for _ in 0..$c {
-					v.push(<$e>::read_options(reader, endian, ())?);
-				}
-				v
-			}};
-			
-			($e:tt) => {{
-				$e::read_options(reader, endian, ())?
-			}};
-		}
+		simple_reader!(reader, endian);
 		
 		let header = r!(HeaderRaw);
 		let vertex_declerations = r!(Vec<[VertexElementRaw; 17]>, header.vertex_declaration_count);
 		
 		let strings_count = r!(u16);
-		r!(16);
+		r!(move 2);
 		let strings_size = r!(u32);
 		let strings_buf = r!(Vec<u8>, strings_size);
 		
 		let model_header = r!(ModelHeaderRaw);
 		let element_ids = r!(Vec<ElementIdRaw>, model_header.element_id_count);
-		let lods = r!(Vec<LodRaw>, header.lod_count);
-		let extra_lods = r!(Vec<ExtraLodRaw>, if model_header.flags2.contains(ModelFlags2Raw::EXTRA_LOD_ENABLED) {header.lod_count} else {0});
+		// textools writes 1 lod count but writes 3 lod structs, with the other 2 empty
+		// i am not putting SE above doing that themselves, but im blaming textools anyways
+		// let lods = r!(Vec<LodRaw>, header.lod_count);
+		// let extra_lods = r!(Vec<ExtraLodRaw>, if model_header.flags2.contains(ModelFlags2Raw::EXTRA_LOD_ENABLED) {header.lod_count} else {0});
+		let lods = r!(Vec<LodRaw>, 3);
+		let extra_lods = r!(Vec<ExtraLodRaw>, if model_header.flags2.contains(ModelFlags2Raw::EXTRA_LOD_ENABLED) {3} else {0});
 		let meshes = r!(Vec<MeshRaw>, model_header.mesh_count);
 		let attribute_string_offset = r!(Vec<u32>, model_header.attribute_count);
+		let terrain_shadow_meshes = r!(Vec<TerrainShadowMeshRaw>, model_header.terrain_shadow_mesh_count);
 		let submeshes = r!(Vec<SubmeshRaw>, model_header.submesh_count);
 		let terrain_shadow_submeshes = r!(Vec<TerrainShadowSubmeshRaw>, model_header.terrain_shadow_submesh_count);
 		let material_string_offset = r!(Vec<u32>, model_header.material_count);
 		let bone_string_offset = r!(Vec<u32>, model_header.bone_count);
-		let bone_table = bone_table_reader(reader, endian, (header.version, model_header.bone_table_count, model_header.bone_table_array_count_total))?;
+		let bone_table = r!(bone_table_reader, (header.version, model_header.bone_table_count, model_header.bone_table_array_count_total));
 		let shapes = r!(Vec<ShapeRaw>, model_header.shape_count);
 		let shape_meshes = r!(Vec<ShapeMeshRaw>, model_header.shape_mesh_count);
 		let shape_values = r!(Vec<ShapeValueRaw>, model_header.shape_value_count);
-		
 		let submesh_bone_map_size = r!(u32);
 		let submesh_bone_map = r!(Vec<u16>, submesh_bone_map_size / 2);
 		
 		let _padding_size = r!(u8);
-		let _padding = r!(Vec<u8>, _padding_size);
+		r!(move _padding_size);
 		
 		let bb = r!(BoundingBoxRaw);
 		let model_bb = r!(BoundingBoxRaw);
@@ -78,18 +60,40 @@ impl BinRead for Mdl {
 		let vertical_fog_bb = r!(BoundingBoxRaw);
 		let bones_bb = r!(Vec<BoundingBoxRaw>, model_header.bone_count);
 		
+		// create meshes
 		let mut lods_new = Vec::new();
 		for (lod_index, lod_raw) in lods.iter().enumerate() {
 			let mut meshes_new = Vec::new();
 			for mesh_index in lod_raw.mesh_index as usize..(lod_raw.mesh_index + lod_raw.mesh_count) as usize {
 				let mesh_raw = &meshes[mesh_index];
 				
+				// shapes
+				let mut shapes_tmp = Vec::new();
+				for shape_raw in &shapes {
+					let name = strings_buf[shape_raw.string_offset as usize..].null_terminated().unwrap();
+					let mut replacements = Vec::new();
+					
+					for shape_mesh_index in shape_raw.mesh_start_index[lod_index]..shape_raw.mesh_start_index[lod_index] + shape_raw.mesh_count[lod_index] {
+						let shape_mesh_raw = &shape_meshes[shape_mesh_index as usize];
+						if shape_mesh_raw.mesh_index_offset != mesh_raw.start_index {continue};
+						for i in shape_mesh_raw.value_offset..shape_mesh_raw.value_offset + shape_mesh_raw.value_count {
+							let val = &shape_values[i as usize];
+							replacements.push((val.base_indices_index, val.replacing_vertex_index));
+						}
+					}
+					
+					if replacements.len() > 0 {
+						shapes_tmp.push((name, replacements));
+					}
+				}
+				
 				// vertices
 				let mut vertices = vec![Vertex::default(); mesh_raw.vertex_count as usize];
 				let vertex_decl = &vertex_declerations[mesh_index];
-				for stream in 0..mesh_raw.vertex_stream_count {
-					let offset = header.vertex_offsets[lod_index] as u64 + mesh_raw.vertex_buffer_offset[stream as usize] as u64;
-					reader.seek(SeekFrom::Start(offset))?;
+				// textools writes vertex_stream_count as the amount of meshes, and not the actual purpose :mochiwohoo:
+				// for stream in 0..mesh_raw.vertex_stream_count {
+				for stream in 0..3u8 {
+					r!(seek header.vertex_offsets[lod_index] as u64 + mesh_raw.vertex_buffer_offset[stream as usize] as u64);
 					
 					for vertex_index in 0..mesh_raw.vertex_count as usize {
 						let vertex = &mut vertices[vertex_index];
@@ -97,27 +101,22 @@ impl BinRead for Mdl {
 							if decl.stream == 255 {break}
 							if decl.stream != stream {continue}
 							
-							macro_rules! r {
-								(f16) => {{
-									half::f16::from_bits(u16::read_options(reader, endian, ())?).to_f32()
-								}};
-								
-								($e:tt) => {{
-									$e::read_options(reader, endian, ())? as f32
-								}};
+							macro_rules! rf {
+								(f16) => {half::f16::from_bits(r!(u16)).to_f32()};
+								($e:ty) => {r!($e) as f32};
 							}
 							
 							let val = match decl.typ {
-								VertexTypeRaw::F32x1 => glam::vec4(r!(f32), 0.0, 0.0, 0.0),
-								VertexTypeRaw::F32x2 => glam::vec4(r!(f32), r!(f32), 0.0, 0.0),
-								VertexTypeRaw::F32x3 => glam::vec4(r!(f32), r!(f32), r!(f32), 0.0),
-								VertexTypeRaw::F32x4 => glam::vec4(r!(f32), r!(f32), r!(f32), r!(f32)),
-								VertexTypeRaw::U8x4  => glam::vec4(r!(u8), r!(u8), r!(u8), r!(u8)),
-								VertexTypeRaw::F8x4  => glam::vec4(r!(u8) / 255.0, r!(u8) / 255.0, r!(u8) / 255.0, r!(u8) / 255.0),
-								VertexTypeRaw::F16x2 => glam::vec4(r!(f16), r!(f16), 0.0, 0.0),
-								VertexTypeRaw::F16x4 => glam::vec4(r!(f16), r!(f16), r!(f16), r!(f16)),
-								// VertexTypeRaw::U16x2 => [r!(u16), r!(u16), 0.0, 0.0],
-								// VertexTypeRaw::U16x4 => [r!(u16), r!(u16), r!(u16), r!(u16)],
+								VertexTypeRaw::F32x1 => glam::vec4(rf!(f32), 0.0, 0.0, 0.0),
+								VertexTypeRaw::F32x2 => glam::vec4(rf!(f32), rf!(f32), 0.0, 0.0),
+								VertexTypeRaw::F32x3 => glam::vec4(rf!(f32), rf!(f32), rf!(f32), 0.0),
+								VertexTypeRaw::F32x4 => glam::vec4(rf!(f32), rf!(f32), rf!(f32), rf!(f32)),
+								VertexTypeRaw::U8x4  => glam::vec4(rf!(u8), rf!(u8), rf!(u8), rf!(u8)),
+								VertexTypeRaw::F8x4  => glam::vec4(rf!(u8) / 255.0, rf!(u8) / 255.0, rf!(u8) / 255.0, rf!(u8) / 255.0),
+								VertexTypeRaw::F16x2 => glam::vec4(rf!(f16), rf!(f16), 0.0, 0.0),
+								VertexTypeRaw::F16x4 => glam::vec4(rf!(f16), rf!(f16), rf!(f16), rf!(f16)),
+								VertexTypeRaw::U16x2 => glam::vec4(rf!(u16), rf!(u16), 0.0, 0.0),
+								VertexTypeRaw::U16x4 => glam::vec4(rf!(u16), rf!(u16), rf!(u16), rf!(u16)),
 							};
 							
 							match decl.usage {
@@ -128,7 +127,7 @@ impl BinRead for Mdl {
 									for i in 0..4 {vertex.blends[i].weight = val[i] / 255.0},
 								
 								VertexUsageRaw::BlendIndices =>
-									for i in 0..4 {vertex.blends[i].bone = val[i] as u8},
+									for i in 0..4 {vertex.blends[i].bone = val[i] as u16},
 								
 								VertexUsageRaw::Normal =>
 									vertex.normal = val.xyz(),
@@ -150,28 +149,85 @@ impl BinRead for Mdl {
 					}
 				}
 				
-				// indices
-				let offset = header.index_offsets[lod_index] as u64 + mesh_raw.start_index as u64 * 2;
-				reader.seek(SeekFrom::Start(offset))?;
+				// // indices
+				// r!(seek header.index_offsets[lod_index] as u64 + mesh_raw.start_index as u64 * 2);
+				// let mesh_indices = r!(Vec<u16>, mesh_raw.index_count);
 				
-				let mut indices = Vec::with_capacity(mesh_raw.index_count as usize);
-				for _ in 0..mesh_raw.index_count {
-					indices.push(u16::read_options(reader, endian, ())?);
+				// split into submeshes
+				let mut submeshes_new = Vec::new();
+				for submesh_index in mesh_raw.submesh_index as usize..(mesh_raw.submesh_index + mesh_raw.submesh_count) as usize {
+					let submesh_raw = &submeshes[submesh_index];
+					
+					r!(seek header.index_offsets[lod_index] as u64 + submesh_raw.index_offset as u64 * 2);
+					let indices = r!(Vec<u16>, submesh_raw.index_count);
+					
+					// rewrite indices and vertices to be submesh specific
+					let mut indices_new = Vec::new();
+					let mut vertices_new = Vec::new();
+					let mut vertex_map = HashMap::new(); // old_index, new_vertex
+					let mut add_vertex = |index_old: u16| -> u16 {
+						*vertex_map.entry(index_old).or_insert_with(|| {
+							vertices_new.push(vertices[index_old as usize].clone());
+							(vertices_new.len() - 1) as u16
+						})
+					};
+					
+					for index_old in &indices {
+						indices_new.push(add_vertex(*index_old));
+					}
+					
+					// rewrite shapes to be submesh specific
+					let index_relative_offset = (submesh_raw.index_offset - mesh_raw.start_index) as u16;
+					let mut shapes_new = Vec::new();
+					for (name, values_old) in &shapes_tmp {
+						let mut values = Vec::new();
+						for (index_old, vertex_old) in values_old {
+							if *index_old < index_relative_offset || *index_old >= index_relative_offset + submesh_raw.index_count as u16 {continue}
+							
+							values.push(ShapeValue {
+								index: *index_old - index_relative_offset,
+								new_vertex: add_vertex(*vertex_old),
+							});
+						}
+						
+						if values.len() > 0 {
+							shapes_new.push(Shape {
+								name: name.to_owned(),
+								values,
+							});
+						}
+					}
+					
+					// attributes
+					let mut attributes_new = Vec::new();
+					for i in 0..attribute_string_offset.len() {
+						let v = 1u32 << i;
+						if submesh_raw.attribute_index_mask & v == v {
+							attributes_new.push(strings_buf[attribute_string_offset[i] as usize..].null_terminated().unwrap());
+						}
+					}
+					
+					submeshes_new.push(Submesh {
+						vertices: vertices_new,
+						indices: indices_new,
+						attributes: attributes_new,
+						shapes: shapes_new,
+					});
 				}
 				
-				//
 				meshes_new.push(Mesh {
-					vertices,
-					indices,
+					material: strings_buf[material_string_offset[mesh_raw.material_index as usize] as usize..].null_terminated().unwrap(),
+					submeshes: submeshes_new,
 				});
 			}
 			
-			lods_new.push(meshes_new);
+			lods_new.push(Lod {
+				meshes: meshes_new,
+			});
 		}
 		
 		Ok(Self {
-			meshes: lods_new,
-			// _raw: raw,
+			lods: lods_new,
 		})
 	}
 }
@@ -207,9 +263,22 @@ impl crate::format::external::Bytes<Error> for Mdl {
 // ---------------------------------------- //
 
 #[derive(Debug, Clone)]
+pub struct Lod {
+	pub meshes: Vec<Mesh>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Mesh {
+	pub material: String,
+	pub submeshes: Vec<Submesh>,
+}
+
+#[derive(Debug, Clone)]
+pub struct Submesh {
 	pub vertices: Vec<Vertex>,
 	pub indices: Vec<u16>,
+	pub attributes: Vec<String>,
+	pub shapes: Vec<Shape>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -224,85 +293,23 @@ pub struct Vertex {
 
 #[derive(Debug, Clone, Default)]
 pub struct Blend {
-	pub bone: u8,
+	pub bone: u16,
 	pub weight: f32,
 }
 
-// ---------------------------------------- //
+#[derive(Debug, Clone)]
+pub struct Shape {
+	pub name: String,
+	pub values: Vec<ShapeValue>,
+}
 
-// #[binrw]
-// #[brw(little)]
-// #[derive(Debug, Clone)]
-// pub struct MdlRaw {
-// 	pub header: HeaderRaw,
-// 	
-// 	#[br(count = header.vertex_declaration_count)]
-// 	pub vertex_declerations: Vec<[VertexElementRaw; 17]>,
-// 	
-// 	pub strings_count: u16,
-// 	pub _padding: u16,
-// 	pub strings_size: u32,
-// 	#[br(count = strings_size)]
-// 	pub strings_buf: Vec<u8>,
-// 	
-// 	pub model_header: ModelHeaderRaw,
-// 	
-// 	#[br(count = model_header.element_id_count)]
-// 	pub element_ids: Vec<ElementIdRaw>,
-// 	
-// 	#[br(count = header.lod_count)]
-// 	pub lods: Vec<LodRaw>,
-// 	
-// 	#[brw(if(model_header.flags2.contains(ModelFlags2Raw::EXTRA_LOD_ENABLED)))]
-// 	#[br(count = header.lod_count)]
-// 	pub extra_lods: Vec<ExtraLodRaw>,
-// 	
-// 	#[br(count = model_header.mesh_count)]
-// 	pub meshes: Vec<MeshRaw>,
-// 	
-// 	#[br(count = model_header.attribute_count)]
-// 	pub attribute_string_offset: Vec<u32>,
-// 	
-// 	#[br(count = model_header.submesh_count)]
-// 	pub submeshes: Vec<SubmeshRaw>,
-// 	
-// 	#[br(count = model_header.terrain_shadow_submesh_count)]
-// 	pub terrain_shadow_submeshes: Vec<TerrainShadowSubmeshRaw>,
-// 	
-// 	#[br(count = model_header.material_count)]
-// 	pub material_string_offset: Vec<u32>,
-// 	
-// 	#[br(count = model_header.bone_count)]
-// 	pub bone_string_offset: Vec<u32>,
-// 	
-// 	#[br(parse_with = bone_table_reader, args(header.version, model_header.bone_table_count, model_header.bone_table_array_count_total))]
-// 	#[bw(write_with = bone_table_writer, args(header.version))]
-// 	pub bone_table: Vec<Vec<u16>>,
-// 	
-// 	#[br(count = model_header.shape_count)]
-// 	pub shapes: Vec<ShapeRaw>,
-// 	
-// 	#[br(count = model_header.shape_mesh_count)]
-// 	pub shape_meshes: Vec<ShapeMeshRaw>,
-// 	
-// 	#[br(count = model_header.shape_value_count)]
-// 	pub shape_values: Vec<ShapeValueRaw>,
-// 	
-// 	pub submesh_bone_map_size: u32,
-// 	#[br(count = submesh_bone_map_size / 2)]
-// 	pub submesh_bone_map: Vec<u16>,
-// 	
-// 	pub _padding2_size: u8,
-// 	#[br(count = _padding2_size)]
-// 	pub _padding2: Vec<u8>,
-// 	
-// 	pub bb: BoundingBoxRaw,
-// 	pub model_bb: BoundingBoxRaw,
-// 	pub water_bb: BoundingBoxRaw,
-// 	pub vertical_fog_bb: BoundingBoxRaw,
-// 	#[br(count = model_header.bone_count)]
-// 	pub bones_bb: Vec<BoundingBoxRaw>,
-// }
+#[derive(Debug, Clone)]
+pub struct ShapeValue {
+	pub index: u16,
+	pub new_vertex: u16,
+}
+
+// ---------------------------------------- //
 
 #[binrw]
 #[derive(Debug, Clone)]
@@ -346,8 +353,8 @@ pub enum VertexTypeRaw {
 	F8x4  = 8,
 	F16x2 = 13,
 	F16x4 = 14,
-	// U16x2 = 16,
-	// U16x4 = 17,
+	U16x2 = 16,
+	U16x4 = 17,
 }
 
 #[binrw]
@@ -498,8 +505,8 @@ pub struct MeshRaw {
 	pub _padding: u16,
 	pub index_count: u32,
 	pub material_index: u16,
-	pub sub_mesh_index: u16,
-	pub sub_mesh_count: u16,
+	pub submesh_index: u16,
+	pub submesh_count: u16,
 	pub bone_table_index: u16,
 	pub start_index: u32,
 	pub vertex_buffer_offset: [u32; 3],
@@ -514,8 +521,8 @@ pub struct TerrainShadowMeshRaw {
 	pub start_index: u32,
 	pub vertex_buffer_offset: u32,
 	pub vertex_count: u16,
-	pub sub_mesh_index: u16,
-	pub sub_mesh_count: u16,
+	pub submesh_index: u16,
+	pub submesh_count: u16,
 	pub vertex_buffer_stride: u8,
 	pub _padding: u8
 }

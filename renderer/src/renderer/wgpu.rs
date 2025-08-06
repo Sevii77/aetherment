@@ -266,6 +266,7 @@ impl super::Renderer for WgpuRenderer {
 		
 		for obj in objects {
 			let Some(obj) = obj else {continue};
+			if !obj.get_visible() {continue};
 			let material = materials.get(obj.get_material_id()).unwrap().as_any().downcast_ref::<WgpuMaterial>().unwrap();
 			
 			let uniform_buffer = self.device.create_buffer(&wgpu::BufferDescriptor {

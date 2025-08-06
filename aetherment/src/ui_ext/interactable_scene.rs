@@ -84,10 +84,13 @@ impl InteractableScene {
 				self.camera_origin += glam::Quat::from_euler(glam::EulerRot::YXZ, self.camera_yaw, self.camera_pitch, 0.0) * glam::vec3(-drag.x, drag.y, 0.0) / 500.0 * self.camera_zoom;
 			}
 		} else if resp.hovered() {
-			let scroll = ctx.input(|v| v.smooth_scroll_delta).y / 50.0;
-			if scroll != 0.0 {
+			let scroll = ctx.input(|v| v.smooth_scroll_delta);
+			if scroll.y != 0.0 {
 				ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
-				self.camera_zoom = (self.camera_zoom - scroll).max(0.01);
+				self.camera_zoom = (self.camera_zoom - scroll.y / 500.0).max(0.01);
+			} else if scroll.x != 0.0 {
+				ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
+				self.camera_zoom = (self.camera_zoom - scroll.x / 100.0).max(0.01);
 			} else {
 				ctx.set_cursor_icon(egui::CursorIcon::Grab);
 			}

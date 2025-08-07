@@ -72,7 +72,7 @@ impl super::View for Browser {
 		"Browser"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
 		let is_busy = *self.busy.read().unwrap();
 		match self.mods.lock().unwrap().deref_mut() {
 			BrowseResult::Mods(mods) => {

@@ -38,7 +38,7 @@ impl log::Log for SimpleLogger {
 
 struct CoreWrapper {
 	core: aetherment::Core,
-	renderer: Box<dyn renderer::Renderer>,
+	renderer: renderer::Renderer,
 }
 
 impl eframe::App for CoreWrapper {

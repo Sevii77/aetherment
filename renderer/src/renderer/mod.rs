@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 use glam::Mat4;
 
 #[cfg(feature = "d3d11")] mod d3d11;
@@ -115,56 +115,61 @@ pub enum SamplerFilter {
 	Linear,
 }
 
+pub enum ShaderResource {
+	Buffer(Buffer),
+	Texture(Texture),
+	Sampler(Sampler),
+}
+
 // ----------
 
-pub trait Renderer {
-	fn create_material(&self, shader: &str, binds: &[MaterialBind]) -> Box<dyn Material>;
+pub type Renderer = Box<dyn RendererInner>;
+pub trait RendererInner {
+	fn create_material(&self, shader: &str, binds: &[MaterialBind]) -> Material;
 	
-	fn create_texture(&self, width: u32, height: u32, format: TextureFormat, usage: TextureUsage) -> Box<dyn Texture>;
-	fn create_texture_initialized(&self, width: u32, height: u32, format: TextureFormat, usage: TextureUsage, data: &[u8]) -> Box<dyn Texture> {
+	fn create_texture(&self, width: u32, height: u32, format: TextureFormat, usage: TextureUsage) -> Texture;
+	fn create_texture_initialized(&self, width: u32, height: u32, format: TextureFormat, usage: TextureUsage, data: &[u8]) -> Texture {
 		let texture = self.create_texture(width, height, format, usage | TextureUsage::COPY_DST);
 		texture.set_data(data);
 		texture
 	}
 	
-	fn create_buffer(&self, size: usize, usage: BufferUsage) -> Box<dyn Buffer>;
+	fn create_buffer(&self, size: usize, usage: BufferUsage) -> Buffer;
 	
-	fn create_sampler(&self, address_u: SamplerAddress, address_v: SamplerAddress, min: SamplerFilter, mag: SamplerFilter) -> Box<dyn Sampler>;
+	fn create_sampler(&self, address_u: SamplerAddress, address_v: SamplerAddress, min: SamplerFilter, mag: SamplerFilter) -> Sampler;
 	
 	fn render(&self,
 		clear_collor: &Option<[f32; 4]>,
-		render_target: &Box<dyn Texture>,
-		depth_buffer: &Box<dyn Texture>,
-		materials: &HashMap<&'static str, Box<dyn Material>>,
+		render_target: &Texture,
+		depth_buffer: &Texture,
+		materials: &HashMap<&'static str, Material>,
 		objects: &crate::ObjectBuffer,
 		camera: &crate::scene::Camera);
 	
-	fn register_texture(&self, texture: &Box<dyn Texture>) -> u64;
+	fn register_texture(&self, texture: &Texture) -> u64;
 	
 	fn as_any(&self) -> &dyn std::any::Any;
 	fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 }
 
-pub trait Material {
+pub type Material = Rc<dyn MaterialInner>;
+pub trait MaterialInner {
 	fn as_any(&self) -> &dyn std::any::Any;
 }
 
-pub trait Texture {
-	fn as_any(&self) -> &dyn std::any::Any;
-	fn set_data(&self, data: &[u8]);
-}
-
-pub trait Buffer {
+pub type Texture = Rc<dyn TextureInner>;
+pub trait TextureInner {
 	fn as_any(&self) -> &dyn std::any::Any;
 	fn set_data(&self, data: &[u8]);
 }
 
-pub trait Sampler {
+pub type Buffer = Rc<dyn BufferInner>;
+pub trait BufferInner {
 	fn as_any(&self) -> &dyn std::any::Any;
+	fn set_data(&self, data: &[u8]);
 }
 
-pub enum ShaderResource {
-	Buffer(Box<dyn Buffer>),
-	Texture(Box<dyn Texture>),
-	Sampler(Box<dyn Sampler>),
+pub type Sampler = Rc<dyn SamplerInner>;
+pub trait SamplerInner {
+	fn as_any(&self) -> &dyn std::any::Any;
 }

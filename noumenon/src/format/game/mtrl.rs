@@ -140,6 +140,11 @@ pub struct Sampler {
 	pub flags: u32,
 }
 
+// Normal = 207536625,
+// Mask = 2320401078,
+// ColorsetIndex = 1449103320,
+// Diffuse = 290653886,
+
 // outdated old endwalker stuff, stuff is missing
 // #[binrw]
 // #[brw(little, repr = u32)]

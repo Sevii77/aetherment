@@ -10,13 +10,13 @@ struct SkyboxColor {
 pub struct Skybox {
 	visible: bool,
 	matrix: glam::Mat4,
-	vertex_buffer: Box<dyn Buffer>,
-	index_buffer: Box<dyn Buffer>,
+	vertex_buffer: Buffer,
+	index_buffer: Buffer,
 	colors: [ShaderResource; 1],
 }
 
 impl Skybox {
-	pub fn new(renderer: &Box<dyn Renderer>, colors: &[(f32, glam::Vec4)]) -> Self {
+	pub fn new(renderer: &Renderer, colors: &[(f32, glam::Vec4)]) -> Self {
 		const VERTICES: &[Vertex] = &[
 			vertex(glam::vec3(-1.0, -1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ZERO, glam::Vec2::ZERO),
 			vertex(glam::vec3( 1.0, -1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ZERO, glam::Vec2::X),
@@ -50,7 +50,7 @@ impl Skybox {
 		}
 	}
 	
-	pub fn simple(renderer: &Box<dyn Renderer>) -> Self {
+	pub fn simple(renderer: &Renderer) -> Self {
 		Self::new(renderer, &[
 			(0.0, glam::vec4(0.0, 0.0, 0.0, 1.0)),
 			(0.45, glam::vec4(0.1, 0.1, 0.1, 1.0)),
@@ -59,7 +59,7 @@ impl Skybox {
 		])
 	}
 	
-	pub(crate) fn create_material(renderer: &Box<dyn Renderer>) -> (&'static str, Box<dyn Material>) {
+	pub(crate) fn create_material(renderer: &Renderer) -> (&'static str, Material) {
 		(
 			"skybox",
 			renderer.create_material(include_str!("./skybox.wgsl"), &[
@@ -93,11 +93,11 @@ impl super::Object for Skybox {
 		"skybox"
 	}
 	
-	fn get_index_buffer(&self) -> &Box<dyn Buffer> {
+	fn get_index_buffer(&self) -> &Buffer {
 		&self.index_buffer
 	}
 	
-	fn get_vertex_buffer(&self) -> &Box<dyn Buffer> {
+	fn get_vertex_buffer(&self) -> &Buffer {
 		&self.vertex_buffer
 	}
 	

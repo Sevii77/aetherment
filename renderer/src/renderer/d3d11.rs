@@ -4,14 +4,14 @@ use windows::{core::{Interface, PCSTR}, Win32::Graphics::{Direct3D::{Fxc::D3DCom
 pub struct D3d11Renderer {
 	device: &'static ID3D11Device,
 	context: Rc<ID3D11DeviceContext>,
-	texture_register: Box<dyn Fn(&Box<dyn super::Texture>) -> u64>,
+	texture_register: Box<dyn Fn(&super::Texture) -> u64>,
 	
 	depth_stencil_state: ID3D11DepthStencilState,
 	rasterizer_state: ID3D11RasterizerState,
 }
 
 impl D3d11Renderer {
-	pub fn new(device_ptr: usize, texture_register: Box<dyn Fn(&Box<dyn super::Texture>) -> u64>) -> Self {
+	pub fn new(device_ptr: usize, texture_register: Box<dyn Fn(&super::Texture) -> u64>) -> Self {
 		let device = &(device_ptr as _);
 		let device = unsafe{std::mem::transmute::<&*mut std::ffi::c_void, &'static *mut std::ffi::c_void>(device)};
 		let device = unsafe{ID3D11Device::from_raw_borrowed(device).ok_or("Failed borrowing device").unwrap()};
@@ -53,8 +53,8 @@ impl D3d11Renderer {
 	}
 }
 
-impl super::Renderer for D3d11Renderer {
-	fn create_material(&self, shader: &str, binds: &[super::MaterialBind]) -> Box<dyn super::Material> {
+impl super::RendererInner for D3d11Renderer {
+	fn create_material(&self, shader: &str, binds: &[super::MaterialBind]) -> super::Material {
 		let hlsl = {
 			let module = naga::front::wgsl::parse_str(shader).unwrap();
 			
@@ -104,7 +104,7 @@ impl super::Renderer for D3d11Renderer {
 			input(4, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0),
 		], &vs_bytecode, Some(&mut layout)).unwrap()};
 		
-		Box::new(D3d11Material {
+		Rc::new(D3d11Material {
 			binds: binds.to_vec(),
 			vs: vs.unwrap(),
 			ps: ps.unwrap(),
@@ -112,7 +112,7 @@ impl super::Renderer for D3d11Renderer {
 		})
 	}
 	
-	fn create_texture(&self, width: u32, height: u32, format: super::TextureFormat, usage: super::TextureUsage) -> Box<dyn super::Texture> {
+	fn create_texture(&self, width: u32, height: u32, format: super::TextureFormat, usage: super::TextureUsage) -> super::Texture {
 		let format = match format {
 			super::TextureFormat::Rgba8Unorm => DXGI_FORMAT_R8G8B8A8_UNORM,
 			super::TextureFormat::Rgba8UnormSrgb => DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
@@ -183,7 +183,7 @@ impl super::Renderer for D3d11Renderer {
 			}), Some(&mut view_depth)).unwrap()};
 		}
 		
-		Box::new(D3d11Texture {
+		Rc::new(D3d11Texture {
 			texture,
 			context: self.context.clone(),
 			view,
@@ -194,7 +194,7 @@ impl super::Renderer for D3d11Renderer {
 		})
 	}
 	
-	fn create_buffer(&self, size: usize, usage: super::BufferUsage) -> Box<dyn super::Buffer> {
+	fn create_buffer(&self, size: usize, usage: super::BufferUsage) -> super::Buffer {
 		let mut buffer = None;
 		unsafe{self.device.CreateBuffer(&D3D11_BUFFER_DESC {
 			ByteWidth: size as u32,
@@ -209,13 +209,13 @@ impl super::Renderer for D3d11Renderer {
 			..Default::default()
 		}, None, Some(&mut buffer)).unwrap()};
 		
-		Box::new(D3d11Buffer {
+		Rc::new(D3d11Buffer {
 			buffer: buffer.unwrap(),
 			context: self.context.clone(),
 		})
 	}
 	
-	fn create_sampler(&self, address_u: super::SamplerAddress, address_v: super::SamplerAddress, min: super::SamplerFilter, mag: super::SamplerFilter) -> Box<dyn super::Sampler> {
+	fn create_sampler(&self, address_u: super::SamplerAddress, address_v: super::SamplerAddress, min: super::SamplerFilter, mag: super::SamplerFilter) -> super::Sampler {
 		let mut sampler = None;
 		unsafe{self.device.CreateSamplerState(&D3D11_SAMPLER_DESC {
 			Filter: match (min, mag) {
@@ -240,16 +240,16 @@ impl super::Renderer for D3d11Renderer {
 			..Default::default()
 		}, Some(&mut sampler)).unwrap()};
 		
-		Box::new(D3d11Sampler {
+		Rc::new(D3d11Sampler {
 			sampler: sampler.unwrap(),
 		})
 	}
 	
 	fn render(&self,
 		clear_color: &Option<[f32; 4]>,
-		render_target: &Box<dyn super::Texture>,
-		depth_buffer: &Box<dyn super::Texture>,
-		materials: &HashMap<&'static str, Box<dyn super::Material>>,
+		render_target: &super::Texture,
+		depth_buffer: &super::Texture,
+		materials: &HashMap<&'static str, super::Material>,
 		objects: &crate::ObjectBuffer,
 		camera: &crate::scene::Camera) {
 		let render_target = render_target.as_any().downcast_ref::<D3d11Texture>().unwrap();
@@ -364,7 +364,7 @@ impl super::Renderer for D3d11Renderer {
 		}
 	}
 	
-	fn register_texture(&self, texture: &Box<dyn super::Texture>) -> u64 {
+	fn register_texture(&self, texture: &super::Texture) -> u64 {
 		(self.texture_register)(texture)
 	}
 	
@@ -386,7 +386,7 @@ pub struct D3d11Material {
 	layout: ID3D11InputLayout,
 }
 
-impl super::Material for D3d11Material {
+impl super::MaterialInner for D3d11Material {
 	fn as_any(&self) -> &dyn std::any::Any {
 		self
 	}
@@ -427,7 +427,7 @@ impl D3d11Texture {
 	}
 }
 
-impl super::Texture for D3d11Texture {
+impl super::TextureInner for D3d11Texture {
 	fn as_any(&self) -> &dyn std::any::Any {
 		self
 	}
@@ -446,7 +446,7 @@ pub struct D3d11Buffer {
 	context: Rc<ID3D11DeviceContext>,
 }
 
-impl super::Buffer for D3d11Buffer {
+impl super::BufferInner for D3d11Buffer {
 	fn as_any(&self) -> &dyn std::any::Any {
 		self
 	}
@@ -464,7 +464,7 @@ pub struct D3d11Sampler {
 	sampler: ID3D11SamplerState,
 }
 
-impl super::Sampler for D3d11Sampler {
+impl super::SamplerInner for D3d11Sampler {
 	fn as_any(&self) -> &dyn std::any::Any {
 		self
 	}

@@ -8,14 +8,14 @@ pub use camera::*;
 
 pub struct Scene {
 	clear_color: Option<[f32; 4]>,
-	render_target: Box<dyn Texture>,
-	depth_buffer: Box<dyn Texture>,
-	materials: HashMap<&'static str, Box<dyn Material>>,
+	render_target: Texture,
+	depth_buffer: Texture,
+	materials: HashMap<&'static str, Material>,
 	objects: crate::ObjectBuffer,
 }
 
 impl Scene {
-	pub fn new(renderer: &Box<dyn Renderer>, render_width: u32, render_height: u32) -> Self {
+	pub fn new(renderer: &Renderer, render_width: u32, render_height: u32) -> Self {
 		Self {
 			clear_color: Some([0.0, 0.0, 0.0, 1.0]),
 			render_target: renderer.create_texture(render_width, render_height, TextureFormat::Rgba8Unorm, TextureUsage::RENDER_TARGET | TextureUsage::TEXTURE_BINDING),
@@ -30,7 +30,7 @@ impl Scene {
 	
 	/// Resizes the render target.
 	/// This will make the previous ones invalid!
-	pub fn resize(&mut self, renderer: &Box<dyn Renderer>, render_width: u32, render_height: u32) {
+	pub fn resize(&mut self, renderer: &Renderer, render_width: u32, render_height: u32) {
 		self.render_target = renderer.create_texture(render_width, render_height, TextureFormat::Rgba8Unorm, TextureUsage::RENDER_TARGET | TextureUsage::TEXTURE_BINDING);
 		self.depth_buffer = renderer.create_texture(render_width, render_height, TextureFormat::Depth32Float, TextureUsage::DEPTH_STENCIL | TextureUsage::TEXTURE_BINDING);
 	}
@@ -39,7 +39,7 @@ impl Scene {
 		self.clear_color = color;
 	}
 	
-	pub fn register_material(&mut self, id: &'static str, material: Box<dyn Material>) {
+	pub fn register_material(&mut self, id: &'static str, material: Material) {
 		self.materials.insert(id, material);
 	}
 	
@@ -65,11 +65,11 @@ impl Scene {
 		obj.as_mut()
 	}
 	
-	pub fn render(&self, renderer: &Box<dyn Renderer>, camera: &Camera) {
+	pub fn render(&self, renderer: &Renderer, camera: &Camera) {
 		renderer.render(&self.clear_color, &self.render_target, &self.depth_buffer, &self.materials, &self.objects, camera);
 	}
 	
-	pub fn get_render_target(&self) -> &Box<dyn Texture> {
+	pub fn get_render_target(&self) -> &Texture {
 		&self.render_target
 	}
 }

@@ -131,7 +131,7 @@ impl log::Log for DalamudLogger {
 
 pub struct State {
 	renderer: renderer::Renderer,
-	renderer_3d: Box<dyn ::renderer::Renderer>,
+	renderer_3d: ::renderer::Renderer,
 	core: aetherment::Core,
 }
 

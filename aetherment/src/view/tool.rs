@@ -19,7 +19,7 @@ impl super::View for Tools {
 		"Tools"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
 		egui_dock::DockArea::new(&mut self.views)
 			.id(egui::Id::new("tool_tabs"))
 			.style(egui_dock::Style::from_egui(ui.style().as_ref()))

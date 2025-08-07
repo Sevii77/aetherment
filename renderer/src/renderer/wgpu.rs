@@ -1,16 +1,16 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 pub struct WgpuRenderer {
 	device: wgpu::Device,
 	queue: wgpu::Queue,
-	texture_register: Box<dyn Fn(&Box<dyn super::Texture>) -> u64>,
+	texture_register: Box<dyn Fn(&super::Texture) -> u64>,
 	
 	depth_stencil_state: wgpu::DepthStencilState,
 	basic_vertex_buffer_layout: wgpu::VertexBufferLayout<'static>,
 }
 
 impl WgpuRenderer {
-	pub fn new(device: wgpu::Device, queue: wgpu::Queue, texture_register: Box<dyn Fn(&Box<dyn super::Texture>) -> u64>) -> Self {
+	pub fn new(device: wgpu::Device, queue: wgpu::Queue, texture_register: Box<dyn Fn(&super::Texture) -> u64>) -> Self {
 		let basic_vertex_buffer_layout = wgpu::VertexBufferLayout {
 			array_stride: 64,
 			step_mode: wgpu::VertexStepMode::Vertex,
@@ -62,8 +62,8 @@ impl WgpuRenderer {
 	}
 }
 
-impl super::Renderer for WgpuRenderer {
-	fn create_material(&self, shader: &str, binds: &[super::MaterialBind]) -> Box<dyn super::Material> {
+impl super::RendererInner for WgpuRenderer {
+	fn create_material(&self, shader: &str, binds: &[super::MaterialBind]) -> super::Material {
 		let mut bind_group_layout_entries = vec![
 			wgpu::BindGroupLayoutEntry {
 				binding: 0,
@@ -146,12 +146,12 @@ impl super::Renderer for WgpuRenderer {
 			cache: None,
 		});
 		
-		Box::new(WgpuMaterial {
+		Rc::new(WgpuMaterial {
 			pipeline,
 		})
 	}
 	
-	fn create_texture(&self, width: u32, height: u32, format: super::TextureFormat, usage: super::TextureUsage) -> Box<dyn super::Texture> {
+	fn create_texture(&self, width: u32, height: u32, format: super::TextureFormat, usage: super::TextureUsage) -> super::Texture {
 		let texture = self.device.create_texture(&wgpu::TextureDescriptor {
 			label: None,
 			size: wgpu::Extent3d {
@@ -178,7 +178,7 @@ impl super::Renderer for WgpuRenderer {
 		
 		let view = texture.create_view(&Default::default());
 		
-		Box::new(WgpuTexture {
+		Rc::new(WgpuTexture {
 			queue: self.queue.clone(),
 			texture: texture,
 			view,
@@ -186,7 +186,7 @@ impl super::Renderer for WgpuRenderer {
 		})
 	}
 	
-	fn create_buffer(&self, size: usize, usage: super::BufferUsage) -> Box<dyn super::Buffer> {
+	fn create_buffer(&self, size: usize, usage: super::BufferUsage) -> super::Buffer {
 		let buffer = self.device.create_buffer(&wgpu::BufferDescriptor {
 			label: None,
 			size: size as u64,
@@ -194,13 +194,13 @@ impl super::Renderer for WgpuRenderer {
 			mapped_at_creation: false,
 		});
 		
-		Box::new(WgpuBuffer {
+		Rc::new(WgpuBuffer {
 			queue: self.queue.clone(),
 			buffer,
 		})
 	}
 	
-	fn create_sampler(&self, address_u: super::SamplerAddress, address_v: super::SamplerAddress, min: super::SamplerFilter, mag: super::SamplerFilter) -> Box<dyn super::Sampler> {
+	fn create_sampler(&self, address_u: super::SamplerAddress, address_v: super::SamplerAddress, min: super::SamplerFilter, mag: super::SamplerFilter) -> super::Sampler {
 		let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
 			label: None,
 			address_mode_u: match address_u {
@@ -226,16 +226,16 @@ impl super::Renderer for WgpuRenderer {
 			..Default::default()
 		});
 		
-		Box::new(WgpuSampler {
+		Rc::new(WgpuSampler {
 			sampler,
 		})
 	}
 	
 	fn render(&self,
 		clear_color: &Option<[f32; 4]>,
-		render_target: &Box<dyn super::Texture>,
-		depth_buffer: &Box<dyn super::Texture>,
-		materials: &HashMap<&'static str, Box<dyn super::Material>>,
+		render_target: &super::Texture,
+		depth_buffer: &super::Texture,
+		materials: &HashMap<&'static str, super::Material>,
 		objects: &crate::ObjectBuffer,
 		camera: &crate::scene::Camera) {
 		let render_target = render_target.as_any().downcast_ref::<WgpuTexture>().unwrap();
@@ -323,7 +323,7 @@ impl super::Renderer for WgpuRenderer {
 		self.queue.submit([encoder.finish()]);
 	}
 	
-	fn register_texture(&self, texture: &Box<dyn super::Texture>) -> u64 {
+	fn register_texture(&self, texture: &super::Texture) -> u64 {
 		(self.texture_register)(texture)
 	}
 	
@@ -342,7 +342,7 @@ pub struct WgpuMaterial {
 	pipeline: wgpu::RenderPipeline,
 }
 
-impl super::Material for WgpuMaterial {
+impl super::MaterialInner for WgpuMaterial {
 	fn as_any(&self) -> &dyn std::any::Any {
 		self
 	}
@@ -363,7 +363,7 @@ impl WgpuTexture {
 	}
 }
 
-impl super::Texture for WgpuTexture {
+impl super::TextureInner for WgpuTexture {
 	fn as_any(&self) -> &dyn std::any::Any {
 		self
 	}
@@ -389,7 +389,7 @@ pub struct WgpuBuffer {
 	buffer: wgpu::Buffer,
 }
 
-impl super::Buffer for WgpuBuffer {
+impl super::BufferInner for WgpuBuffer {
 	fn as_any(&self) -> &dyn std::any::Any {
 		self
 	}
@@ -405,7 +405,7 @@ pub struct WgpuSampler {
 	sampler: wgpu::Sampler,
 }
 
-impl super::Sampler for WgpuSampler {
+impl super::SamplerInner for WgpuSampler {
 	fn as_any(&self) -> &dyn std::any::Any {
 		self
 	}

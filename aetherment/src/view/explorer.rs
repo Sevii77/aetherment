@@ -4,7 +4,7 @@ mod resource;
 
 pub trait ExplorerView {
 	fn title(&self) -> String;
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer);
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer);
 }
 
 enum TabType {
@@ -25,7 +25,7 @@ struct ExplorerTab {
 
 struct Viewer<'r> {
 	add: Option<(TabType, (egui_dock::SurfaceIndex, egui_dock::NodeIndex))>,
-	renderer: &'r crate::Renderer,
+	renderer: &'r renderer::Renderer,
 }
 
 impl<'r> egui_dock::TabViewer for Viewer<'r> {
@@ -71,9 +71,7 @@ impl Explorer {
 		};
 		
 		s.add_tab(Box::new(tree::Tree::new()), Split::None, None);
-		s.add_tab(Box::new(resource::Resource::new("common/graphics/texture/-mogu_anime_en.tex")), Split::Horizontal(0.2), None);
-		s.add_tab(Box::new(resource::Resource::new("common/graphics/texture/-caustics.tex")), Split::None, None);
-		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/obj/body/b0001/texture/c0201b0001_base.tex")), Split::None, None);
+		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/obj/body/b0001/texture/c0201b0001_base.tex")), Split::Horizontal(0.2), None);
 		s.add_tab(Box::new(resource::Resource::new("chara/monster/m0934/obj/body/b0001/model/m0934b0001.mdl")), Split::None, None);
 		s.add_tab(Box::new(resource::Resource::new("chara/human/c1401/obj/face/f0001/model/c1401f0001_fac.mdl")), Split::None, None);
 		s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/model/c0201e6100_top.mdl")), Split::None, None);
@@ -117,7 +115,7 @@ impl super::View for Explorer {
 		"Explorer"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
 		let mut viewer = Viewer {
 			add: None,
 			renderer,

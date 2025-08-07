@@ -4,14 +4,14 @@ pub struct Mesh {
 	visible: bool,
 	matrix: glam::Mat4,
 	material: &'static str,
-	vertex_buffer: Box<dyn Buffer>,
-	index_buffer: Box<dyn Buffer>,
+	vertex_buffer: Buffer,
+	index_buffer: Buffer,
 	index_count: u32,
 	shader_resources: Vec<ShaderResource>,
 }
 
 impl Mesh {
-	pub fn new(renderer: &Box<dyn Renderer>, vertices: &[Vertex], indices: &[u16]) -> Self {
+	pub fn new(renderer: &Renderer, vertices: &[Vertex], indices: &[u16]) -> Self {
 		Self {
 			visible: true,
 			matrix: glam::Mat4::IDENTITY,
@@ -28,7 +28,7 @@ impl Mesh {
 		}
 	}
 	
-	pub fn new_test_cube(renderer: &Box<dyn Renderer>) -> Self {
+	pub fn new_test_cube(renderer: &Renderer) -> Self {
 		let vertices = &mut [
 			vertex(glam::vec3(-1.0, -1.0,  1.0), glam::vec3( 0.0,  0.0,  1.0), glam::vec4(1.0, 0.0, 0.0, 1.0), glam::vec2(0.0, 0.0)),
 			vertex(glam::vec3( 1.0, -1.0,  1.0), glam::vec3( 0.0,  0.0,  1.0), glam::vec4(1.0, 0.0, 0.0, 1.0), glam::vec2(1.0, 0.0)),
@@ -75,7 +75,7 @@ impl Mesh {
 		Self::new(renderer, vertices, indices)
 	}
 	
-	pub(crate) fn create_material(renderer: &Box<dyn Renderer>) -> (&'static str, Box<dyn Material>) {
+	pub(crate) fn create_material(renderer: &Renderer) -> (&'static str, Material) {
 		(
 			"3dmesh_lit",
 			renderer.create_material(include_str!("./mesh.wgsl"), &[
@@ -99,11 +99,11 @@ impl Mesh {
 		)
 	}
 	
-	pub fn set_vertices(&mut self, renderer: &Box<dyn Renderer>, vertices: &[Vertex]) {
+	pub fn set_vertices(&mut self, renderer: &Renderer, vertices: &[Vertex]) {
 		self.vertex_buffer = create_vertex_buffer(renderer, vertices);
 	}
 	
-	pub fn set_indices(&mut self, renderer: &Box<dyn Renderer>, indices: &[u16]) {
+	pub fn set_indices(&mut self, renderer: &Renderer, indices: &[u16]) {
 		self.index_buffer = create_index_buffer(renderer, indices);
 		self.index_count = indices.len() as u32;
 	}
@@ -130,11 +130,11 @@ impl super::Object for Mesh {
 		&self.material
 	}
 	
-	fn get_index_buffer(&self) -> &Box<dyn Buffer> {
+	fn get_index_buffer(&self) -> &Buffer {
 		&self.index_buffer
 	}
 	
-	fn get_vertex_buffer(&self) -> &Box<dyn Buffer> {
+	fn get_vertex_buffer(&self) -> &Buffer {
 		&self.vertex_buffer
 	}
 	
@@ -159,13 +159,13 @@ impl super::Object for Mesh {
 	}
 }
 
-fn create_vertex_buffer(renderer: &Box<dyn Renderer>, vertices: &[Vertex]) -> Box<dyn Buffer> {
+fn create_vertex_buffer(renderer: &Renderer, vertices: &[Vertex]) -> Buffer {
 	let vertex_buffer = renderer.create_buffer(size_of_val(vertices), BufferUsage::COPY_DST | BufferUsage::VERTEX);
 	vertex_buffer.set_data(bytemuck::cast_slice(vertices));
 	vertex_buffer
 }
 
-fn create_index_buffer(renderer: &Box<dyn Renderer>, indices: &[u16]) -> Box<dyn Buffer> {
+fn create_index_buffer(renderer: &Renderer, indices: &[u16]) -> Buffer {
 	let index_buffer;
 	if indices.len() % 2 == 0 {
 		index_buffer = renderer.create_buffer(size_of_val(indices), BufferUsage::COPY_DST | BufferUsage::INDEX);

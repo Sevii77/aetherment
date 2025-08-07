@@ -72,7 +72,7 @@ impl super::View for Mods {
 		"Mods"
 	}
 
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
 		let backend = crate::backend();
 		let config = crate::config();
 		config.mark_for_changes();

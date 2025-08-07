@@ -42,8 +42,6 @@ pub fn noumenon() -> Option<&'static noumenon::Noumenon> {
 	unsafe{NOUMENON.get_or_insert_with(|| noumenon::get_noumenon(config().config.game_install.as_ref())).as_ref()}
 }
 
-pub type Renderer = Box<dyn renderer::Renderer>;
-
 pub trait EnumTools {
 	type Iterator: core::iter::Iterator<Item = Self>;
 	
@@ -128,7 +126,7 @@ impl Core {
 		s
 	}
 	
-	pub fn draw(&mut self, ui: &mut egui::Ui, renderer: &Box<dyn renderer::Renderer>,) {
+	pub fn draw(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
 		let status = backend().get_status();
 		match status {
 			modman::backend::Status::Ok => {

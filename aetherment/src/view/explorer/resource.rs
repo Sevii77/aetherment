@@ -38,7 +38,7 @@ pub fn read_file(path: &Path) -> Result<Vec<u8>, crate::resource_loader::Backtra
 pub trait ResourceView {
 	fn title(&self) -> String;
 	fn has_changes(&self) -> bool;
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer);
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer);
 }
 
 // ----------
@@ -68,7 +68,7 @@ impl super::ExplorerView for Resource {
 		)
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
 		ui.filled_reserved_vertical("path_footer", |ui_filled, ui_reserved| {
 			self.resource.ui(ui_filled, renderer);
 			

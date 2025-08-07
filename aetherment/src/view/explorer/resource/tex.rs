@@ -44,7 +44,7 @@ impl super::ResourceView for TexView {
 		false
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &crate::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
 		if self.img.is_none() {
 			self.load_image(ui.ctx());
 		}

@@ -26,7 +26,7 @@ impl std::ops::DerefMut for InteractableScene {
 }
 
 impl InteractableScene {
-	pub fn new(renderer: &crate::Renderer) -> Self {
+	pub fn new(renderer: &renderer::Renderer) -> Self {
 		let scene = renderer::Scene::new(renderer, 32, 32);
 		
 		Self {
@@ -41,7 +41,7 @@ impl InteractableScene {
 		}
 	}
 	
-	pub fn render(&mut self, renderer: &crate::Renderer, width: usize, height: usize, ui: &mut egui::Ui) {
+	pub fn render(&mut self, renderer: &renderer::Renderer, width: usize, height: usize, ui: &mut egui::Ui) {
 		if (self.width != width || self.height != height) && width >= 16 && height >= 16 {
 			self.width = width;
 			self.height = height;

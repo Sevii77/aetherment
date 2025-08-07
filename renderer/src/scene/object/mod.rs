@@ -12,8 +12,8 @@ pub trait Object {
 	fn get_matrix(&self) -> &Mat4;
 	fn get_matrix_mut(&mut self) -> &mut Mat4;
 	fn get_material_id(&self) -> &str;
-	fn get_vertex_buffer(&self) -> &Box<dyn Buffer>;
-	fn get_index_buffer(&self) -> &Box<dyn Buffer>;
+	fn get_vertex_buffer(&self) -> &Buffer;
+	fn get_index_buffer(&self) -> &Buffer;
 	fn get_index_count(&self) -> u32;
 	fn get_shader_resources(&self) -> &[ShaderResource];
 	fn get_shader_resources_mut(&mut self) -> &mut [ShaderResource];

@@ -14,6 +14,33 @@ pub struct Mdl {
 	pub lods: Vec<Lod>,
 }
 
+impl Mdl {
+	pub fn absolute_mtrl_path(material_path: &str, variant: usize) -> String {
+		if !material_path.starts_with("/") {
+			return material_path.to_string();
+		}
+		
+		let type1 = &material_path[4..=4];
+		let id1 = &material_path[5..9];
+		let type2 = &material_path[9..=9];
+		let id2 = &material_path[10..14];
+		
+		match (type1, type2) {
+			("c", "a") => format!("chara/accessory/a{id2}/material/v{variant:04}{material_path}"),
+			("c", "b") => format!("chara/human/c{id1}/obj/body/b{id2}/material/v{variant:04}{material_path}"),
+			("c", "e") => format!("chara/equipment/e{id2}/material/v{variant:04}{material_path}"),
+			("c", "f") => format!("chara/human/c{id1}/obj/face/f{id2}/material{material_path}"),
+			("c", "h") => format!("chara/human/c{id1}/obj/hair/h{id2}/material/v{variant:04}{material_path}"),
+			("c", "t") => format!("chara/human/c{id1}/obj/tail/t{id2}/material/v{variant:04}{material_path}"),
+			("c", "z") => format!("chara/human/c{id1}/obj/zear/z{id2}/material{material_path}"),
+			("d", "e") => format!("chara/demihuman/d{id1}/obj/equipment/e{id2}/material/v{variant:04}{material_path}"),
+			("m", "b") => format!("chara/monster/m{id1}/obj/body/b{id2}/material/v{variant:04}{material_path}"),
+			("w", "b") => format!("chara/weapon/w{id1}/obj/body/b{id2}/material/v{variant:04}{material_path}"),
+			_ => material_path.to_string()
+		}
+	}
+}
+
 impl BinRead for Mdl {
 	type Args<'a> = ();
 	

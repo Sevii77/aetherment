@@ -27,7 +27,7 @@ impl super::View for Debug {
 		"Debug"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &crate::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
 		ui.collapsing("3D Renderer", |ui| {
 			let scene = self.scene.get_or_insert_with(|| {
 				let mut scene = InteractableScene::new(renderer);

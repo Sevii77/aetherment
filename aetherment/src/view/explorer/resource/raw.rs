@@ -44,7 +44,7 @@ impl RawView {
 		for i in self.scroll..self.len / 16 + 1 {
 			let row = &self.data[i * 16..self.len.min(i * 16 + 16)];
 			
-			let mut line = format!("{i:08x}");
+			let mut line = format!("{i:07x}0");
 			let mut text = "  ".to_string();
 			
 			for j in 0..16 {

@@ -76,3 +76,20 @@ pub fn calculate_tangents(vertices: &mut [Vertex], indices: &[u16]) {
 		v.tangent = Vec4::new(tangent.x, tangent.y, tangent.z, w);
 	}
 }
+
+pub fn calculate_normals(vertices: &mut [Vertex], indices: &[u16]) {
+	for i in (0..indices.len()).step_by(3) {
+		let i1 = indices[i    ] as usize;
+		let i2 = indices[i + 1] as usize;
+		let i3 = indices[i + 2] as usize;
+		
+		let v1 = &vertices[i1];
+		let v2 = &vertices[i2];
+		let v3 = &vertices[i3];
+		
+		let normal = (v2.position - v1.position).cross(v3.position - v1.position).normalize();
+		vertices[i1].normal = normal;
+		vertices[i2].normal = normal;
+		vertices[i3].normal = normal;
+	}
+}

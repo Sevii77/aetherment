@@ -397,6 +397,10 @@ impl super::BufferInner for WgpuBuffer {
 	fn set_data(&self, data: &[u8]) {
 		self.queue.write_buffer(&self.buffer, 0, data);
 	}
+	
+	fn size(&self) -> usize {
+		self.buffer.size() as usize
+	}
 }
 
 // ----------

@@ -76,6 +76,7 @@ impl Explorer {
 		s.add_tab(Box::new(resource::Resource::new("chara/human/c1401/obj/face/f0001/model/c1401f0001_fac.mdl")), Split::None, None);
 		s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/model/c0201e6100_top.mdl")), Split::None, None);
 		s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/material/v0001/mt_c0201e6100_top_a.mtrl")), Split::Vertical(0.5), None);
+		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb")), Split::None, None);
 		
 		s
 	}

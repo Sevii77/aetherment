@@ -69,8 +69,12 @@ impl super::RendererInner for D3d11Renderer {
 				..Default::default()
 			};
 			
+			let options2 = naga::back::hlsl::PipelineOptions {
+				entry_point: None,
+			};
+			
 			let mut buf = String::new();
-			let mut writer = naga::back::hlsl::Writer::new(&mut buf, &options);
+			let mut writer = naga::back::hlsl::Writer::new(&mut buf, &options, &options2);
 			writer.write(&module, &info, None).unwrap();
 			
 			buf
@@ -212,6 +216,7 @@ impl super::RendererInner for D3d11Renderer {
 		Rc::new(D3d11Buffer {
 			buffer: buffer.unwrap(),
 			context: self.context.clone(),
+			size,
 		})
 	}
 	
@@ -444,6 +449,7 @@ impl super::TextureInner for D3d11Texture {
 pub struct D3d11Buffer {
 	buffer: ID3D11Buffer,
 	context: Rc<ID3D11DeviceContext>,
+	size: usize,
 }
 
 impl super::BufferInner for D3d11Buffer {
@@ -455,6 +461,10 @@ impl super::BufferInner for D3d11Buffer {
 		let mut data_map = D3D11_MAPPED_SUBRESOURCE::default();
 		unsafe{self.context.Map(&self.buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, Some(&mut data_map)).unwrap()};
 		unsafe{core::ptr::copy_nonoverlapping(data.as_ptr(), data_map.pData as _, data.len())};
+	}
+	
+	fn size(&self) -> usize {
+		self.size
 	}
 }
 

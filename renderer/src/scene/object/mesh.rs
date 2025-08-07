@@ -11,14 +11,14 @@ pub struct Mesh {
 }
 
 impl Mesh {
-	pub fn new(renderer: &Renderer, vertices: &[Vertex], indices: &[u16]) -> Self {
+	pub fn new_buffer(renderer: &Renderer, vertices: Buffer, indices: Buffer) -> Self {
 		Self {
 			visible: true,
 			matrix: glam::Mat4::IDENTITY,
 			material: "3dmesh_lit",
-			vertex_buffer: create_vertex_buffer(renderer, vertices),
-			index_buffer: create_index_buffer(renderer, indices),
-			index_count: indices.len() as u32,
+			vertex_buffer: vertices,
+			index_count: (indices.size() / 2) as u32,
+			index_buffer: indices,
 			shader_resources: vec![
 				ShaderResource::Texture(renderer.create_texture_initialized(1, 1, TextureFormat::Rgba8Unorm, TextureUsage::TEXTURE_BINDING, &[255; 4])),
 				ShaderResource::Sampler(renderer.create_sampler(SamplerAddress::Repeat, SamplerAddress::Repeat, SamplerFilter::Linear, SamplerFilter::Linear)),
@@ -26,6 +26,9 @@ impl Mesh {
 				ShaderResource::Sampler(renderer.create_sampler(SamplerAddress::Repeat, SamplerAddress::Repeat, SamplerFilter::Linear, SamplerFilter::Linear)),
 			]
 		}
+	}
+	pub fn new(renderer: &Renderer, vertices: &[Vertex], indices: &[u16]) -> Self {
+		Self::new_buffer(renderer, create_vertex_buffer(renderer, vertices), create_index_buffer(renderer, indices))
 	}
 	
 	pub fn new_test_cube(renderer: &Renderer) -> Self {
@@ -159,13 +162,13 @@ impl super::Object for Mesh {
 	}
 }
 
-fn create_vertex_buffer(renderer: &Renderer, vertices: &[Vertex]) -> Buffer {
+pub fn create_vertex_buffer(renderer: &Renderer, vertices: &[Vertex]) -> Buffer {
 	let vertex_buffer = renderer.create_buffer(size_of_val(vertices), BufferUsage::COPY_DST | BufferUsage::VERTEX);
 	vertex_buffer.set_data(bytemuck::cast_slice(vertices));
 	vertex_buffer
 }
 
-fn create_index_buffer(renderer: &Renderer, indices: &[u16]) -> Buffer {
+pub fn create_index_buffer(renderer: &Renderer, indices: &[u16]) -> Buffer {
 	let index_buffer;
 	if indices.len() % 2 == 0 {
 		index_buffer = renderer.create_buffer(size_of_val(indices), BufferUsage::COPY_DST | BufferUsage::INDEX);

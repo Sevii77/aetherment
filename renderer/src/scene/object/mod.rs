@@ -1,10 +1,10 @@
 use glam::{Mat4, Vec3, Quat, Vec4Swizzles};
 use crate::renderer::{Buffer, ShaderResource};
 
-mod mesh;
-pub use mesh::*;
-mod skybox;
-pub use skybox::*;
+pub mod mesh;
+pub use mesh::Mesh;
+pub mod skybox;
+pub use skybox::Skybox;
 
 pub trait Object {
 	fn as_any(&self) -> &dyn std::any::Any;

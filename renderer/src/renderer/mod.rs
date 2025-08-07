@@ -167,6 +167,7 @@ pub type Buffer = Rc<dyn BufferInner>;
 pub trait BufferInner {
 	fn as_any(&self) -> &dyn std::any::Any;
 	fn set_data(&self, data: &[u8]);
+	fn size(&self) -> usize;
 }
 
 pub type Sampler = Rc<dyn SamplerInner>;

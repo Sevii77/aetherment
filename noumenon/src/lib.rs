@@ -12,7 +12,13 @@ macro_rules! simple_reader {
 			}};
 			
 			(seek $c:expr) => {{
-				reader.seek(SeekFrom::Start($c as u64))?
+				reader.seek(::std::io::SeekFrom::Start($c as u64))?
+			}};
+			
+			(eof) => {{
+				let mut v = Vec::new();
+				reader.read_to_end(&mut v)?;
+				v
 			}};
 			
 			(Vec<$e:ty>, $c:expr) => {{
@@ -41,6 +47,10 @@ macro_rules! simple_reader {
 // ----------
 
 pub mod format;
+
+// https://github.com/redstrate/Physis
+// i fucking love you for making this redstrate <3
+mod havok;
 
 // ----------
 

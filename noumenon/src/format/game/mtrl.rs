@@ -1,7 +1,5 @@
-
 use std::{fmt::Debug, io::{Read, Seek, Write}};
 use binrw::{binrw, BinRead, BinWrite};
-
 use crate::NullReader;
 
 pub const EXT: &'static [&'static str] = &["mtrl"];

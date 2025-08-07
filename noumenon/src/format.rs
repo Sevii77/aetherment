@@ -9,7 +9,8 @@ pub mod external {
 	pub use tga::Tga;
 	pub mod tiff;
 	pub use tiff::Tiff;
-	
+	pub mod gltf;
+	pub use gltf::Gltf;
 	// pub mod fbx;
 	// pub use fbx::Fbx;
 }
@@ -27,4 +28,6 @@ pub mod game {
 	pub use exh::Exh;
 	pub mod mdl;
 	pub use mdl::Mdl;
+	pub mod sklb;
+	pub use sklb::Sklb;
 }

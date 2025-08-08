@@ -79,7 +79,7 @@ impl BinRead for Mtrl {
 				.map(|v| Sampler {
 					typ: v.typ,
 					flags: v.flags,
-					texture: strings[texture_infos[v.texture_id as usize].0 as usize..].null_terminated().unwrap(),
+					texture: if v.texture_id == 255 {String::new()} else {strings[texture_infos[v.texture_id as usize].0 as usize..].null_terminated().unwrap()},
 				}).collect(),
 			shader_keys,
 			shader_flags,

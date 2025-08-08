@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use glam::Vec4Swizzles;
-use noumenon::format::{external::Bytes, game::{Mdl, Mtrl, Tex}};
+use noumenon::format::{external::Bytes, game::Mdl};
 use crate::ui_ext::{InteractableScene, UiExt};
 
 pub struct MdlView {
@@ -36,7 +36,7 @@ impl super::ResourceView for MdlView {
 		false
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> crate::view::explorer::Action {
 		let scene = self.scene.get_or_insert_with(|| {
 			let mut scene = InteractableScene::new(renderer);
 			
@@ -180,6 +180,8 @@ impl super::ResourceView for MdlView {
 				});
 			}
 		});
+		
+		crate::view::explorer::Action::None
 	}
 }
 

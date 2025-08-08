@@ -27,7 +27,7 @@ impl super::ResourceView for SklbView {
 		false
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> crate::view::explorer::Action {
 		let scene = self.scene.get_or_insert_with(|| {
 			let mut scene = InteractableScene::new(renderer);
 			
@@ -93,5 +93,7 @@ impl super::ResourceView for SklbView {
 		
 		let size = ui.available_size();
 		scene.render(renderer, size.x as usize, size.y as usize, ui);
+		
+		crate::view::explorer::Action::None
 	}
 }

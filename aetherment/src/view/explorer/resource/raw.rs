@@ -89,11 +89,13 @@ impl super::ResourceView for RawView {
 		false
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> crate::view::explorer::Action {
 		if self.text.is_some() {
 			self.ui_text(ui);
 		} else {
 			self.ui_binary(ui);
 		}
+		
+		crate::view::explorer::Action::None
 	}
 }

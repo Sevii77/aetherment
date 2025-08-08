@@ -44,7 +44,7 @@ impl super::ResourceView for TexView {
 		false
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> crate::view::explorer::Action {
 		if self.img.is_none() {
 			self.load_image(ui.ctx());
 		}
@@ -85,5 +85,7 @@ impl super::ResourceView for TexView {
 				self.load_image(ui.ctx());
 			}
 		});
+		
+		crate::view::explorer::Action::None
 	}
 }

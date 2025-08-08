@@ -1,17 +1,40 @@
+use std::collections::HashSet;
+
 mod workspace;
 mod tree;
 mod resource;
 
 pub trait ExplorerView {
+	fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 	fn title(&self) -> String;
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer);
+	fn path(&self) -> Option<&str>;
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> Action;
 }
 
-enum TabType {
+#[derive(Debug, Clone, PartialEq)]
+pub enum Action {
+	None,
+	OpenNew(String),
+	OpenExisting(String),
+	OpenComplex((TabType, (egui_dock::SurfaceIndex, egui_dock::NodeIndex))),
+	Close(String),
+}
+
+impl Action {
+	pub fn or(&mut self, other: Self) {
+		if *self == Self::None {
+			*self = other;
+		}
+	}
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TabType {
 	Tree,
 	Resource,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 enum Split {
 	None,
 	Horizontal(f32),
@@ -24,7 +47,7 @@ struct ExplorerTab {
 }
 
 struct Viewer<'r> {
-	add: Option<(TabType, (egui_dock::SurfaceIndex, egui_dock::NodeIndex))>,
+	action: Action,
 	renderer: &'r renderer::Renderer,
 }
 
@@ -41,7 +64,7 @@ impl<'r> egui_dock::TabViewer for Viewer<'r> {
 	
 	fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
 		ui.push_id(tab.id, |ui| {
-			tab.tab.ui(ui, self.renderer);
+			self.action.or(tab.tab.ui(ui, self.renderer));
 		});
 	}
 	
@@ -49,18 +72,27 @@ impl<'r> egui_dock::TabViewer for Viewer<'r> {
 		ui.set_min_width(150.0);
 		
 		if ui.selectable_label(false, "Add Tree").clicked() {
-			self.add = Some((TabType::Tree, (surface, node)));
+			self.action = Action::OpenComplex((TabType::Tree, (surface, node)));
 		}
 		
 		if ui.selectable_label(false, "Add Resource View").clicked() {
-			self.add = Some((TabType::Resource, (surface, node)));
+			self.action = Action::OpenComplex((TabType::Resource, (surface, node)));
 		}
+	}
+	
+	fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
+		if let Some(path) = tab.tab.path() {
+			self.action = Action::Close(path.to_owned());
+		}
+		
+		true
 	}
 }
 
 pub struct Explorer {
 	id_counter: usize,
 	views: egui_dock::DockState<ExplorerTab>,
+	last_focused_resource: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex, egui_dock::TabIndex, String)>,
 }
 
 impl Explorer {
@@ -68,6 +100,7 @@ impl Explorer {
 		let mut s = Self {
 			id_counter: 0,
 			views: egui_dock::DockState::new(Vec::new()),
+			last_focused_resource: None,
 		};
 		
 		s.add_tab(Box::new(tree::Tree::new()), Split::None, None);
@@ -81,6 +114,24 @@ impl Explorer {
 		s
 	}
 	
+	fn update_trees(&mut self) {
+		let mut open_paths = HashSet::new();
+		for surface in self.views.iter_surfaces() {
+			for node in surface.iter_nodes() {
+				for tab in node.iter_tabs() {
+					if let Some(path) = tab.tab.path() {
+						open_paths.insert(path.to_owned());
+					}
+				}
+			}
+		}
+		
+		for (_, tab) in self.views.iter_all_tabs_mut() {
+			let Some(tree) = tab.tab.as_any_mut().downcast_mut::<tree::Tree>() else {continue};
+			tree.open_paths = open_paths.clone();
+		}
+	}
+	
 	fn add_tab(&mut self, tab: Box<dyn ExplorerView>, split: Split, surface_node: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex)>) {
 		self.id_counter += 1;
 		let tab = ExplorerTab {
@@ -89,7 +140,6 @@ impl Explorer {
 		};
 		
 		'split: {
-			// let Some(fraction) = split else {break 'split};
 			let Some(surface_node) = surface_node.or_else(||
 				self.views.focused_leaf().or_else(||
 					self.views.iter_all_tabs().last().map(|v| v.0))) else {break 'split};
@@ -108,6 +158,7 @@ impl Explorer {
 		}
 		
 		self.views.push_to_focused_leaf(tab);
+		self.update_trees();
 	}
 }
 
@@ -118,7 +169,7 @@ impl super::View for Explorer {
 	
 	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
 		let mut viewer = Viewer {
-			add: None,
+			action: Action::None,
 			renderer,
 		};
 		
@@ -131,10 +182,33 @@ impl super::View for Explorer {
 			.show_leaf_collapse_buttons(false)
 			.show_inside(ui, &mut viewer);
 		
-		match viewer.add {
-			Some((TabType::Tree, v)) => self.add_tab(Box::new(tree::Tree::new()), Split::None, Some(v)),
-			Some((TabType::Resource, v)) => self.add_tab(Box::new(resource::Resource::new("ui/uld/logo_sqex_hr1.tex")), Split::None, Some(v)),
-			None => {}
+		if let Some(focused) = self.views.focused_leaf() {
+			if let Some((_, tab)) = self.views.find_active_focused() {
+				if let Some(path) = tab.tab.path() {
+					let path = path.to_string();
+					let tab_id = tab.id;
+					let node = self.views.iter_all_nodes().nth(focused.1.0).unwrap();
+					if let Some(index) = node.1.iter_tabs().position(|v| v.id == tab_id) {
+						self.last_focused_resource = Some((focused.0, focused.1, egui_dock::TabIndex(index), path));
+					}
+				}
+			}
+		}
+		
+		match viewer.action {
+			Action::OpenNew(path) => self.add_tab(Box::new(resource::Resource::new(&path)), Split::None, self.last_focused_resource.as_ref().map(|v| (v.0, v.1))),
+			Action::OpenExisting(path) => {
+				if let Some(focused) = &mut self.last_focused_resource {
+					self.views[focused.0][focused.1].tabs_mut().unwrap()[focused.2.0].tab = Box::new(resource::Resource::new(&path));
+					self.update_trees();
+				}
+			}
+			Action::OpenComplex((TabType::Tree, v)) => self.add_tab(Box::new(tree::Tree::new()), Split::None, Some(v)),
+			Action::OpenComplex((TabType::Resource, v)) => self.add_tab(Box::new(resource::Resource::new("ui/uld/logo_sqex_hr1.tex")), Split::None, Some(v)),
+			Action::Close(_path) =>{
+				self.update_trees();
+			}
+			Action::None => {}
 		}
 	}
 }

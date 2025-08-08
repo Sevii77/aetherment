@@ -39,7 +39,7 @@ pub fn read_file(path: &Path) -> Result<Vec<u8>, crate::resource_loader::Backtra
 pub trait ResourceView {
 	fn title(&self) -> String;
 	fn has_changes(&self) -> bool;
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer);
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> super::Action;
 }
 
 // ----------
@@ -47,7 +47,7 @@ pub trait ResourceView {
 pub struct Resource {
 	path: String,
 	resource: Box<dyn ResourceView>,
-	changed: bool,
+	changed_path: bool,
 }
 
 impl Resource {
@@ -55,12 +55,16 @@ impl Resource {
 		Self {
 			path: path.to_string(),
 			resource: load_resource_view(path),
-			changed: false,
+			changed_path: false,
 		}
 	}
 }
 
 impl super::ExplorerView for Resource {
+	fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+		self
+	}
+	
 	fn title(&self) -> String {
 		format!("{} - {}{}",
 			self.resource.title(),
@@ -69,23 +73,30 @@ impl super::ExplorerView for Resource {
 		)
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
+	fn path(&self) -> Option<&str> {
+		Some(&self.path)
+	}
+	
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> super::Action {
+		let mut act = super::Action::None;
 		ui.filled_reserved_vertical("path_footer", |ui_filled, ui_reserved| {
-			self.resource.ui(ui_filled, renderer);
+			act = self.resource.ui(ui_filled, renderer);
 			
 			let resp = egui::TextEdit::singleline(&mut self.path)
 				.desired_width(f32::INFINITY)
 				.ui(ui_reserved);
 			
 			if resp.changed() {
-				self.changed = true;
+				self.changed_path = true;
 			}
 			
-			if resp.lost_focus() && self.changed {
+			if resp.lost_focus() && self.changed_path {
 				self.resource = load_resource_view(&self.path);
-				self.changed = false;
+				self.changed_path = false;
 			}
 		});
+		
+		act
 	}
 }
 

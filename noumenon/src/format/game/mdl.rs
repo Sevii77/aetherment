@@ -576,7 +576,6 @@ impl crate::format::external::Gltf<Error> for Mdl {
 				name: Some(model_name.to_string()),
 				inverse_bind_matrices: Some(matrix_access),
 				joints: bone_nodes.clone(),
-				// skeleton: Some(parent),
 				skeleton: None,
 				extensions: Default::default(),
 				extras: Default::default(),
@@ -659,7 +658,6 @@ impl crate::format::external::Gltf<Error> for Mdl {
 		
 		let mut nodes = Vec::new();
 		for (lod_index, lod) in self.lods.iter().enumerate() {
-			// let mut child_nodes = Vec::new();
 			for (mesh_index, mesh) in lod.meshes.iter().enumerate() {
 				for (submesh_index, submesh) in mesh.submeshes.iter().enumerate() {
 					// TODO: dont add bones if theres no skeleton, and only use 4 if 8 isnt needed (probably anything except faces)
@@ -795,18 +793,9 @@ impl crate::format::external::Gltf<Error> for Mdl {
 						..Default::default()
 					});
 					
-					// child_nodes.push(node);
 					nodes.push(node);
 				}
 			}
-			
-			// let node = root.push(json::Node {
-			// 	name: Some(format!("Lod{lod_index}")),
-			// 	children: Some(child_nodes),
-			// 	..Default::default()
-			// });
-			
-			// nodes.push(node);
 		}
 		
 		root.buffers[0].byte_length.0 = buf.len() as u64;
@@ -846,6 +835,7 @@ impl crate::format::external::Gltf<Error> for Mdl {
 	}
 }
 
+// https://github.com/gltf-rs/gltf/blob/main/examples/export/main.rs#L41
 fn align_to_multiple_of_four(n: &mut usize) {
 	*n = (*n + 3) & !3;
 }

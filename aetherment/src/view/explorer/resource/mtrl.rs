@@ -26,7 +26,7 @@ impl super::ResourceView for MtrlView {
 		self.changed
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> crate::view::explorer::Action {
 		egui::ScrollArea::both().show(ui, |ui| {
 			ui.label("Shader");
 			self.changed |= ui.text_edit_singleline(&mut self.mtrl.shader).changed();
@@ -178,5 +178,7 @@ impl super::ResourceView for MtrlView {
 			ui.label("Shader Flags");
 			self.changed |= ui.num_edit(&mut self.mtrl.shader_flags, "").changed();
 		});
+		
+		crate::view::explorer::Action::None
 	}
 }

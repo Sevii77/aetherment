@@ -22,11 +22,19 @@ impl Workspace {
 }
 
 impl super::ExplorerView for Workspace {
+	fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+		self
+	}
+	
 	fn title(&self) -> String {
 		format!("Workspace - {}", self.meta.name)
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn path(&self) -> Option<&str> {
+		None
+	}
+	
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> super::Action {
 		let meta = &mut self.meta;
 		let mut changed = false;
 		
@@ -112,5 +120,7 @@ impl super::ExplorerView for Workspace {
 		if changed {
 			_ = self.meta.save(&self.root.join("meta.json"));
 		}
+		
+		super::Action::None
 	}
 }

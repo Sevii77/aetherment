@@ -1,4 +1,4 @@
 /target
-obj/
-bin/
+/plugin/plugin/obj
+/plugin/plugin/bin
 remote system

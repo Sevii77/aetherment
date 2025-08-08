@@ -19,7 +19,8 @@ impl super::ResourceView for ErrorView {
 		false
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> crate::view::explorer::Action {
 		ui.label(egui::RichText::new(format!("{:#?}", self.error)).color(egui::Color32::RED));
+		crate::view::explorer::Action::None
 	}
 }

@@ -3,8 +3,8 @@ name = "noumenon"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "mtrl"
+# [[bin]]
+# name = "mtrl"
 
 [dependencies]
 half = "2.1.0"
@@ -19,7 +19,6 @@ image = {version = "0.25.6", default-features = false, features = ["png", "tiff"
 image_dds = {version = "0.7.2", default-features = false, features = ["ddsfile", "encode", "strum"]}
 
 gltf = {version = "1.4.1", features = ["names"]}
-# gltf-json = {version = "0.15.2", features = ["names"]}
 # fbxcel = {version = "0.9.0", features = ["writer", "tree"]}
 
 ironworks = {git = "https://github.com/ackwell/ironworks", rev = "302ca433950df0668bf5a91c22d4268f6815c07a", features = ["sqpack"]}

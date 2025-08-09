@@ -186,7 +186,7 @@ impl super::ExplorerView for Tree {
 				}
 			} else if let Some(e) = self.game_paths_error.as_ref() {
 				ui.add(egui::Label::new("An error was experienced while browsing files. This may be caused by a corrupted paths file.").wrap());
-				ui.add(egui::Label::new(format!("{e:#?}")).wrap());
+				ui.add(egui::Label::new(egui::RichText::new(format!("{e:#?}")).color(egui::Color32::RED)).wrap());
 				
 				if ui.button("Redownload paths")
 					.on_hover_text("Paths are provided by ResLogger2 (https://rl2.perchbird.dev)")

@@ -19,8 +19,9 @@ pub trait UiExt {
 	fn num_multi_edit<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<WidgetText>) -> Response;
 	fn num_multi_edit_range<Num: egui::emath::Numeric>(&mut self, values: &mut [Num], label: impl Into<WidgetText>, range: &[std::ops::RangeInclusive<Num>]) -> egui::Response;
 	fn combo<S: Into<WidgetText>, S2: Into<WidgetText>>(&mut self, preview: S2, label: S, contents: impl FnOnce(&mut Ui));
-	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S);
-	fn combo_enum_id<Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, id: impl std::hash::Hash);
+	fn combo_id<S: Into<WidgetText>>(&mut self, preview: S, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui));
+	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S) -> Response;
+	fn combo_enum_id<Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, id: impl std::hash::Hash) -> Response;
 	fn helptext<S: Into<WidgetText>>(&mut self, text: S);
 	fn slider<S: Into<WidgetText>, N: egui::emath::Numeric>(&mut self, value: &mut N, range: std::ops::RangeInclusive<N>, label: S) -> Response;
 	fn get_clipboard(&mut self) -> String;
@@ -90,7 +91,14 @@ impl UiExt for Ui {
 			.show_ui(self, contents);
 	}
 	
-	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S) {
+	fn combo_id<S: Into<WidgetText>>(&mut self, preview: S, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui)) {
+		egui::ComboBox::from_id_salt(id)
+			.height(300.0)
+			.selected_text(preview)
+			.show_ui(self, contents);
+	}
+	
+	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S) -> Response {
 		egui::ComboBox::from_label(label)
 			.height(300.0)
 			.selected_text(val.to_str())
@@ -99,10 +107,10 @@ impl UiExt for Ui {
 					let name = item.to_str();
 					ui.selectable_value(val, item, name);
 				}
-			});
+			}).response
 	}
 	
-	fn combo_enum_id<Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, id: impl std::hash::Hash) {
+	fn combo_enum_id<Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, id: impl std::hash::Hash) -> Response {
 		egui::ComboBox::from_id_salt(id)
 			.height(300.0)
 			.selected_text(val.to_str())
@@ -111,7 +119,7 @@ impl UiExt for Ui {
 					let name = item.to_str();
 					ui.selectable_value(val, item, name);
 				}
-			});
+			}).response
 	}
 	
 	fn helptext<S: Into<WidgetText>>(&mut self, text: S) {

@@ -190,6 +190,12 @@ pub enum Error {
 
 // ----------
 
+pub(crate) fn crc32(buf: &[u8]) -> u32 {
+	let mut hasher = crc32fast::Hasher::new_with_initial(0xFFFFFFFF);
+	hasher.update(buf);
+	!hasher.finalize()
+}
+
 struct VoidReader;
 impl ironworks::file::File for VoidReader {
 	fn read(_data: impl ironworks::FileStream) -> Result<Self, ironworks::Error> {

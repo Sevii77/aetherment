@@ -138,14 +138,15 @@ impl Mdl {
 				let mut normal = None;
 				
 				for sampler in &mtrl.samplers {
-					match sampler.typ {
-						290653886 => { // Diffuse
+					match super::mtrl::shader_param_name(sampler.id).as_deref() {
+						Some("g_SamplerDiffuse") |
+						Some("g_SamplerColorMap0") => {
 							let Some(tex) = read_tex(&file_reader, &sampler.texture) else {continue};
 							diffuse = Some(MaterialBakeTexture{width: tex.width, height: tex.height, data: tex.pixels[..(tex.width * tex.height * 4) as usize].to_vec()});
 							diffuse_is_diffuse = true;
 						}
 						
-						1449103320 => { // ColorsetIndex
+						Some("g_SamplerIndex") => {
 							let Some(tex) = read_tex(&file_reader, &sampler.texture) else {continue};
 							let pixels = tex.pixels[..(tex.width * tex.height * 4) as usize]
 								.chunks_exact(4)
@@ -170,7 +171,8 @@ impl Mdl {
 							}
 						}
 						
-						207536625 => { // Normal
+						Some("g_SamplerNormal") |
+						Some("g_SamplerNormalMap0") => {
 							let Some(tex) = read_tex(&file_reader, &sampler.texture) else {continue};
 							normal = Some(MaterialBakeTexture{width: tex.width, height: tex.height, data: tex.pixels[..(tex.width * tex.height * 4) as usize].to_vec()});
 						}
@@ -195,6 +197,12 @@ impl Mdl {
 						diffuse.data.chunks_exact_mut(4)
 							.zip(normal.data.chunks_exact(4))
 							.for_each(|(dv, nv)| dv[3] = nv[2])
+					}
+					
+					("bgcolorchange.shpk", Some(diffuse), Some(normal)) => {
+						diffuse.data.chunks_exact_mut(4)
+							.zip(normal.data.chunks_exact(4))
+							.for_each(|(dv, nv)| dv[3] = nv[3])
 					}
 					
 					_ => {}
@@ -928,12 +936,12 @@ struct ModelHeaderRaw {
 	shape_mesh_count: u16,
 	shape_value_count: u16,
 	lod_count: u8,
-	#[br(map = |v: u8| ModelFlags1Raw::from_bits(v).unwrap())]
+	#[br(map = |v: u8| ModelFlags1Raw::from_bits_retain(v))]
 	#[bw(map = |v: &ModelFlags1Raw| v.bits())]
 	flags1: ModelFlags1Raw,
 	element_id_count: u16,
 	terrain_shadow_mesh_count: u8,
-	#[br(map = |v: u8| ModelFlags2Raw::from_bits(v).unwrap())]
+	#[br(map = |v: u8| ModelFlags2Raw::from_bits_retain(v))]
 	#[bw(map = |v: &ModelFlags2Raw| v.bits())]
 	flags2: ModelFlags2Raw,
 	model_clip_out_distance: f32,

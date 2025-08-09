@@ -114,24 +114,25 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 				None => out_file.split(".").last().unwrap(),
 			};
 			
-			let converter = aetherment::noumenon_::Convert::from_ext(&gameext, &mut BufReader::new(Cursor::new(data)))?;
-			
-			if out_file == "-" {
-				let mut data = Vec::new();
-				converter.convert(&out_format, &mut BufWriter::new(Cursor::new(&mut data)))?;
-				std::io::stdout().lock().write_all(&data)?;
-			} else {
-				converter.convert(&out_format, &mut BufWriter::new(File::create(&out_file)?))?;
+			match aetherment::noumenon_::Convert::from_ext(&gameext, &mut BufReader::new(Cursor::new(&data))) {
+				Ok(converter) => {
+					if out_file == "-" {
+						let mut data = Vec::new();
+						converter.convert(&out_format, &mut BufWriter::new(Cursor::new(&mut data)))?;
+						std::io::stdout().lock().write_all(&data)?;
+					} else {
+						converter.convert(&out_format, &mut BufWriter::new(File::create(&out_file)?))?;
+					}
+				}
+				
+				Err(_) => {
+					if out_file == "-" {
+						std::io::stdout().lock().write_all(&data)?;
+					} else {
+						std::fs::write(&out_file, &data)?;
+					}
+				}
 			}
-			
-			// let converter = aetherment::noumenon_::Convert::from_ext(&gameext, &mut BufReader::new(Cursor::new(data)))?;
-			// let outfile = std::env::current_dir()?.join(gamepath.split("/").last().unwrap().split(".").next().unwrap()).with_extension(&format);
-			// 
-			// if let Some(parent) = outfile.parent() {
-			// 	std::fs::create_dir_all(parent)?;
-			// }
-			// 
-			// converter.convert(&format, &mut BufWriter::new(std::fs::File::create(outfile)?))?;
 		}
 		
 		Some(("convert", sub)) => {

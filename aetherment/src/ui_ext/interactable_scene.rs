@@ -31,7 +31,7 @@ impl InteractableScene {
 		
 		Self {
 			camera_origin: glam::Vec3::ZERO,
-			camera_zoom: 10.0,
+			camera_zoom: 4.0,
 			camera_pitch: -0.2,
 			camera_yaw: 0.0,
 			texture_id: egui::TextureId::User(renderer.register_texture(scene.get_render_target())),
@@ -64,7 +64,7 @@ impl InteractableScene {
 		resp.context_menu(|ui| {
 			if ui.button("Reset Camera").clicked() {
 				self.camera_origin = glam::Vec3::ZERO;
-				self.camera_zoom = 10.0;
+				self.camera_zoom = 4.0;
 				self.camera_pitch = -0.2;
 				self.camera_yaw = 0.0;
 				

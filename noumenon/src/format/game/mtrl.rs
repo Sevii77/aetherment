@@ -1,10 +1,515 @@
-use std::{fmt::Debug, io::{Read, Seek, Write}};
+use std::{collections::HashMap, fmt::Debug, io::{Read, Seek, Write}};
 use binrw::{binrw, BinRead, BinWrite};
 use crate::NullReader;
 
 pub const EXT: &'static [&'static str] = &["mtrl"];
 
 pub type Error = binrw::Error;
+
+pub fn shader_param_name(id: u32) -> Option<String> {
+	let names = std::cell::LazyCell::new(|| {
+		let names = [
+			// https://github.com/Ottermandias/Penumbra.GameData/blob/main/Files/ShaderStructs/Names.cs\
+			"g_SphereMapIndex",
+			"g_TileIndex",
+			"g_AlphaAperture",
+			"g_AlphaMultiParam",
+			"g_AlphaOffset",
+			"g_AlphaThreshold",
+			"g_AmbientOcclusionMask",
+			"g_AngleClip",
+			"g_BackScatterPower",
+			"g_Color",
+			"g_ColorUVScale",
+			"g_DetailColor",
+			"g_DetailColorUvScale",
+			"g_DetailID",
+			"g_DetailNormalScale",
+			"g_DiffuseColor",
+			"g_EmissiveColor",
+			"g_EnvMapPower",
+			"g_FarClip",
+			"g_Fresnel",
+			"g_FresnelValue0",
+			"g_FurLength",
+			"g_GlassIOR",
+			"g_Gradation",
+			"g_HairBackScatterRoughnessOffsetRate",
+			"g_HairScatterColorShift",
+			"g_HairSecondaryRoughnessOffsetRate",
+			"g_HairSpecularBackScatterShift",
+			"g_HairSpecularPrimaryShift",
+			"g_HairSpecularSecondaryShift",
+			"g_HeightMapScale",
+			"g_HeightScale",
+			"g_InclusionAperture",
+			"g_Intensity",
+			"g_IrisOptionColorRate",
+			"g_IrisRingColor",
+			"g_IrisRingEmissiveIntensity",
+			"g_IrisRingForceColor",
+			"g_IrisThickness",
+			"g_LayerColor",
+			"g_LayerDepth",
+			"g_LayerIrregularity",
+			"g_LayerScale",
+			"g_LayerVelocity",
+			"g_LightingType",
+			"g_LipFresnelValue0",
+			"g_LipRoughnessScale",
+			"g_LipShininess",
+			"g_MultiDetailColor",
+			"g_MultiDiffuseColor",
+			"g_MultiEmissiveColor",
+			"g_MultiHeightScale",
+			"g_MultiNormalScale",
+			"g_MultiSpecularColor",
+			"g_MultiSSAOMask",
+			"g_MultiWaveScale",
+			"g_MultiWhitecapDistortion",
+			"g_MultiWhitecapScale",
+			"g_NearClip",
+			"g_NormalScale",
+			"g_NormalScale1",
+			"g_NormalUVScale",
+			"g_OutlineColor",
+			"g_OutlineWidth",
+			"g_PrefersFailure",
+			"g_Ray",
+			"g_ReflectionPower",
+			"g_RefractionColor",
+			"g_ScatteringLevel",
+			"g_ShaderID",
+			"g_ShadowAlphaThreshold",
+			"g_ShadowOffset",
+			"g_ShadowPosOffset",
+			"g_SheenAperture",
+			"g_SheenRate",
+			"g_SheenTintRate",
+			"g_Shininess",
+			"g_SpecularColor",
+			"g_SpecularColorMask",
+			"g_SpecularMask",
+			"g_SpecularPower",
+			"g_SpecularUVScale",
+			"g_SSAOMask",
+			"g_SubSurfacePower",
+			"g_SubSurfaceProfileID",
+			"g_SubSurfaceWidth",
+			"g_TexAnim",
+			"g_TextureMipBias",
+			"g_TexU",
+			"g_TexV",
+			"g_TileAlpha",
+			"g_TileScale",
+			"g_ToonIndex",
+			"g_ToonLightScale",
+			"g_ToonReflectionScale",
+			"g_ToonSpecIndex",
+			"g_Transparency",
+			"g_TransparencyDistance",
+			"g_UseSubSurfaceRate",
+			"g_WaveletDistortion",
+			"g_WaveletNoiseParam",
+			"g_WaveletOffset",
+			"g_WaveletScale",
+			"g_WaveSpeed",
+			"g_WaveTime",
+			"g_WaveTime1",
+			"g_WhitecapColor",
+			"g_WhitecapDistance",
+			"g_WhitecapDistortion",
+			"g_WhitecapNoiseScale",
+			"g_WhitecapScale",
+			"g_WhitecapSpeed",
+			"g_WhiteEyeColor",
+			
+			// directly from shpk files
+			"g_AmbientExtra",
+			"g_AmbientParam",
+			"g_AmbientParamArray",
+			"g_AnimSampler",
+			"g_AuraParam",
+			"g_BGAmbientParameter",
+			"g_BGSelectionModelCommonParameter",
+			"g_BGSelectionModelParameter",
+			"g_BushInstancingData",
+			"g_BushNoInstancingData",
+			"g_CameraParameter",
+			"g_CloudShadowMatrix",
+			"g_CloudShadowSampler",
+			"g_CommonParameter",
+			"g_CompositeCommonSampler",
+			"g_ConnectionVertex",
+			"g_CustomizeParameter",
+			"g_DecalColor",
+			"g_DecalParameter",
+			"g_DirectionalShadowParameter",
+			"g_DissolveParam",
+			"g_DissolveSampler",
+			"g_DofLutSampler",
+			"g_DynamicWaveCompostInfo",
+			"g_DynamicWaveObjectParams",
+			"g_DynamicWaveTypeInfo",
+			"g_EadgBias",
+			"g_FakeSpecularParam",
+			"g_FogParameter",
+			"g_FogWeightLutSampler",
+			"g_GeometryParam",
+			"g_GlassOffscreenParam",
+			"g_GrassCommonParam",
+			"g_GrassGridParam",
+			"g_InputConnectionVertex",
+			"g_InputConnectionVertexPrev",
+			"g_InstanceData",
+			"g_InstanceParameter",
+			"g_InstancingData",
+			"g_InstancingMatrix",
+			"g_JointMatrixArray",
+			"g_JointMatrixArrayPrev",
+			"g_LightDirection",
+			"g_LightDrawParam",
+			"g_LightParam",
+			"g_MaterialParam",
+			"g_MaterialParameter",
+			"g_MaterialParameterDynamic",
+			"g_ModelParameter",
+			"g_OmniShadowParam",
+			"g_PSParam",
+			"g_PS_DecalSpecificParameters",
+			"g_PS_DocumentParameters",
+			"g_PS_DofCocParam",
+			"g_PS_InstanceExtraParameters",
+			"g_PS_ModelLightParameters",
+			"g_PS_ModelSpecificParameters",
+			"g_PS_Parameters",
+			"g_PS_ShadowDistance",
+			"g_PS_ShadowParameters",
+			"g_PS_UvTransform",
+			"g_PS_ViewProjectionInverseMatrix",
+			"g_Parameter",
+			"g_PbrParameterCommon",
+			"g_PlateEadg",
+			"g_PrevInstancingMatrix",
+			"g_PreviousInstanceData",
+			"g_PreviousInstancingData",
+			"g_PreviousWavingParam",
+			"g_PreviousWindParam",
+			"g_RoofMatrix",
+			"g_RoofParameter",
+			"g_RoofProjectionMatrix",
+			"g_RoofSampler",
+			"g_Sampler",
+			"g_Sampler0",
+			"g_Sampler1",
+			"g_SamplerAttenuation",
+			"g_SamplerAuraTexture",
+			"g_SamplerAuraTexture1",
+			"g_SamplerAuraTexture2",
+			"g_SamplerCatchlight",
+			"g_SamplerCaustics",
+			"g_SamplerCharaToon",
+			"g_SamplerColor1",
+			"g_SamplerColor2",
+			"g_SamplerColor3",
+			"g_SamplerColor4",
+			"g_SamplerColorMap",
+			"g_SamplerColorMap0",
+			"g_SamplerColorMap1",
+			"g_SamplerDecal",
+			"g_SamplerDepth",
+			"g_SamplerDepthWithWater",
+			"g_SamplerDetailColorMap",
+			"g_SamplerDetailNormalMap",
+			"g_SamplerDiffuse",
+			"g_SamplerDissolveTexture",
+			"g_SamplerDissolveTexture1",
+			"g_SamplerDistortion",
+			"g_SamplerDither",
+			"g_SamplerDynamicWave",
+			"g_SamplerDynamicWavePrev",
+			"g_SamplerDynamicWavePrev2",
+			"g_SamplerEnvMap",
+			"g_SamplerFinalColor",
+			"g_SamplerFlow",
+			"g_SamplerFresnel",
+			"g_SamplerGBuffer",
+			"g_SamplerGBuffer1",
+			"g_SamplerGBuffer2",
+			"g_SamplerGBuffer3",
+			"g_SamplerGBuffer4",
+			"g_SamplerGahter",
+			"g_SamplerGradationMap",
+			"g_SamplerIndex",
+			"g_SamplerLight",
+			"g_SamplerLightDiffuse",
+			"g_SamplerLightSpecular",
+			"g_SamplerMask",
+			"g_SamplerNoise",
+			"g_SamplerNormal",
+			"g_SamplerNormal2",
+			"g_SamplerNormalMap",
+			"g_SamplerNormalMap0",
+			"g_SamplerNormalMap1",
+			"g_SamplerOcclusion",
+			"g_SamplerOmniShadowDynamic",
+			"g_SamplerOmniShadowIndexTable",
+			"g_SamplerOmniShadowStatic",
+			"g_SamplerPalette",
+			"g_SamplerRawDynamicWave",
+			"g_SamplerReflection",
+			"g_SamplerReflectionArray",
+			"g_SamplerReflectionMap",
+			"g_SamplerReflection_",
+			"g_SamplerRefractionMap",
+			"g_SamplerShadow",
+			"g_SamplerShadowMask",
+			"g_SamplerSkinDiffuse",
+			"g_SamplerSkinMask",
+			"g_SamplerSkinNormal",
+			"g_SamplerSpecularMap",
+			"g_SamplerSpecularMap0",
+			"g_SamplerSpecularMap1",
+			"g_SamplerSphareMapCustum",
+			"g_SamplerSphereMap",
+			"g_SamplerSubsurfaceKernel",
+			"g_SamplerTable",
+			"g_SamplerTileNormal",
+			"g_SamplerTileOrb",
+			"g_SamplerToneMapLut",
+			"g_SamplerVPosition",
+			"g_SamplerViewPosition",
+			"g_SamplerWaveMap",
+			"g_SamplerWaveMap1",
+			"g_SamplerWaveletMap0",
+			"g_SamplerWaveletMap1",
+			"g_SamplerWaveletNoise",
+			"g_SamplerWhitecapMap",
+			"g_SamplerWind0",
+			"g_SamplerWind1",
+			"g_SamplerWrinklesMask",
+			"g_ScreenParameter",
+			"g_ShaderTypeParameter",
+			"g_ShadingParameters",
+			"g_ShadowBiasParameter",
+			"g_ShadowMaskParameter",
+			"g_ShapeDeformIndex",
+			"g_ShapeDeformParam",
+			"g_ShapeDeformVertex",
+			"g_SkinMaterialParameter",
+			"g_SkySampler",
+			"g_ToneMapParameter",
+			"g_ToneMapSampler",
+			"g_UnderWaterParam",
+			"g_VSParam",
+			"g_VS_PerInstanceParameters",
+			"g_VS_ViewMatrix",
+			"g_VS_ViewProjectionMatrix",
+			"g_WaterParameter",
+			"g_WavingParam",
+			"g_WetnessParameter",
+			"g_WindInfo",
+			"g_WindParam",
+			"g_WorldMatrix",
+			"g_WorldViewMatrix",
+			"g_WorldViewProjMatrix",
+			"g_WrinklessWeightRate",
+		];
+		
+		names.into_iter()
+			.map(|v| (crate::crc32(v.as_bytes()), v))
+			.collect::<HashMap<_, _>>()
+	});
+	
+	names.get(&id).map(|v| v.to_string())
+}
+
+pub const USED_SAMPLERS: [u32; 24] = [
+	1768480522,
+	207536625,
+	2816579574,
+	4271961042,
+	731504677,
+	2320401078,
+	3719555455,
+	3862043388,
+	2285931524,
+	3845360663,
+	557626425,
+	1446741167,
+	3615719374,
+	1449103320,
+	290653886,
+	541659712,
+	1464738518,
+	465317650,
+	510652316,
+	2863978985,
+	2514613837,
+	4174878074,
+	2281064269,
+	1824202628,
+];
+
+pub const USED_SHADERS: [&'static str; 23] = [
+	"bgprop.shpk",
+	"bguvscroll.shpk",
+	"verticalfog.shpk",
+	"crystal.shpk",
+	"characterstockings.shpk",
+	"character.shpk",
+	"characterinc.shpk",
+	"bgcolorchange.shpk",
+	"skin.shpk",
+	"characterglass.shpk",
+	"lightshaft.shpk",
+	"characterlegacy.shpk",
+	"water.shpk",
+	"charactertattoo.shpk",
+	"bg.shpk",
+	"characterscroll.shpk",
+	"characterocclusion.shpk",
+	"charactertransparency.shpk",
+	"characterreflection.shpk",
+	"bgcrestchange.shpk",
+	"hair.shpk",
+	"iris.shpk",
+	"river.shpk",
+];
+
+pub const USED_SHADER_SAMPLERS: &[(&'static str, &'static [u32])] = &[
+	("bgprop.shpk", &[
+		510652316,
+		2863978985,
+		465317650,
+	]),
+	("bguvscroll.shpk", &[
+		510652316,
+		1768480522,
+		465317650,
+		2863978985,
+		3719555455,
+		1824202628,
+	]),
+	("verticalfog.shpk", &[
+		2285931524,
+	]),
+	("crystal.shpk", &[
+		3615719374,
+		465317650,
+		510652316,
+		4174878074,
+		2863978985,
+	]),
+	("characterstockings.shpk", &[
+		1449103320,
+		207536625,
+		2320401078,
+	]),
+	("character.shpk", &[
+		731504677,
+		207536625,
+		1449103320,
+		2816579574,
+		290653886,
+		2320401078,
+	]),
+	("characterinc.shpk", &[
+		207536625,
+		2320401078,
+		290653886,
+		1449103320,
+	]),
+	("bgcolorchange.shpk", &[
+		510652316,
+		465317650,
+		2863978985,
+	]),
+	("skin.shpk", &[
+		207536625,
+		2320401078,
+		290653886,
+	]),
+	("characterglass.shpk", &[
+		207536625,
+		1449103320,
+		2320401078,
+		290653886,
+	]),
+	("lightshaft.shpk", &[
+		557626425,
+		1446741167,
+	]),
+	("characterlegacy.shpk", &[
+		290653886,
+		207536625,
+		2320401078,
+		1449103320,
+	]),
+	("water.shpk", &[
+		1464738518,
+		541659712,
+		2514613837,
+		2281064269,
+		3862043388,
+		3845360663,
+	]),
+	("charactertattoo.shpk", &[
+		207536625,
+	]),
+	("bg.shpk", &[
+		465317650,
+		2863978985,
+		510652316,
+		1768480522,
+		1824202628,
+		3719555455,
+	]),
+	("characterscroll.shpk", &[
+		2816579574,
+		207536625,
+		290653886,
+		2320401078,
+		1449103320,
+		4271961042,
+	]),
+	("characterocclusion.shpk", &[
+		207536625,
+	]),
+	("charactertransparency.shpk", &[
+		207536625,
+		2320401078,
+		1449103320,
+		290653886,
+	]),
+	("characterreflection.shpk", &[
+		207536625,
+		4271961042,
+		2320401078,
+	]),
+	("bgcrestchange.shpk", &[
+		2863978985,
+		1768480522,
+		510652316,
+		465317650,
+	]),
+	("hair.shpk", &[
+		2320401078,
+		207536625,
+	]),
+	("iris.shpk", &[
+		2320401078,
+		290653886,
+		207536625,
+	]),
+	("river.shpk", &[
+		3862043388,
+		2281064269,
+		2514613837,
+	]),
+];
+
+// ----------
 
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -42,7 +547,7 @@ impl BinRead for Mtrl {
 		let _extra_data = r!(Vec<u8>, extra_data_size);
 		
 		let colorsets = if dataset_size >= 2048 {r!(Vec<[ColorRow; 32]>, colorset_count)} else {Vec::new()};
-		let colorset_dyes = if dataset_size >= 2176 {r!(Vec<[u32; 32]>, colorset_count)} else {Vec::new()};
+		let colorset_dyes = if dataset_size >= 2176 {r!(Vec<[ColorDyeRow; 32]>, colorset_count)} else {Vec::new()};
 		
 		let constant_values_size = r!(u16);
 		let shader_key_count = r!(u16);
@@ -66,7 +571,7 @@ impl BinRead for Mtrl {
 				.map(|(i, v)| ColorSet {
 					name: strings[colorset_infos.iter().find(|v| v.1 as usize == i).unwrap().0 as usize..].null_terminated().unwrap(),
 					regular: v,
-					dyes: colorset_dyes.get(i).copied(),
+					dyes: colorset_dyes.get(i).map(|v| v.to_owned()),
 				}).collect(),
 			constants: constants
 				.into_iter()
@@ -77,9 +582,12 @@ impl BinRead for Mtrl {
 			samplers: samplers
 				.into_iter()
 				.map(|v| Sampler {
-					typ: v.typ,
-					flags: v.flags,
+					id: v.id,
 					texture: if v.texture_id == 255 {String::new()} else {strings[texture_infos[v.texture_id as usize].0 as usize..].null_terminated().unwrap()},
+					u_address_mode: (v.flags & 0x3).into(),
+					v_address_mode: (v.flags >> 2 & 0x3).into(),
+					lod_bias: ((v.flags << 12 >> 22) as f32) / 64.0,
+					min_lod: v.flags >> 20 & 0xF,
 				}).collect(),
 			shader_keys,
 			shader_flags,
@@ -124,58 +632,47 @@ pub struct Constant {
 }
 
 impl Constant {
-	/// Panics if T is not the same size as value byte count
-	pub fn value_as<T: Sized>(&mut self) -> &mut T {
-		assert!(size_of::<T>() == self.value.len(), "T is not the same size as value");
-		unsafe{std::mem::transmute_copy(&mut self.value.as_ptr())}
+	pub fn value_as<T: bytemuck::NoUninit + bytemuck::AnyBitPattern>(&mut self) -> &mut [T] {
+		bytemuck::cast_slice_mut(&mut self.value)
 	}
 }
 
 #[derive(Debug, Clone)]
 pub struct Sampler {
-	pub typ: u32,
+	pub id: u32, 
 	pub texture: String,
-	pub flags: u32,
+	pub u_address_mode: AddressMode,
+	pub v_address_mode: AddressMode,
+	pub lod_bias: f32,
+	pub min_lod: u32,
 }
 
-// Normal = 207536625,
-// Mask = 2320401078,
-// ColorsetIndex = 1449103320,
-// Diffuse = 290653886,
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddressMode {
+	Wrap   = 0,
+	Mirror = 1,
+	Clamp  = 2,
+	Border = 3,
+}
 
-// outdated old endwalker stuff, stuff is missing
-// #[binrw]
-// #[brw(little, repr = u32)]
-// #[repr(u32)]
-// #[derive(Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-// pub enum SamplerType {
-// 	CharaNormal = 207536625, // chara/equipment/e6015/texture/v01_c0201e6015_sho_n.tex
-// 	CharaDiffuse = 290653886, // chara/human/c0801/obj/face/f0003/texture/c0801f0003_fac_d.tex
-// 	BgUnk465317650 = 465317650, // bg/ex4/02_mid_m5/twn/m5t1/texture/m5t1_k1_flor5_s.tex (some funky stuff idk)
-// 	BgDiffuse = 510652316, // bg/ex4/02_mid_m5/twn/m5t1/texture/m5t1_k1_flor5_d.tex
-// 	WaterUnk541659712 = 541659712, // bgcommon/nature/water/texture/_n_wavelet_000.tex (used by water shader together with 1464738518, so probably only uses certain layer(s))
-// 	LiftShaftUnk557626425 = 557626425, // bgcommon/nature/lightshaft/texture/_n_lightshaft_s0_000.tex
-// 	CharaSpecular = 731504677, // chara/monster/m0060/obj/body/b0001/texture/v01_m0060b0001_s.tex
-// 	LiftShaftUnk1446741167 = 1446741167, // bgcommon/nature/lightshaft/texture/_n_lightshaft_s1_000.tex (noise layer shader by RGB, idk)
-// 	WaterUnk1464738518 = 1464738518, // bgcommon/nature/water/texture/_n_wavelet_000.tex (see 541659712)
-// 	BgUnk1768480522 = 1768480522, // bgcommon/texture/dummy_d.tex
-// 	BgUnk1824202628 = 1824202628, // bgcommon/texture/dummy_s.tex
-// 	WaterUnk2281064269 = 2281064269, // bg/ffxiv/est_e1/hou/e1h1/texture/e1h1_w1_wate1_f.tex (ironworks doesnt like it, but probably water splashes/fog/mist/the stuff at the bottom of waterfalls)
-// 	Fog = 2285931524, // bgcommon/nature/verticalfog/texture/_n_verticalfog_000.tex (3 different noise layers for RGB)
-// 	Multi = 2320401078, // chara/equipment/e6015/texture/v01_c0201e6015_sho_m.tex
-// 	WaterUnk2514613837 = 2514613837, // bgcommon/nature/water/texture/_n_whitecap_000.tex
-// 	BgNormal = 2863978985, // bg/ex4/02_mid_m5/twn/m5t1/texture/m5t1_k1_flor5_n.tex (this texture sucks but its normal for bg)
-// 	BgUnk3719555455 = 3719555455, // bgcommon/texture/dummy_n.tex
-// 	WaterNormal = 3862043388, // bgcommon/nature/water/texture/_n_wave_000.tex (normal but the alpha layer seems to have a different purpose)
-// 	Cubemap = 4174878074, // bgcommon/nature/envmap/texture/_n_envmap_000.tex (ironworks fail, probably cubemap)
-// 	Reflection = 4271961042, // chara/monster/m0536/obj/body/b0001/texture/v01_m0536b0001_d.tex (used by iris, also by ozma which uses the iris shader lol)
-// }
+impl From<u32> for AddressMode {
+	fn from(value: u32) -> Self {
+		match value {
+			0 => Self::Wrap,
+			1 => Self::Mirror,
+			2 => Self::Clamp,
+			3 => Self::Border,
+			_ => unreachable!()
+		}
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct ColorSet {
 	pub name: String,
 	pub regular: [ColorRow; 32],
-	pub dyes: Option<[u32; 32]>,
+	pub dyes: Option<[ColorDyeRow; 32]>,
 }
 
 #[derive(Debug, Clone)]
@@ -199,7 +696,7 @@ pub struct ColorRow {
 	pub _unknown22: f32,
 	pub _unknown23: f32,
 	pub shader_id: u16,
-	pub tile_index: i16,
+	pub tile_index: u16,
 	pub tile_alpha: f32,
 	pub sphere_map_index: u16,
 	pub tile_transform: glam::Mat2,
@@ -261,7 +758,7 @@ impl BinRead for ColorRow {
 			_unknown22: r!(f16),
 			_unknown23: r!(f16),
 			shader_id: r!(u16),
-			tile_index: r!(i16),
+			tile_index: (r!(f16) * 64.0) as u16,
 			tile_alpha: r!(f16),
 			sphere_map_index: r!(u16),
 			tile_transform: glam::Mat2::from_cols_array(&[r!(f16), r!(f16), r!(f16), r!(f16)]),
@@ -270,6 +767,65 @@ impl BinRead for ColorRow {
 }
 
 impl BinWrite for ColorRow {
+	type Args<'a> = ();
+	
+	fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<()> {
+		todo!();
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct ColorDyeRow {
+	pub template: u16,
+	pub channel: u8,
+	pub diffuse: bool,
+	pub specular: bool,
+	pub emmisive: bool,
+	pub scalar3: bool,
+	pub metalic: bool,
+	pub roughness: bool,
+	pub sheen_rate: bool,
+	pub sheen_tint_rate: bool,
+	pub sheen_aperature: bool,
+	pub anisotropy: bool,
+	pub sphere_map_index: bool,
+	pub sphere_map_mask: bool,
+}
+
+// impl Default for ColorDyeRow {
+// 	fn default() -> Self {
+// 		Self {
+// 			
+// 		}
+// 	}
+// }
+
+impl BinRead for ColorDyeRow {
+	type Args<'a> = ();
+	
+	fn read_options<R: Read + Seek>(reader: &mut R, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<Self> {
+		let data = u32::read_options(reader, endian, ())?;
+		
+		Ok(Self {
+			template: (data >> 16 & 0x7FF) as u16,
+			channel: (data >> 27 & 0x3) as u8,
+			diffuse: (data & 0x0001) != 0,
+			specular: (data & 0x0002) != 0,
+			emmisive: (data & 0x0004) != 0,
+			scalar3: (data & 0x0008) != 0,
+			metalic: (data & 0x0010) != 0,
+			roughness: (data & 0x0020) != 0,
+			sheen_rate: (data & 0x0040) != 0,
+			sheen_tint_rate: (data & 0x0080) != 0,
+			sheen_aperature: (data & 0x0100) != 0,
+			anisotropy: (data & 0x0200) != 0,
+			sphere_map_index: (data & 0x0400) != 0,
+			sphere_map_mask: (data & 0x0800) != 0,
+		})
+	}
+}
+
+impl BinWrite for ColorDyeRow {
 	type Args<'a> = ();
 	
 	fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<()> {
@@ -290,7 +846,7 @@ struct ConstantDefinitionRaw {
 #[binrw]
 #[derive(Debug, Clone)]
 struct SamplerRaw {
-	typ: u32,
+	id: u32,
 	flags: u32,
 	texture_id: u8,
 	_padding: [u8; 3],

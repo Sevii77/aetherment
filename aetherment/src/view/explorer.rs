@@ -104,12 +104,16 @@ impl Explorer {
 		};
 		
 		s.add_tab(Box::new(tree::Tree::new()), Split::None, None);
-		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/obj/body/b0001/texture/c0201b0001_base.tex")), Split::Horizontal(0.2), None);
-		s.add_tab(Box::new(resource::Resource::new("chara/monster/m0934/obj/body/b0001/model/m0934b0001.mdl")), Split::None, None);
+		s.add_tab(Box::new(resource::Resource::new("chara/monster/m0934/obj/body/b0001/model/m0934b0001.mdl")), Split::Horizontal(0.2), None);
 		s.add_tab(Box::new(resource::Resource::new("chara/human/c1401/obj/face/f0001/model/c1401f0001_fac.mdl")), Split::None, None);
+		s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/texture/fun_b0_m0080_1a_d.tex")), Split::None, None);
+		s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/bgparts/fun_b0_m0080.mdl")), Split::None, None);
 		s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/model/c0201e6100_top.mdl")), Split::None, None);
-		s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/material/v0001/mt_c0201e6100_top_a.mtrl")), Split::Vertical(0.5), None);
-		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb")), Split::None, None);
+		
+		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb")), Split::Vertical(0.5), None);
+		
+		s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/material/fun_b0_m0080_1a.mtrl")), Split::Horizontal(0.4), None);
+		s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/material/v0001/mt_c0201e6100_top_a.mtrl")), Split::None, None);
 		
 		s
 	}
@@ -133,6 +137,7 @@ impl Explorer {
 	}
 	
 	fn add_tab(&mut self, tab: Box<dyn ExplorerView>, split: Split, surface_node: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex)>) {
+		self.last_focused_resource = None;
 		self.id_counter += 1;
 		let tab = ExplorerTab {
 			id: self.id_counter,
@@ -198,9 +203,16 @@ impl super::View for Explorer {
 		match viewer.action {
 			Action::OpenNew(path) => self.add_tab(Box::new(resource::Resource::new(&path)), Split::None, self.last_focused_resource.as_ref().map(|v| (v.0, v.1))),
 			Action::OpenExisting(path) => {
-				if let Some(focused) = &mut self.last_focused_resource {
-					self.views[focused.0][focused.1].tabs_mut().unwrap()[focused.2.0].tab = Box::new(resource::Resource::new(&path));
+				if !'s: {
+					let Some(focused) = &mut self.last_focused_resource else {break 's false};
+					let node = &mut self.views[focused.0][focused.1];
+					let Some(tabs) = node.tabs_mut() else {break 's false};
+					tabs[focused.2.0].tab = Box::new(resource::Resource::new(&path));
 					self.update_trees();
+					
+					true
+				} {
+					self.add_tab(Box::new(resource::Resource::new(&path)), Split::None, self.last_focused_resource.as_ref().map(|v| (v.0, v.1)));
 				}
 			}
 			Action::OpenComplex((TabType::Tree, v)) => self.add_tab(Box::new(tree::Tree::new()), Split::None, Some(v)),

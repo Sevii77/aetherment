@@ -2,7 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 use windows::{core::{Interface, PCSTR}, Win32::Graphics::{Direct3D::{Fxc::D3DCompile, *}, Direct3D11::*, Dxgi::Common::*}};
 
 pub struct D3d11Renderer {
-	device: &'static ID3D11Device,
+	device_ptr: usize,
 	context: Rc<ID3D11DeviceContext>,
 	texture_register: Box<dyn Fn(&super::Texture) -> u64>,
 	
@@ -13,8 +13,7 @@ pub struct D3d11Renderer {
 impl D3d11Renderer {
 	pub fn new(device_ptr: usize, texture_register: Box<dyn Fn(&super::Texture) -> u64>) -> Self {
 		let device = &(device_ptr as _);
-		let device = unsafe{std::mem::transmute::<&*mut std::ffi::c_void, &'static *mut std::ffi::c_void>(device)};
-		let device = unsafe{ID3D11Device::from_raw_borrowed(device).ok_or("Failed borrowing device").unwrap()};
+		let device = unsafe{ID3D11Device::from_raw_borrowed(device).unwrap()};
 		
 		let mut context = None;
 		unsafe{device.CreateDeferredContext(0, Some(&mut context)).unwrap()};
@@ -37,7 +36,7 @@ impl D3d11Renderer {
 		}, Some(&mut rasterizer_state)).unwrap()};
 		
 		Self {
-			device,
+			device_ptr,
 			context: std::rc::Rc::new(context.unwrap()),
 			texture_register,
 			
@@ -47,14 +46,15 @@ impl D3d11Renderer {
 	}
 	
 	pub fn update_device(&mut self, device_ptr: usize) {
-		let device = &(device_ptr as _);
-		let device = unsafe{std::mem::transmute::<&*mut std::ffi::c_void, &'static *mut std::ffi::c_void>(device)};
-		self.device = unsafe{ID3D11Device::from_raw_borrowed(device).ok_or("Failed borrowing device").unwrap()};
+		self.device_ptr = device_ptr;
 	}
 }
 
 impl super::RendererInner for D3d11Renderer {
 	fn create_material(&self, shader: &str, binds: &[super::MaterialBind]) -> super::Material {
+		let device = &(self.device_ptr as _);
+		let device = unsafe{ID3D11Device::from_raw_borrowed(device).unwrap()};
+		
 		let hlsl = {
 			let module = naga::front::wgsl::parse_str(shader).unwrap();
 			
@@ -78,10 +78,10 @@ impl super::RendererInner for D3d11Renderer {
 		
 		let mut vs = None;
 		let vs_bytecode = unsafe{compile_shader(&hlsl, "vs_main", "vs_5_0").unwrap()};
-		unsafe{self.device.CreateVertexShader(&vs_bytecode, None, Some(&mut vs)).unwrap()};
+		unsafe{device.CreateVertexShader(&vs_bytecode, None, Some(&mut vs)).unwrap()};
 		
 		let mut ps = None;
-		unsafe{self.device.CreatePixelShader(&compile_shader(&hlsl, "fs_main", "ps_5_0").unwrap(), None, Some(&mut ps))}.unwrap();
+		unsafe{device.CreatePixelShader(&compile_shader(&hlsl, "fs_main", "ps_5_0").unwrap(), None, Some(&mut ps))}.unwrap();
 		
 		fn input(index: u32, format: DXGI_FORMAT, slot: u32, offset: u32, class: D3D11_INPUT_CLASSIFICATION, step: u32) -> D3D11_INPUT_ELEMENT_DESC {
 			D3D11_INPUT_ELEMENT_DESC {
@@ -96,7 +96,7 @@ impl super::RendererInner for D3d11Renderer {
 		}
 		
 		let mut layout = None;
-		unsafe{self.device.CreateInputLayout(&[
+		unsafe{device.CreateInputLayout(&[
 			input(0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0),
 			input(1, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0),
 			input(2, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0),
@@ -113,6 +113,9 @@ impl super::RendererInner for D3d11Renderer {
 	}
 	
 	fn create_texture(&self, width: u32, height: u32, format: super::TextureFormat, usage: super::TextureUsage) -> super::Texture {
+		let device = &(self.device_ptr as _);
+		let device = unsafe{ID3D11Device::from_raw_borrowed(device).unwrap()};
+		
 		let format = match format {
 			super::TextureFormat::Rgba8Unorm => DXGI_FORMAT_R8G8B8A8_UNORM,
 			super::TextureFormat::Rgba8UnormSrgb => DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
@@ -120,7 +123,7 @@ impl super::RendererInner for D3d11Renderer {
 		};
 		
 		let mut texture = None;
-		unsafe{self.device.CreateTexture2D(&D3D11_TEXTURE2D_DESC {
+		unsafe{device.CreateTexture2D(&D3D11_TEXTURE2D_DESC {
 			Width: width,
 			Height: height,
 			MipLevels: 1,
@@ -144,7 +147,7 @@ impl super::RendererInner for D3d11Renderer {
 		
 		let mut view = None;
 		if usage.contains(super::TextureUsage::TEXTURE_BINDING) {
-			unsafe{self.device.CreateShaderResourceView(&texture, Some(&D3D11_SHADER_RESOURCE_VIEW_DESC {
+			unsafe{device.CreateShaderResourceView(&texture, Some(&D3D11_SHADER_RESOURCE_VIEW_DESC {
 				Format: format,
 				ViewDimension: D3D_SRV_DIMENSION_TEXTURE2D,
 				Anonymous: D3D11_SHADER_RESOURCE_VIEW_DESC_0 {
@@ -158,7 +161,7 @@ impl super::RendererInner for D3d11Renderer {
 		
 		let mut view_rt = None;
 		if usage.contains(super::TextureUsage::RENDER_TARGET) {
-			unsafe{self.device.CreateRenderTargetView(&texture, Some(&D3D11_RENDER_TARGET_VIEW_DESC {
+			unsafe{device.CreateRenderTargetView(&texture, Some(&D3D11_RENDER_TARGET_VIEW_DESC {
 				Format: format,
 				ViewDimension: D3D11_RTV_DIMENSION_TEXTURE2D,
 				Anonymous: D3D11_RENDER_TARGET_VIEW_DESC_0 {
@@ -171,7 +174,7 @@ impl super::RendererInner for D3d11Renderer {
 		
 		let mut view_depth = None;
 		if usage.contains(super::TextureUsage::DEPTH_STENCIL) {
-			unsafe{self.device.CreateDepthStencilView(&texture, Some(&D3D11_DEPTH_STENCIL_VIEW_DESC {
+			unsafe{device.CreateDepthStencilView(&texture, Some(&D3D11_DEPTH_STENCIL_VIEW_DESC {
 				Format: format,
 				ViewDimension: D3D11_DSV_DIMENSION_TEXTURE2D,
 				Flags: 0,
@@ -195,8 +198,11 @@ impl super::RendererInner for D3d11Renderer {
 	}
 	
 	fn create_buffer(&self, size: usize, usage: super::BufferUsage) -> super::Buffer {
+		let device = &(self.device_ptr as _);
+		let device = unsafe{ID3D11Device::from_raw_borrowed(device).unwrap()};
+		
 		let mut buffer = None;
-		unsafe{self.device.CreateBuffer(&D3D11_BUFFER_DESC {
+		unsafe{device.CreateBuffer(&D3D11_BUFFER_DESC {
 			ByteWidth: size as u32,
 			Usage: D3D11_USAGE_DYNAMIC,
 			BindFlags:
@@ -217,8 +223,11 @@ impl super::RendererInner for D3d11Renderer {
 	}
 	
 	fn create_sampler(&self, address_u: super::SamplerAddress, address_v: super::SamplerAddress, min: super::SamplerFilter, mag: super::SamplerFilter) -> super::Sampler {
+		let device = &(self.device_ptr as _);
+		let device = unsafe{ID3D11Device::from_raw_borrowed(device).unwrap()};
+		
 		let mut sampler = None;
-		unsafe{self.device.CreateSamplerState(&D3D11_SAMPLER_DESC {
+		unsafe{device.CreateSamplerState(&D3D11_SAMPLER_DESC {
 			Filter: match (min, mag) {
 				(super::SamplerFilter::Nearest, super::SamplerFilter::Nearest) => D3D11_FILTER_MIN_MAG_MIP_POINT,
 				(super::SamplerFilter::Nearest, super::SamplerFilter::Linear)  => D3D11_FILTER_MIN_POINT_MAG_LINEAR_MIP_POINT,
@@ -253,6 +262,9 @@ impl super::RendererInner for D3d11Renderer {
 		materials: &HashMap<&'static str, super::Material>,
 		objects: &crate::ObjectBuffer,
 		camera: &crate::scene::Camera) {
+		let device = &(self.device_ptr as _);
+		let device = unsafe{ID3D11Device::from_raw_borrowed(device).unwrap()};
+		
 		let render_target = render_target.as_any().downcast_ref::<D3d11Texture>().unwrap();
 		let depth_buffer = depth_buffer.as_any().downcast_ref::<D3d11Texture>().unwrap();
 		
@@ -282,7 +294,7 @@ impl super::RendererInner for D3d11Renderer {
 				let material = materials.get(obj.get_material_id()).unwrap().as_any().downcast_ref::<D3d11Material>().unwrap();
 				
 				let mut uniform_buffer = None;
-				self.device.CreateBuffer(&D3D11_BUFFER_DESC {
+				device.CreateBuffer(&D3D11_BUFFER_DESC {
 					ByteWidth: size_of::<super::Uniform>() as u32,
 					Usage: D3D11_USAGE_DYNAMIC,
 					BindFlags: D3D11_BIND_VERTEX_BUFFER.0 as u32,
@@ -360,7 +372,7 @@ impl super::RendererInner for D3d11Renderer {
 			let mut cmdlist = None;
 			self.context.FinishCommandList(true, Some(&mut cmdlist)).unwrap();
 			let cmdlist = cmdlist.unwrap();
-			self.device.GetImmediateContext().unwrap().ExecuteCommandList(Some(&cmdlist), true);
+			device.GetImmediateContext().unwrap().ExecuteCommandList(Some(&cmdlist), true);
 			self.context.ClearState();
 		}
 	}

@@ -11,7 +11,7 @@ using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 
 namespace Aetherment;
 
@@ -72,7 +72,7 @@ public class Aetherment: IDalamudPlugin {
 	private UiColor uicolor;
 	private TexFinder texfinder;
 	
-	private SharpDX.Direct3D11.Device device;
+	private nint device;
 	
 	[StructLayout(LayoutKind.Sequential)]
 	public unsafe struct Initializers {
@@ -146,7 +146,7 @@ public class Aetherment: IDalamudPlugin {
 		uicolor = new();
 		texfinder = new();
 		
-		device = Interface.UiBuilder.Device;
+		device = Interface.UiBuilder.DeviceHandle;
 		
 		var init = new Initializers {
 			ffi_str_drop = Marshal.GetFunctionPointerForDelegate(FFI.Str.drop),
@@ -177,7 +177,7 @@ public class Aetherment: IDalamudPlugin {
 				set_ui_colors = Marshal.GetFunctionPointerForDelegate(uicolor.setUiColors),
 				dalamud_add_style = Marshal.GetFunctionPointerForDelegate(dalamud.addStyle),
 			},
-			d3d11_device = device.NativePointer,
+			d3d11_device = device,
 		};
 		
 		try {
@@ -280,7 +280,7 @@ public class Aetherment: IDalamudPlugin {
 					byte set_keyboard_focus = 0;
 					nint tex;
 					unsafe {
-						tex = Native.draw(state, device.NativePointer, new() {
+						tex = Native.draw(state, device, new() {
 							width = size.X,
 							height = size.Y,
 							mouse_x = io.MousePos.X - pos.X,
@@ -311,7 +311,7 @@ public class Aetherment: IDalamudPlugin {
 					if(set_keyboard_focus != 0)
 						io.WantTextInput = true;
 					
-					drawlist.AddImage(tex, pos, pos + size);
+					drawlist.AddImage(new ImTextureID(tex), pos, pos + size);
 					
 					if(input_buf_ptr != 0)
 						Marshal.FreeHGlobal(input_buf_ptr);

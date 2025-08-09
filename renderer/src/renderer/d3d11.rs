@@ -69,12 +69,8 @@ impl super::RendererInner for D3d11Renderer {
 				..Default::default()
 			};
 			
-			let options2 = naga::back::hlsl::PipelineOptions {
-				entry_point: None,
-			};
-			
 			let mut buf = String::new();
-			let mut writer = naga::back::hlsl::Writer::new(&mut buf, &options, &options2);
+			let mut writer = naga::back::hlsl::Writer::new(&mut buf, &options);
 			writer.write(&module, &info, None).unwrap();
 			
 			buf

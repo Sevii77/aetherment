@@ -52,8 +52,8 @@ impl Skybox {
 	
 	pub fn simple(renderer: &Renderer) -> Self {
 		Self::new(renderer, &[
-			(0.0, glam::vec4(0.0, 0.0, 0.0, 1.0)),
-			(0.45, glam::vec4(0.1, 0.1, 0.1, 1.0)),
+			(0.0, glam::vec4(0.1, 0.1, 0.1, 1.0)),
+			(0.45, glam::vec4(0.2, 0.2, 0.2, 1.0)),
 			(0.55, glam::vec4(0.4, 0.9, 1.0, 1.0)),
 			(1.0, glam::vec4(0.1, 0.6, 1.0, 1.0)),
 		])

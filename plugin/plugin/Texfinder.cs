@@ -2,7 +2,7 @@ using System;
 using System.Numerics;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace Aetherment;
@@ -102,7 +102,7 @@ public partial class TexFinder {
 						var ratio = Math.Min(s.X / texture->ActualWidth, s.Y / texture->ActualHeight);
 						var pos = ImGui.GetCursorScreenPos();
 						var imgsize = new Vector2(texture->ActualWidth, texture->ActualHeight) * ratio;
-						draw.AddImage(new IntPtr(texture->D3D11ShaderResourceView), pos, pos + imgsize);
+						draw.AddImage(new ImTextureID(texture->D3D11ShaderResourceView), pos, pos + imgsize);
 						
 						var scale = hr1 ? 2 : 1;
 						var (u, v) = (part.U * scale, part.V * scale);
@@ -143,7 +143,7 @@ public partial class TexFinder {
 							var ratio = Math.Min(s.X / texture->ActualWidth, s.Y / texture->ActualHeight);
 							var pos = ImGui.GetCursorScreenPos();
 							var imgsize = new Vector2(texture->ActualWidth, texture->ActualHeight) * ratio;
-							draw.AddImage(new IntPtr(texture->D3D11ShaderResourceView), pos, pos + imgsize);
+							draw.AddImage(new ImTextureID(texture->D3D11ShaderResourceView), pos, pos + imgsize);
 							
 							// outline
 							var scale = hr1 ? 2 : 1;

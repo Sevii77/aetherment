@@ -57,6 +57,10 @@ mod havok;
 // this docs doesnt autogenerate based on supported types and extensions (is that even possible?)
 /// Convert between external/game formats
 /// 
+/// Mdl
+/// - mdl
+/// - gltf
+/// 
 /// Mtrl
 /// - mtrl
 /// 
@@ -70,7 +74,7 @@ mod havok;
 /// - tiff / tif
 /// - tga
 pub enum Convert {
-	// Mdl,
+	Mdl(format::game::Mdl),
 	Mtrl(format::game::Mtrl),
 	Tex(format::game::Tex),
 	Uld(format::game::Uld),
@@ -80,6 +84,8 @@ impl Convert {
 	pub fn from_ext<R>(ext: &str, reader: &mut R) -> Result<Self, Error> where
 	R: std::io::Read + std::io::Seek {
 		use format::{game::*, external::*};
+		
+		if mdl::EXT.contains(&ext) {return Ok(Self::Mdl(<Mdl as Bytes<mdl::Error>>::read(reader)?))}
 		
 		if mtrl::EXT.contains(&ext) {return Ok(Self::Mtrl(<Mtrl as Bytes<mtrl::Error>>::read(reader)?))}
 		
@@ -94,11 +100,41 @@ impl Convert {
 		Err(Error::InvalidFormatFrom(ext.to_string()))
 	}
 	
-	pub fn convert<W>(&self, ext: &str, writer: &mut W) -> Result<(), Error> where
+	pub fn convert<W>(&self, ext: &str, writer: &mut W, file_path: Option<&str>, file_reader: Option<impl Fn(&str) -> Option<Vec<u8>>>) -> Result<(), Error> where
 	W: std::io::Write + std::io::Seek {
 		use format::{game::*, external::*};
 		
 		match self {
+			Convert::Mdl(v) => {
+				if mdl::EXT.contains(&ext) {return Ok(<Mdl as Bytes<mdl::Error>>::write(v, writer)?)}
+				if gltf::EXT.contains(&ext) {
+					let Some(file_path) = file_path else {return Err(Error::ParametersRequires)};
+					let Some(file_reader) = file_reader else {return Err(Error::ParametersRequires)};
+					
+					let skeletons = Mdl::skeleton_paths(file_path)
+						.into_iter()
+						.flat_map(|v| {
+							let sklb_data = file_reader(&v).unwrap();
+							let sklb = <Sklb as Bytes<sklb::Error>>::read(&mut std::io::Cursor::new(sklb_data)).unwrap();
+							
+							sklb.bones
+								.iter()
+								.map(|bone| gltf::Bone {
+									name: bone.name.clone(),
+									parent: if bone.parent >= 0 {Some(sklb.bones[bone.parent as usize].name.clone())} else {None},
+									translation: bone.translation,
+									rotation: bone.rotation,
+									scale: bone.scale,
+								}).collect::<Vec<_>>()
+						}).collect::<Vec<_>>();
+					let materials = v.bake_materials(file_reader);
+					
+					return Ok(<Mdl as Gltf<mdl::Error>>::write(v, writer, materials, skeletons)?)
+				}
+				
+				Err(Error::InvalidFormatTo(ext.to_string()))
+			}
+			
 			Convert::Mtrl(v) => {
 				if mtrl::EXT.contains(&ext) {return Ok(<Mtrl as Bytes<mtrl::Error>>::write(v, writer)?)}
 				
@@ -186,6 +222,8 @@ pub enum Error {
 	InvalidFormatFrom(String),
 	#[error("Invalid format to convert to {0:?}")]
 	InvalidFormatTo(String),
+	#[error("Arguments path and file_reading are not set but are needed for this file")]
+	ParametersRequires,
 }
 
 // ----------

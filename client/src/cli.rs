@@ -116,12 +116,16 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 			
 			match aetherment::noumenon_::Convert::from_ext(&gameext, &mut BufReader::new(Cursor::new(&data))) {
 				Ok(converter) => {
+					fn file_reader(path: &str) -> Option<Vec<u8>> {
+						aetherment::noumenon().unwrap().file::<Vec<u8>>(path).ok()
+					}
+					
 					if out_file == "-" {
 						let mut data = Vec::new();
-						converter.convert(&out_format, &mut BufWriter::new(Cursor::new(&mut data)))?;
+						converter.convert(&out_format, &mut BufWriter::new(Cursor::new(&mut data)), Some(gamepath), Some(file_reader))?;
 						std::io::stdout().lock().write_all(&data)?;
 					} else {
-						converter.convert(&out_format, &mut BufWriter::new(File::create(&out_file)?))?;
+						converter.convert(&out_format, &mut BufWriter::new(File::create(&out_file)?), Some(gamepath), Some(file_reader))?;
 					}
 				}
 				
@@ -189,7 +193,7 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 								Err(err) => {println!("Failed converting {path:?} ({err:?})"); continue}
 							};
 							
-							if let Err(err) = converter.convert(&out_format, &mut BufWriter::new(f)) {
+							if let Err(err) = converter.convert(&out_format, &mut BufWriter::new(f), None, None::<fn(&str) -> Option<Vec<u8>>>) {
 								println!("Failed converting {path:?} ({err:?})");
 								continue;
 							}
@@ -224,10 +228,10 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 				
 				if out_file == "-" {
 					let mut data = Vec::new();
-					converter.convert(&out_format, &mut BufWriter::new(Cursor::new(&mut data)))?;
+					converter.convert(&out_format, &mut BufWriter::new(Cursor::new(&mut data)), None, None::<fn(&str) -> Option<Vec<u8>>>)?;
 					std::io::stdout().lock().write_all(&data)?;
 				} else {
-					converter.convert(&out_format, &mut BufWriter::new(File::create(&out_file)?))?;
+					converter.convert(&out_format, &mut BufWriter::new(File::create(&out_file)?), None, None::<fn(&str) -> Option<Vec<u8>>>)?;
 				}
 			}
 		}
@@ -270,13 +274,15 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 
 fn default_target_ext(ext: &str) -> &str {
 	match ext {
-		"tex" => "png",
+		"tex"  => "png",
 		"atex" => "png",
-		"png" => "tex",
-		"tif" => "tex",
+		"png"  => "tex",
+		"tif"  => "tex",
 		"tiff" => "tex",
-		"tga" => "tex",
-		"dds" => "tex",
+		"tga"  => "tex",
+		"dds"  => "tex",
+		"mdl"  => "gltf",
+		"gltf" => "mdl",
 		_ => ext,
 	}
 }

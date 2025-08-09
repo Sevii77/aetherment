@@ -175,7 +175,7 @@ mods ontop of one another (multiple tattoos for example).");
 					};
 					
 					let mut buf = Vec::new();
-					if let Err(err) = converter.convert("tex", &mut std::io::Cursor::new(&mut buf)) {
+					if let Err(err) = converter.convert("tex", &mut std::io::Cursor::new(&mut buf), None, None::<fn(&str) -> Option<Vec<u8>>>) {
 						log!(err, "Failed importing file ({err:?})");
 						break 'outer;
 					}

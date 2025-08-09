@@ -691,7 +691,9 @@ impl crate::format::external::Gltf<Error> for Mdl {
 							color1: v.color,
 							position: v.position,
 							normal: v.normal,
-							bones: v.blends.iter().map(|v| bone_ids[&self.bones[v.bone as usize]] as u8).collect::<Vec<_>>().try_into().unwrap(),
+							bones: if self.bones.len() > 0 {
+								v.blends.iter().map(|v| bone_ids[&self.bones[v.bone as usize]] as u8).collect::<Vec<_>>().try_into().unwrap()
+							} else {[0u8; 8]},
 							weights: v.blends.iter().map(|v| v.weight).collect::<Vec<_>>().try_into().unwrap(),
 						}).collect::<Vec<_>>();
 					

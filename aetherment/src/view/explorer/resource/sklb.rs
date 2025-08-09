@@ -96,4 +96,8 @@ impl super::ResourceView for SklbView {
 		
 		crate::view::explorer::Action::None
 	}
+	
+	fn export(&self) -> super::Export {
+		super::Export::Invalid
+	}
 }

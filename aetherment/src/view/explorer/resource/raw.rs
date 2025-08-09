@@ -98,4 +98,8 @@ impl super::ResourceView for RawView {
 		
 		crate::view::explorer::Action::None
 	}
+	
+	fn export(&self) -> super::Export {
+		super::Export::Bytes(self.data.clone())
+	}
 }

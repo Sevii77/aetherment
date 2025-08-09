@@ -36,17 +36,24 @@ pub fn read_file(path: &Path) -> Result<Vec<u8>, crate::resource_loader::Backtra
 
 // ----------
 
+pub enum Export {
+	Converter(noumenon::Convert),
+	Bytes(Vec<u8>),
+	Invalid,
+}
+
 pub trait ResourceView {
 	fn title(&self) -> String;
 	fn has_changes(&self) -> bool;
 	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> super::Action;
+	fn export(&self) -> Export;
 }
 
 // ----------
 
 pub struct Resource {
 	path: String,
-	resource: Box<dyn ResourceView>,
+	pub(crate) resource: Box<dyn ResourceView>,
 	changed_path: bool,
 }
 
@@ -61,6 +68,10 @@ impl Resource {
 }
 
 impl super::ExplorerView for Resource {
+	fn as_any(&self) -> &dyn std::any::Any {
+		self
+	}
+	
 	fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
 		self
 	}

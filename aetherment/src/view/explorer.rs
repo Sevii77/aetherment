@@ -1,10 +1,11 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, io::Write};
 
 mod workspace;
 mod tree;
 mod resource;
 
 pub trait ExplorerView {
+	fn as_any(&self) -> &dyn std::any::Any;
 	fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 	fn title(&self) -> String;
 	fn path(&self) -> Option<&str>;
@@ -18,6 +19,7 @@ pub enum Action {
 	OpenExisting(String),
 	OpenComplex((TabType, (egui_dock::SurfaceIndex, egui_dock::NodeIndex))),
 	Close(String),
+	Export((String, usize)),
 }
 
 impl Action {
@@ -87,12 +89,29 @@ impl<'r> egui_dock::TabViewer for Viewer<'r> {
 		
 		true
 	}
+	
+	fn context_menu(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab, _surface: egui_dock::SurfaceIndex, _node: egui_dock::NodeIndex) {
+		let Some(path) = tab.tab.path() else {return};
+		
+		if ui.button("Export").clicked() {
+			self.action = Action::Export((path.to_owned(), tab.id));
+			ui.close_menu();
+		}
+	}
+}
+
+enum FileDialogStatus {
+	Idle,
+	Exporting(egui_file::FileDialog, usize),
+	Importing(egui_file::FileDialog, usize),
+	Result(egui::RichText),
 }
 
 pub struct Explorer {
 	id_counter: usize,
 	views: egui_dock::DockState<ExplorerTab>,
 	last_focused_resource: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex, egui_dock::TabIndex, String)>,
+	file_dialog: FileDialogStatus,
 }
 
 impl Explorer {
@@ -101,6 +120,7 @@ impl Explorer {
 			id_counter: 0,
 			views: egui_dock::DockState::new(Vec::new()),
 			last_focused_resource: None,
+			file_dialog: FileDialogStatus::Idle,
 		};
 		
 		s.add_tab(Box::new(tree::Tree::new()), Split::None, None);
@@ -220,7 +240,140 @@ impl super::View for Explorer {
 			Action::Close(_path) =>{
 				self.update_trees();
 			}
+			Action::Export((path, tab_id)) => {
+				if let FileDialogStatus::Idle = self.file_dialog {
+					let mut dialog = egui_file::FileDialog::save_file(Some(crate::config().config.file_dialog_path.clone()))
+						.title(&format!("Exporting {}", path.split("/").last().unwrap()));
+					dialog.open();
+					
+					self.file_dialog = FileDialogStatus::Exporting(dialog, tab_id);
+				}
+			}
 			Action::None => {}
 		}
+		
+		match &mut self.file_dialog {
+			FileDialogStatus::Exporting(dialog, id) => {
+				match dialog.show(ui.ctx()).state() {
+					egui_file::State::Selected => {
+						let msg = 'x: {
+							let id = *id;
+							let path = dialog.path().map(|v| v.to_owned());
+							save_path(dialog.directory().to_path_buf());
+							
+							let Some(path) = path else {break 'x "Selected path is invalid".to_string()};
+							let Some(ext) = path.extension().map(|v| v.to_string_lossy().to_string()) else {break 'x "Invalid extension".to_string()};
+							
+							let (data, game_path) = 'd: {
+								for surface in self.views.iter_surfaces() {
+									for node in surface.iter_nodes() {
+										let Some(tabs) = node.tabs() else {continue};
+										for tab in tabs {
+											if tab.id == id {
+												let Some(resource) = tab.tab.as_any().downcast_ref::<resource::Resource>() else {break 'x "Resource to export is somehow not a resource".to_string()};
+												let Some(game_path) = resource.path() else {break 'x "Resource to export somehow does not have a path".to_string()};
+												break 'd (resource.resource.export(), game_path);
+											}
+										}
+									}
+								}
+								
+								break 'x "Tab to export is no longer valid".to_string();
+							};
+							
+							if let resource::Export::Invalid = data {break 'x "Resource to export does not support exporting (currently)".to_string()};
+							
+							let file = match std::fs::File::create(path) {
+								Ok(v) => v,
+								Err(e) => break 'x format!("Failed to create time\n{e:#?}"),
+							};
+							let mut writer = std::io::BufWriter::new(file);
+							
+							match data {
+								resource::Export::Converter(converter) => {
+									fn file_reader(path: &str) -> Option<Vec<u8>> {
+										crate::noumenon().unwrap().file::<Vec<u8>>(path).ok()
+									}
+									
+									if let Err(e) = converter.convert(&ext, &mut writer, Some(game_path), Some(file_reader)) {
+										break 'x format!("Failed converting file to requested output format\n{e:#?}");
+									};
+								}
+								
+								resource::Export::Bytes(bytes) => {
+									if let Err(e) = writer.write_all(&bytes) {
+										break 'x format!("Failed writing raw bytes to file\n{e:#?}");
+									};
+								}
+								
+								resource::Export::Invalid => unreachable!(),
+							}
+							
+							String::new()
+						};
+						
+						let msg = if msg.is_empty() {
+							egui::RichText::new("Export successful").heading()
+						} else {
+							egui::RichText::new(msg).color(egui::Color32::RED).heading()
+						};
+						
+						self.file_dialog = FileDialogStatus::Result(msg);
+					}
+					
+					egui_file::State::Cancelled => {
+						save_path(dialog.directory().to_path_buf());
+						self.file_dialog = FileDialogStatus::Idle;
+					}
+					
+					_ => {}
+				}
+			}
+			
+			FileDialogStatus::Importing(dialog, _id) => {
+				match dialog.show(ui.ctx()).state() {
+					egui_file::State::Selected => {
+						save_path(dialog.directory().to_path_buf());
+						self.file_dialog = FileDialogStatus::Idle;
+						
+						// TODO
+					}
+					
+					egui_file::State::Cancelled => {
+						save_path(dialog.directory().to_path_buf());
+						self.file_dialog = FileDialogStatus::Idle;
+					}
+					
+					_ => {}
+				}
+			}
+			
+			FileDialogStatus::Result(msg) => {
+				let mut close = false;
+				egui::Modal::new(egui::Id::new("dialogresult")).show(ui.ctx(), |ui| {
+					ui.set_max_width(600.0);
+					ui.vertical_centered(|ui| {
+						ui.label(msg.to_owned());
+						
+						ui.add_space(32.0);
+						if ui.button("Close").clicked() {
+							close = true;
+						}
+					});
+				});
+				
+				if close {
+					self.file_dialog = FileDialogStatus::Idle;
+				}
+			}
+			
+			FileDialogStatus::Idle => {}
+		}
 	}
+}
+
+fn save_path(path: std::path::PathBuf) {
+	let config = crate::config();
+	config.config.file_dialog_path = path;
+	_ = config.save_forced();
 }

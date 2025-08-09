@@ -88,4 +88,8 @@ impl super::ResourceView for TexView {
 		
 		crate::view::explorer::Action::None
 	}
+	
+	fn export(&self) -> super::Export {
+		super::Export::Converter(noumenon::Convert::Tex(self.tex.clone()))
+	}
 }

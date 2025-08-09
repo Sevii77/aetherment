@@ -335,6 +335,10 @@ impl super::ResourceView for MtrlView {
 		
 		crate::view::explorer::Action::None
 	}
+	
+	fn export(&self) -> super::Export {
+		super::Export::Converter(noumenon::Convert::Mtrl(self.mtrl.clone()))
+	}
 }
 
 fn shader_param_name(id: u32) -> String {

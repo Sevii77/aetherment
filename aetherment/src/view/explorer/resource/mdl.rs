@@ -183,6 +183,10 @@ impl super::ResourceView for MdlView {
 		
 		crate::view::explorer::Action::None
 	}
+	
+	fn export(&self) -> super::Export {
+		super::Export::Converter(noumenon::Convert::Mdl(self.mdl.clone()))
+	}
 }
 
 fn create_indices(submesh: &noumenon::format::game::mdl::Submesh, shape_states: &[(String, bool)]) -> Vec<u16> {

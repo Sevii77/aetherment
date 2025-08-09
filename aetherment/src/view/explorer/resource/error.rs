@@ -23,4 +23,8 @@ impl super::ResourceView for ErrorView {
 		ui.label(egui::RichText::new(format!("{:#?}", self.error)).color(egui::Color32::RED));
 		crate::view::explorer::Action::None
 	}
+	
+	fn export(&self) -> super::Export {
+		super::Export::Invalid
+	}
 }

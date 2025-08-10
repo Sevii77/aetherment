@@ -19,7 +19,7 @@ impl Scene {
 		Self {
 			clear_color: Some([0.0, 0.0, 0.0, 1.0]),
 			render_target: renderer.create_texture(render_width, render_height, TextureFormat::Rgba8Unorm, TextureUsage::RENDER_TARGET | TextureUsage::TEXTURE_BINDING),
-			depth_buffer: renderer.create_texture(render_width, render_height, TextureFormat::Depth32Float, TextureUsage::DEPTH_STENCIL | TextureUsage::TEXTURE_BINDING),
+			depth_buffer: renderer.create_texture(render_width, render_height, TextureFormat::Depth32Float, TextureUsage::DEPTH_STENCIL),
 			materials: HashMap::from([
 				Skybox::create_material(renderer),
 				Mesh::create_material(renderer),
@@ -32,7 +32,7 @@ impl Scene {
 	/// This will make the previous ones invalid!
 	pub fn resize(&mut self, renderer: &Renderer, render_width: u32, render_height: u32) {
 		self.render_target = renderer.create_texture(render_width, render_height, TextureFormat::Rgba8Unorm, TextureUsage::RENDER_TARGET | TextureUsage::TEXTURE_BINDING);
-		self.depth_buffer = renderer.create_texture(render_width, render_height, TextureFormat::Depth32Float, TextureUsage::DEPTH_STENCIL | TextureUsage::TEXTURE_BINDING);
+		self.depth_buffer = renderer.create_texture(render_width, render_height, TextureFormat::Depth32Float, TextureUsage::DEPTH_STENCIL);
 	}
 	
 	pub fn set_clear_color(&mut self, color: Option<[f32; 4]>) {

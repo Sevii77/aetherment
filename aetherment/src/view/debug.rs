@@ -31,7 +31,7 @@ impl super::View for Debug {
 		ui.collapsing("3D Renderer", |ui| {
 			let scene = self.scene.get_or_insert_with(|| {
 				let mut scene = InteractableScene::new(renderer);
-				scene.set_clear_color(Some([0.0; 4]));
+				// scene.set_clear_color(Some([0.0; 4]));
 				
 				let albedo = image::ImageReader::new(std::io::Cursor::new(include_bytes!("../../debug_albedo.png"))).with_guessed_format().unwrap().decode().unwrap().into_bytes();
 				let normal = image::ImageReader::new(std::io::Cursor::new(include_bytes!("../../debug_normal.png"))).with_guessed_format().unwrap().decode().unwrap().into_bytes();

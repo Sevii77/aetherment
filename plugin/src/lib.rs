@@ -194,8 +194,9 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 		});
 		
 		let renderer_egui = renderer::Renderer::new(init.d3d11_device).unwrap();
-		let renderer_3d = Box::new(::renderer::renderer::D3d11Renderer::new(init.d3d11_device, Box::new(|texture| {
+		let renderer_3d: Box<dyn ::renderer::renderer::RendererInner> = Box::new(::renderer::renderer::D3d11Renderer::new(init.d3d11_device, Box::new(|texture| {
 			let texture = texture.as_any().downcast_ref::<::renderer::renderer::D3d11Texture>().unwrap();
+			log::debug!(target: "aetherment", "3d renderer: {}", texture.get_view_ptr() as u64);
 			texture.get_view_ptr() as u64
 		})));
 		

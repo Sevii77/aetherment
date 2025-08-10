@@ -3,7 +3,7 @@ use windows::{core::{Interface, PCSTR}, Win32::Graphics::{Direct3D::{Fxc::D3DCom
 
 pub struct D3d11Renderer {
 	device_ptr: usize,
-	context: Rc<ID3D11DeviceContext>,
+	context: ID3D11DeviceContext,
 	texture_register: Box<dyn Fn(&super::Texture) -> u64>,
 	
 	depth_stencil_state: ID3D11DepthStencilState,
@@ -32,12 +32,13 @@ impl D3d11Renderer {
 			FillMode: D3D11_FILL_SOLID,
 			CullMode: D3D11_CULL_FRONT,
 			ScissorEnable: windows::core::BOOL(0),
+			// FrontCounterClockwise: windows::core::BOOL(1),
 			..Default::default()
 		}, Some(&mut rasterizer_state)).unwrap()};
 		
 		Self {
 			device_ptr,
-			context: std::rc::Rc::new(context.unwrap()),
+			context: context.unwrap(),
 			texture_register,
 			
 			depth_stencil_state: depth_stencil_state.unwrap(),
@@ -98,10 +99,10 @@ impl super::RendererInner for D3d11Renderer {
 		let mut layout = None;
 		unsafe{device.CreateInputLayout(&[
 			input(0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0),
-			input(1, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0),
-			input(2, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0),
-			input(3, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0),
-			input(4, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0),
+			input(1, DXGI_FORMAT_R32G32B32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0),
+			input(2, DXGI_FORMAT_R32G32B32_FLOAT, 0, 20, D3D11_INPUT_PER_VERTEX_DATA, 0),
+			input(3, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 32, D3D11_INPUT_PER_VERTEX_DATA, 0),
+			input(4, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 48, D3D11_INPUT_PER_VERTEX_DATA, 0),
 		], &vs_bytecode, Some(&mut layout)).unwrap()};
 		
 		Rc::new(D3d11Material {
@@ -133,7 +134,8 @@ impl super::RendererInner for D3d11Renderer {
 				Count: 1,
 				Quality: 0,
 			},
-			Usage: D3D11_USAGE_DYNAMIC,
+			Usage: if usage.contains(super::TextureUsage::RENDER_TARGET) || usage.contains(super::TextureUsage::DEPTH_STENCIL) 
+				{D3D11_USAGE_DEFAULT} else {D3D11_USAGE_DYNAMIC},
 			BindFlags:
 				if usage.contains(super::TextureUsage::TEXTURE_BINDING) {D3D11_BIND_SHADER_RESOURCE.0 as u32} else {0} |
 				if usage.contains(super::TextureUsage::RENDER_TARGET) {D3D11_BIND_RENDER_TARGET.0 as u32} else {0} |
@@ -297,7 +299,7 @@ impl super::RendererInner for D3d11Renderer {
 				device.CreateBuffer(&D3D11_BUFFER_DESC {
 					ByteWidth: size_of::<super::Uniform>() as u32,
 					Usage: D3D11_USAGE_DYNAMIC,
-					BindFlags: D3D11_BIND_VERTEX_BUFFER.0 as u32,
+					BindFlags: D3D11_BIND_CONSTANT_BUFFER.0 as u32,
 					CPUAccessFlags: D3D11_CPU_ACCESS_WRITE.0 as u32,
 					..Default::default()
 				}, None, Some(&mut uniform_buffer)).unwrap();
@@ -316,12 +318,11 @@ impl super::RendererInner for D3d11Renderer {
 				self.context.Map(&uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, Some(&mut data_map)).unwrap();
 				core::ptr::copy_nonoverlapping(&uniform_data, data_map.pData as _, 1);
 				
-				self.context.VSSetShader(Some(&material.vs), None);
-				self.context.PSSetShader(Some(&material.ps), None);
+				self.context.VSSetShader(&material.vs, None);
+				self.context.PSSetShader(&material.ps, None);
 				self.context.VSSetConstantBuffers(0, Some(&[Some(uniform_buffer.clone())]));
 				self.context.PSSetConstantBuffers(0, Some(&[Some(uniform_buffer)]));
-				self.context.IASetInputLayout(Some(&material.layout));
-				
+				self.context.IASetInputLayout(&material.layout);
 				for (i, (resource, bind)) in obj.get_shader_resources().iter().zip(&material.binds).enumerate() {
 					let index = i as u32 + 1;
 					
@@ -426,7 +427,7 @@ unsafe fn compile_shader(source: &str, entry: &str, target: &str) -> Result<Vec<
 
 pub struct D3d11Texture {
 	texture: ID3D11Texture2D,
-	context: Rc<ID3D11DeviceContext>,
+	context: ID3D11DeviceContext,
 	view: Option<ID3D11ShaderResourceView>,
 	view_rt: Option<ID3D11RenderTargetView>,
 	view_depth: Option<ID3D11DepthStencilView>,
@@ -456,7 +457,7 @@ impl super::TextureInner for D3d11Texture {
 
 pub struct D3d11Buffer {
 	buffer: ID3D11Buffer,
-	context: Rc<ID3D11DeviceContext>,
+	context: ID3D11DeviceContext,
 	size: usize,
 }
 

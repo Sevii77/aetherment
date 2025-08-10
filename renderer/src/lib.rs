@@ -8,7 +8,7 @@ pub use scene::*;
 pub(crate) type ObjectBuffer = Vec<Option<Box<dyn Object>>>;
 
 #[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
 	pub uv: Vec2,
 	pub position: Vec3,

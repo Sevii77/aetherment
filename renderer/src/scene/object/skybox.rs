@@ -18,10 +18,10 @@ pub struct Skybox {
 impl Skybox {
 	pub fn new(renderer: &Renderer, colors: &[(f32, glam::Vec4)]) -> Self {
 		const VERTICES: &[Vertex] = &[
-			vertex(glam::vec3(-1.0, -1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ZERO, glam::Vec2::ZERO),
-			vertex(glam::vec3( 1.0, -1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ZERO, glam::Vec2::X),
-			vertex(glam::vec3(-1.0,  1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ZERO, glam::Vec2::Y),
-			vertex(glam::vec3( 1.0,  1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ZERO, glam::Vec2::ONE),
+			vertex(glam::vec3(-1.0, -1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ONE, glam::Vec2::ZERO),
+			vertex(glam::vec3( 1.0, -1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ONE, glam::Vec2::X),
+			vertex(glam::vec3(-1.0,  1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ONE, glam::Vec2::Y),
+			vertex(glam::vec3( 1.0,  1.0, 0.0), glam::Vec3::ZERO, glam::Vec4::ONE, glam::Vec2::ONE),
 		];
 		
 		const INDICES: &[u16] = &[0, 1, 2, 1, 3, 2];
@@ -33,13 +33,13 @@ impl Skybox {
 		}
 		
 		let vertex_buffer = renderer.create_buffer(size_of_val(VERTICES), BufferUsage::COPY_DST | BufferUsage::VERTEX);
-		vertex_buffer.set_data(&bytemuck::cast_slice(VERTICES));
+		vertex_buffer.set_data(bytemuck::cast_slice(VERTICES));
 		
 		let index_buffer = renderer.create_buffer(size_of_val(INDICES), BufferUsage::COPY_DST | BufferUsage::INDEX);
-		index_buffer.set_data(&bytemuck::cast_slice(INDICES));
+		index_buffer.set_data(bytemuck::cast_slice(INDICES));
 		
 		let color_buffer = renderer.create_buffer(size_of::<SkyboxColor>(), BufferUsage::COPY_DST | BufferUsage::UNIFORM);
-		color_buffer.set_data(&bytemuck::cast_slice(&[colors_new]));
+		color_buffer.set_data(bytemuck::cast_slice(&[colors_new]));
 		
 		Self {
 			visible: true,

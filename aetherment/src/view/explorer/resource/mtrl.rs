@@ -1,5 +1,5 @@
 use noumenon::format::{external::Bytes, game::{mtrl::{self, AddressMode}, Mtrl}};
-use crate::{ui_ext::UiExt, EnumTools};
+use crate::{ui_ext::UiExt, view::explorer::Action, EnumTools};
 
 impl EnumTools for AddressMode {
 	type Iterator = std::array::IntoIter<Self, 4>;
@@ -50,7 +50,9 @@ impl super::ResourceView for MtrlView {
 		self.changed
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> crate::view::explorer::Action {
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> Action {
+		let mut act = Action::None;
+		
 		egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
 			ui.label("Shader");
 			ui.combo(self.mtrl.shader.to_string(), "", |ui| {
@@ -274,7 +276,15 @@ impl super::ResourceView for MtrlView {
 					}
 					
 					ui.indent(i, |ui| {
-						self.changed |= ui.text_edit_singleline(&mut sampler.texture).changed();
+						let resp = ui.text_edit_singleline(&mut sampler.texture);
+						resp.context_menu(|ui| {
+							if ui.button("Open in new tab").clicked() {
+								act = Action::OpenNew(sampler.texture.clone());
+								ui.close_menu();
+							}
+						});
+						self.changed |= resp.changed();
+						
 						self.changed |= ui.combo_enum(&mut sampler.u_address_mode, "U Address Mode").changed();
 						self.changed |= ui.combo_enum(&mut sampler.v_address_mode, "V Address Mode").changed();
 						self.changed |= ui.num_edit_range(&mut sampler.lod_bias, "Lod Bias", -8.0..=7.984375).changed();
@@ -333,7 +343,7 @@ impl super::ResourceView for MtrlView {
 			self.changed |= ui.num_edit(&mut self.mtrl.shader_flags, "").changed();
 		});
 		
-		crate::view::explorer::Action::None
+		act
 	}
 	
 	fn export(&self) -> super::Export {

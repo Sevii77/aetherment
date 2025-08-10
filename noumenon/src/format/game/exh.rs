@@ -22,11 +22,11 @@ pub struct Exh {
 	_unk4: [u8; 8],
 	
 	#[br(count = column_count)]
-	pub(crate) columns: Vec<Column>,
+	pub columns: Vec<Column>,
 	#[br(count = page_count)]
-	pages: Vec<Page>,
+	pub pages: Vec<Page>,
 	#[br(count = language_count)]
-	languages: Vec<Language>,
+	pub languages: Vec<LanguageSeg>,
 }
 
 impl ironworks::file::File for Exh {
@@ -53,7 +53,7 @@ impl crate::format::external::Bytes<Error> for Exh {
 #[brw(big)]
 #[derive(Debug, Clone)]
 pub struct Column {
-	pub(crate) kind: ColumnKind,
+	pub kind: ColumnKind,
 	pub(crate) offset: u16,
 }
 
@@ -100,13 +100,13 @@ impl ColumnKind {
 			ColumnKind::I64 => 8,
 			ColumnKind::U64 => 8,
 			ColumnKind::PackedBool0 => 1,
-			ColumnKind::PackedBool1 => 1,
-			ColumnKind::PackedBool2 => 1,
-			ColumnKind::PackedBool3 => 1,
-			ColumnKind::PackedBool4 => 1,
-			ColumnKind::PackedBool5 => 1,
-			ColumnKind::PackedBool6 => 1,
-			ColumnKind::PackedBool7 => 1,
+			ColumnKind::PackedBool1 => 0,
+			ColumnKind::PackedBool2 => 0,
+			ColumnKind::PackedBool3 => 0,
+			ColumnKind::PackedBool4 => 0,
+			ColumnKind::PackedBool5 => 0,
+			ColumnKind::PackedBool6 => 0,
+			ColumnKind::PackedBool7 => 0,
 		}
 	}
 }
@@ -115,14 +115,44 @@ impl ColumnKind {
 #[brw(big)]
 #[derive(Debug, Clone)]
 pub struct Page {
-	start_id: u32,
-	row_count: u32,
+	pub start_id: u32,
+	pub row_count: u32,
 }
 
 #[binrw]
 #[brw(big)]
 #[derive(Debug, Clone)]
-pub struct Language {
-	language: u8,
+pub struct LanguageSeg {
+	pub language: u8,
 	_unk1: u8,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[repr(u8)]
+pub enum Language {
+	None = 0,
+	Japanese = 1,
+	English = 2,
+	German = 3,
+	French = 4,
+	ChineseSimplified = 5,
+	ChineseTraditional = 6,
+	Korean = 7,
+	ChineseTraditional2 = 8,
+}
+
+impl Language {
+	pub fn code(&self) -> Option<&'static str> {
+		match self {
+			Language::None                => None,
+			Language::Japanese            => Some("ja"),
+			Language::English             => Some("en"),
+			Language::German              => Some("de"),
+			Language::French              => Some("fr"),
+			Language::ChineseSimplified   => Some("chs"),
+			Language::ChineseTraditional  => Some("cht"),
+			Language::Korean              => Some("ko"),
+			Language::ChineseTraditional2 => Some("tc"),
+		}
+	}
 }

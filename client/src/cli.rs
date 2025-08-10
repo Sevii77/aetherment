@@ -86,7 +86,7 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 	
 	match matches.subcommand() {
 		Some(("extract", sub)) => {
-			let Some(noumenon) = aetherment::noumenon() else {
+			let Some(noumenon) = aetherment::noumenon_instance() else {
 				println!("Game install path set in config is invalid");
 				return Ok(());
 			};
@@ -114,10 +114,10 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 				None => out_file.split(".").last().unwrap(),
 			};
 			
-			match aetherment::noumenon_::Convert::from_ext(&gameext, &mut BufReader::new(Cursor::new(&data))) {
+			match aetherment::noumenon::Convert::from_ext(&gameext, &mut BufReader::new(Cursor::new(&data))) {
 				Ok(converter) => {
 					fn file_reader(path: &str) -> Option<Vec<u8>> {
-						aetherment::noumenon().unwrap().file::<Vec<u8>>(path).ok()
+						aetherment::noumenon_instance().unwrap().file::<Vec<u8>>(path).ok()
 					}
 					
 					if out_file == "-" {
@@ -174,7 +174,7 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 								Err(err) => {println!("Failed converting {path:?} ({err:?})"); continue}
 							};
 							
-							let converter = match aetherment::noumenon_::Convert::from_ext(&in_format, &mut BufReader::new(f)) {
+							let converter = match aetherment::noumenon::Convert::from_ext(&in_format, &mut BufReader::new(f)) {
 								Ok(v) => v,
 								Err(err) => {println!("Failed converting {path:?} ({err:?})"); continue}
 							};
@@ -221,9 +221,9 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 				let converter = if in_file == "-" {
 					let mut data = Vec::new();
 					std::io::stdin().lock().read_to_end(&mut data)?;
-					aetherment::noumenon_::Convert::from_ext(&in_format, &mut BufReader::new(Cursor::new(data)))?
+					aetherment::noumenon::Convert::from_ext(&in_format, &mut BufReader::new(Cursor::new(data)))?
 				} else {
-					aetherment::noumenon_::Convert::from_ext(&in_format, &mut BufReader::new(File::open(in_file)?))?
+					aetherment::noumenon::Convert::from_ext(&in_format, &mut BufReader::new(File::open(in_file)?))?
 				};
 				
 				if out_file == "-" {

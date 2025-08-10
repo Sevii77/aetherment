@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use glam::Vec4Swizzles;
 use noumenon::format::{external::Bytes, game::Mdl};
-use crate::ui_ext::{InteractableScene, UiExt};
+use crate::{ui_ext::{InteractableScene, UiExt}, view::explorer::Action};
 
 pub struct MdlView {
+	changed: bool,
 	mdl: Mdl,
 	scene: Option<InteractableScene>,
 	lod: usize,
@@ -17,6 +18,7 @@ impl MdlView {
 		let data = super::read_file(path)?;
 		
 		Ok(Self {
+			changed: false,
 			mdl: Mdl::read(&mut std::io::Cursor::new(&data))?,
 			scene: None,
 			lod: 0,
@@ -33,10 +35,12 @@ impl super::ResourceView for MdlView {
 	}
 	
 	fn has_changes(&self) -> bool {
-		false
+		self.changed
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> crate::view::explorer::Action {
+	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> Action {
+		let mut act = Action::None;
+		
 		let scene = self.scene.get_or_insert_with(|| {
 			let mut scene = InteractableScene::new(renderer);
 			
@@ -44,7 +48,7 @@ impl super::ResourceView for MdlView {
 			
 			// load in textures and modify them for our viewing pleasure
 			let textures = self.mdl.bake_materials(|path| {
-				crate::noumenon().unwrap().file::<Vec<u8>>(path).ok()
+				crate::noumenon_instance().unwrap().file::<Vec<u8>>(path).ok()
 			}).into_iter()
 				.map(|(k, material)| (k, (
 					material.diffuse.map(|v| renderer.create_texture_initialized(v.width, v.height, renderer::renderer::TextureFormat::Rgba8Unorm, renderer::renderer::TextureUsage::TEXTURE_BINDING, &v.data)),
@@ -105,83 +109,93 @@ impl super::ResourceView for MdlView {
 			let size = ui.available_size();
 			scene.render(renderer, size.x as usize, size.y as usize, ui);
 			
-			let ui = ui_right;
-			if self.mdl.lods.len() > 1 {
-				ui.combo(format!("LOD {}", self.lod), "", |ui| {
-					for i in 0..self.mdl.lods.len() {
-						if ui.selectable_label(self.lod == i, format!("LOD {i}")).clicked() {
-							self.lod = i;
-							
-							for ((mesh_lod, _, _), id) in &self.objects {
-								*scene.get_object_mut(*id).unwrap().get_visible_mut() = *mesh_lod == i;
+			egui::ScrollArea::vertical().auto_shrink(false).show(ui_right, |ui| {
+				if self.mdl.lods.len() > 1 {
+					ui.combo(format!("LOD {}", self.lod), "", |ui| {
+						for i in 0..self.mdl.lods.len() {
+							if ui.selectable_label(self.lod == i, format!("LOD {i}")).clicked() {
+								self.lod = i;
+								
+								for ((mesh_lod, _, _), id) in &self.objects {
+									*scene.get_object_mut(*id).unwrap().get_visible_mut() = *mesh_lod == i;
+								}
 							}
 						}
-					}
-				});
-			}
-			
-			ui.spacer();
-			
-			let mut update_objects = false;
-			if self.shapes.len() > 0 {
-				ui.label("Shapes");
-				for (name, state) in &mut self.shapes {
-					update_objects |= ui.checkbox(state, &*name).changed();
+					});
 				}
 				
 				ui.spacer();
-			}
-			
-			if update_objects {
-				for ((lod_index, mesh_index, submesh_index), obj_id) in &self.objects {
-					let submesh = &self.mdl.lods[*lod_index].meshes[*mesh_index].submeshes[*submesh_index];
-					let obj = scene.get_object_mut(*obj_id).unwrap().as_any_mut().downcast_mut::<renderer::Mesh>().unwrap();
-					obj.set_indices(renderer, &create_indices(submesh, &self.shapes));
-				}
-			}
-			
-			for (mesh_index, mesh) in self.mdl.lods[self.lod].meshes.iter_mut().enumerate() {
-				ui.collapsing(format!("Mesh {mesh_index}"), |ui| {
-					ui.label("Material");
-					ui.text_edit_singleline(&mut mesh.material);
+				
+				let mut update_objects = false;
+				if self.shapes.len() > 0 {
+					ui.label("Shapes");
+					for (name, state) in &mut self.shapes {
+						update_objects |= ui.checkbox(state, &*name).changed();
+					}
 					
-					for (submesh_index, submesh) in mesh.submeshes.iter_mut().enumerate() {
-						let obj = scene.get_object_mut(self.objects[&(self.lod, mesh_index, submesh_index)]).unwrap();
+					ui.spacer();
+				}
+				
+				if update_objects {
+					for ((lod_index, mesh_index, submesh_index), obj_id) in &self.objects {
+						let submesh = &self.mdl.lods[*lod_index].meshes[*mesh_index].submeshes[*submesh_index];
+						let obj = scene.get_object_mut(*obj_id).unwrap().as_any_mut().downcast_mut::<renderer::Mesh>().unwrap();
+						obj.set_indices(renderer, &create_indices(submesh, &self.shapes));
+					}
+				}
+				
+				for (mesh_index, mesh) in self.mdl.lods[self.lod].meshes.iter_mut().enumerate() {
+					ui.collapsing(format!("Mesh {mesh_index}"), |ui| {
+						ui.label("Material");
+						let resp = ui.text_edit_singleline(&mut mesh.material);
+						resp.context_menu(|ui| {
+							if ui.button("Open in new tab").clicked() {
+								act = Action::OpenNew(Mdl::absolute_mtrl_path(&mesh.material, 1));
+								ui.close_menu();
+							}
+						});
+						self.changed |= resp.changed();
 						
-						ui.spacer();
-						ui.checkbox(obj.get_visible_mut(), format!("Submesh {submesh_index}"));
-						ui.indent("options", |ui| {
-							ui.label("Attributes");
-							let mut delete = None;
-							for (i, attr) in submesh.attributes.iter().enumerate() {
-								ui.horizontal(|ui| {
-									if ui.button("🗑").clicked() {
-										delete = Some(i);
-									}
-									
-									ui.label(attr);
-								});
-							}
+						for (submesh_index, submesh) in mesh.submeshes.iter_mut().enumerate() {
+							let obj = scene.get_object_mut(self.objects[&(self.lod, mesh_index, submesh_index)]).unwrap();
 							
-							if let Some(i) = delete {
-								submesh.attributes.remove(i);
-							}
-							
-							ui.horizontal(|ui| {
-								if ui.button("➕").clicked() {
-									submesh.attributes.push(self.add_attr.clone());
-									self.add_attr.clear();
+							ui.spacer();
+							ui.checkbox(obj.get_visible_mut(), format!("Submesh {submesh_index}"));
+							ui.indent("options", |ui| {
+								ui.label("Attributes");
+								let mut delete = None;
+								for (i, attr) in submesh.attributes.iter().enumerate() {
+									ui.horizontal(|ui| {
+										if ui.button("🗑").clicked() {
+											delete = Some(i);
+										}
+										
+										ui.label(attr);
+									});
 								}
 								
-								ui.text_edit_singleline(&mut self.add_attr);
+								if let Some(i) = delete {
+									submesh.attributes.remove(i);
+									self.changed = true;
+								}
+								
+								ui.horizontal(|ui| {
+									if ui.button("➕").clicked() {
+										submesh.attributes.push(self.add_attr.clone());
+										self.add_attr.clear();
+										self.changed = true;
+									}
+									
+									ui.text_edit_singleline(&mut self.add_attr);
+								});
 							});
-						});
-					}
-				});
-			}
+						}
+					});
+				}
+			});
 		});
 		
-		crate::view::explorer::Action::None
+		act
 	}
 	
 	fn export(&self) -> super::Export {

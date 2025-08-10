@@ -53,35 +53,6 @@ fn main() {
 	_ = log::set_boxed_logger(Box::new(SimpleLogger));
 	log::set_max_level(log::LevelFilter::Debug);
 	
-	// // let path = "chara/equipment/e6100/model/c0201e6100_top.mdl";
-	// let path = "chara/human/c1401/obj/face/f0001/model/c1401f0001_fac.mdl";
-	// let mdl = aetherment::noumenon().unwrap().file::<aetherment::noumenon_::format::game::Mdl>(path).unwrap();
-	// 
-	// fn file_reader(path: &str) -> Option<Vec<u8>> {
-	// 	aetherment::noumenon().unwrap().file::<Vec<u8>>(path).ok()
-	// }
-	// let materials = mdl.bake_materials(file_reader);
-	// 
-	// let skeletons = aetherment::noumenon_::format::game::Mdl::skeleton_paths(path)
-	// 	.into_iter()
-	// 	.flat_map(|v| {
-	// 		let sklb = aetherment::noumenon().unwrap().file::<aetherment::noumenon_::format::game::Sklb>(&v).unwrap();
-	// 		sklb.bones
-	// 			.iter()
-	// 			.map(|bone| aetherment::noumenon_::format::external::gltf::Bone {
-	// 				name: bone.name.clone(),
-	// 				parent: if bone.parent >= 0 {Some(sklb.bones[bone.parent as usize].name.clone())} else {None},
-	// 				translation: bone.translation,
-	// 				rotation: bone.rotation,
-	// 				scale: bone.scale,
-	// 			}).collect::<Vec<_>>()
-	// 	}).collect::<Vec<_>>();
-	// 
-	// let mut file = std::fs::File::create("./test.glb").unwrap();
-	// <aetherment::noumenon_::format::game::Mdl as aetherment::noumenon_::format::external::Gltf<aetherment::noumenon_::format::game::mdl::Error>>::write(&mdl, &mut file, materials, skeletons).unwrap();
-	// 
-	// return;
-	
 	if std::env::args().len() > 1 {
 		cli::handle_cli().unwrap();
 		

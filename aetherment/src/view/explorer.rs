@@ -292,7 +292,7 @@ impl super::View for Explorer {
 							match data {
 								resource::Export::Converter(converter) => {
 									fn file_reader(path: &str) -> Option<Vec<u8>> {
-										crate::noumenon().unwrap().file::<Vec<u8>>(path).ok()
+										crate::noumenon_instance().unwrap().file::<Vec<u8>>(path).ok()
 									}
 									
 									if let Err(e) = converter.convert(&ext, &mut writer, Some(game_path), Some(file_reader)) {

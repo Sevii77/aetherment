@@ -10,8 +10,7 @@ pub mod modman;
 #[cfg(any(feature = "plugin", feature = "client"))] mod view;
 #[cfg(any(feature = "plugin", feature = "client"))] mod remote;
 #[cfg(any(feature = "plugin", feature = "client"))] pub mod service;
-// #[cfg(any(feature = "plugin", feature = "client"))] pub extern crate renderer;
-pub use noumenon as noumenon_; // idk what to call it
+pub use noumenon;
 
 static mut CONFIG: Option<config::ConfigManager> = None;
 pub fn config() -> &'static mut config::ConfigManager {
@@ -34,11 +33,11 @@ pub fn backend() -> &'static mut Box<dyn modman::backend::Backend> {
 
 static mut NOUMENON: Option<Option<noumenon::Noumenon>> = None;
 #[cfg(feature = "plugin")]
-pub fn noumenon() -> Option<&'static noumenon::Noumenon> {
+pub fn noumenon_instance() -> Option<&'static noumenon::Noumenon> {
 	unsafe{NOUMENON.get_or_insert_with(|| noumenon::get_noumenon(Some(std::env::current_exe().unwrap().parent().unwrap().parent().unwrap()))).as_ref()}
 }
 #[cfg(not(feature = "plugin"))]
-pub fn noumenon() -> Option<&'static noumenon::Noumenon> {
+pub fn noumenon_instance() -> Option<&'static noumenon::Noumenon> {
 	unsafe{NOUMENON.get_or_insert_with(|| noumenon::get_noumenon(config().config.game_install.as_ref())).as_ref()}
 }
 

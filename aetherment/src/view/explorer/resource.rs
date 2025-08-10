@@ -8,6 +8,7 @@ mod mdl;
 mod mtrl;
 mod sklb;
 
+#[derive(Debug, Clone)]
 pub enum Path {
 	Game(String),
 	Real(std::path::PathBuf),
@@ -25,7 +26,7 @@ impl Path {
 pub fn read_file(path: &Path) -> Result<Vec<u8>, crate::resource_loader::BacktraceError> {
 	match path {
 		Path::Game(path) =>
-			Ok(crate::noumenon()
+			Ok(crate::noumenon_instance()
 				.ok_or("No Noumenon instance")?
 				.file::<Vec<u8>>(&path)?),
 		

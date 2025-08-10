@@ -597,7 +597,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			crate::resource_loader::load_file_disk(&root.join(&mod_id).join(path)).ok()
 		} else {
 			// log!("Loading file {path} from game to overlay onto");
-			crate::noumenon()?.file(path).ok()
+			crate::noumenon_instance()?.file(path).ok()
 		}
 	};
 	

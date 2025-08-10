@@ -271,7 +271,7 @@ pub fn get_mod_files(meta: &meta::Meta, files_path: &std::path::Path) -> HashMap
 
 pub fn game_files_hashes(files: HashSet<&str>) -> HashMap<String, String> {
 	let mut hashes = HashMap::new();
-	let Some(noum) = crate::noumenon() else {return hashes};
+	let Some(noum) = crate::noumenon_instance() else {return hashes};
 	
 	for file in files {
 		let file = file.trim_end_matches(".comp");
@@ -440,7 +440,7 @@ pub fn create_mod(mod_path: &std::path::Path, settings: ModCreationSettings) -> 
 }
 
 pub fn check_diff<R: Read + Seek>(mod_data: R) -> Result<Vec<String>, crate::resource_loader::BacktraceError> {
-	let noum = crate::noumenon().ok_or("Noumenon not loaded")?;
+	let noum = crate::noumenon_instance().ok_or("Noumenon not loaded")?;
 	let mut pack = zip::ZipArchive::new(mod_data)?;
 	
 	let mut hashes_buf = Vec::new();

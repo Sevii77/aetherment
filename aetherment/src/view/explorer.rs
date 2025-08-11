@@ -227,6 +227,7 @@ impl super::View for Explorer {
 					let Some(focused) = &mut self.last_focused_resource else {break 's false};
 					let node = &mut self.views[focused.0][focused.1];
 					let Some(tabs) = node.tabs_mut() else {break 's false};
+					if tabs.len() <= focused.2.0 {break 's false};
 					tabs[focused.2.0].tab = Box::new(resource::Resource::new(&path));
 					self.update_trees();
 					

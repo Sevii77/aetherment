@@ -235,10 +235,6 @@ impl BinRead for Mdl {
 		
 		let model_header = r!(ModelHeaderRaw);
 		let element_ids = r!(Vec<ElementIdRaw>, model_header.element_id_count);
-		// textools writes 1 lod count but writes 3 lod structs, with the other 2 empty
-		// i am not putting SE above doing that themselves, but im blaming textools anyways
-		// let lods = r!(Vec<LodRaw>, header.lod_count);
-		// let extra_lods = r!(Vec<ExtraLodRaw>, if model_header.flags2.contains(ModelFlags2Raw::EXTRA_LOD_ENABLED) {header.lod_count} else {0});
 		let lods = r!(Vec<LodRaw>, 3);
 		let extra_lods = r!(Vec<ExtraLodRaw>, if model_header.flags2.contains(ModelFlags2Raw::EXTRA_LOD_ENABLED) {3} else {0});
 		let meshes = r!(Vec<MeshRaw>, model_header.mesh_count);
@@ -254,9 +250,11 @@ impl BinRead for Mdl {
 		let shape_values = r!(Vec<ShapeValueRaw>, model_header.shape_value_count);
 		let submesh_bone_map_size = r!(u32);
 		let submesh_bone_map = r!(Vec<u16>, submesh_bone_map_size / 2);
+		let neck_morth = r!(Vec<NeckMorphRaw>, model_header.neck_morph_count);
+		let unkown_face_shadow_data = r!(Vec<UnkFaceShadowDataRaw>, model_header.unknown_face_shadow_data_count);
 		
-		let _padding_size = r!(u8);
-		r!(move _padding_size);
+		let padding_size = r!(u8);
+		r!(move padding_size);
 		
 		let bb = r!(BoundingBoxRaw);
 		let model_bb = r!(BoundingBoxRaw);
@@ -294,8 +292,6 @@ impl BinRead for Mdl {
 				// vertices
 				let mut vertices = vec![Vertex::default(); mesh_raw.vertex_count as usize];
 				let vertex_decl = &vertex_declerations[mesh_index];
-				// textools writes vertex_stream_count as the amount of meshes, and not the actual purpose :mochiwohoo:
-				// for stream in 0..mesh_raw.vertex_stream_count {
 				for stream in 0..3u8 {
 					r!(seek header.vertex_offsets[lod_index] as u64 + mesh_raw.vertex_buffer_offset[stream as usize] as u64);
 					
@@ -953,11 +949,13 @@ struct ModelHeaderRaw {
 	flags3: u8, // ?
 	bg_change_material_index: u8,
 	bg_crest_change_material_index: u8,
-	unknown6: u8,
+	neck_morph_count: u8,
 	bone_table_array_count_total: u16,
 	unknown8: u16,
+	unknown_face_shadow_data_count: u16,
 	unknown9: u16,
-	_padding: [u8; 6],
+	unknown10: u16,
+	unknown11: u16,
 }
 
 bitflags::bitflags! {
@@ -1205,6 +1203,24 @@ struct ShapeMeshRaw {
 struct ShapeValueRaw {
 	base_indices_index: u16,
 	replacing_vertex_index: u16,
+}
+
+#[binrw]
+#[derive(Debug, Clone)]
+struct NeckMorphRaw {
+	rel_position: [f32; 3],
+	unknown1: [u8; 4],
+	rel_normal: [f32; 3],
+	bone_table: [u8; 4],
+}
+
+#[binrw]
+#[derive(Debug, Clone)]
+struct UnkFaceShadowDataRaw {
+	unknown1: f32,
+	unknown2: f32,
+	unknown3: f32,
+	unknown4: u32,
 }
 
 #[binrw]

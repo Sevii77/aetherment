@@ -153,7 +153,7 @@ impl super::View for Mods {
 					if let Some(meta) = backend.get_mod_meta(m) {
 						ui.push_id(m, |ui| {
 							if ui.selectable_label(self.selected_mod == *m, &meta.name).clicked() {
-								ui.free_textures(&format!("aetherment://{}/", self.selected_mod));
+								ui.free_textures("aetherment://");
 								self.selected_mod = m.clone();
 							}
 						});
@@ -408,9 +408,9 @@ impl super::View for Mods {
 fn draw_description(ui: &mut egui::Ui, mod_id: &str, text: &str, md_cache: &mut egui_commonmark::CommonMarkCache) {
 	if text.starts_with("[md]") {
 		ui.userspace_loaders(|ui| {
+			ui.set_width_range(50.0..=400.0);
 			egui_commonmark::CommonMarkViewer::new()
 				.default_implicit_uri_scheme(format!("aetherment://{}/", mod_id))
-				// .max_image_width(width)
 				.show(ui, md_cache, &text[4..]);
 		});
 	} else {
@@ -441,14 +441,14 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 						ui.horizontal(|ui| {
 							changed |= ui.selectable_value(val, i as u32, &sub.name).clicked();
 							if !sub.description.is_empty() {
-								ui.helptext(&sub.description);
+								draw_help(ui, mod_id, &sub.description, md_cache);
 							}
 						});
 					}
 				});
 				
 				if !desc.is_empty() {
-					draw_help(ui, mod_id, &*desc, md_cache);
+					draw_help(ui, mod_id, desc, md_cache);
 				}
 			});
 			
@@ -550,29 +550,35 @@ fn draw_option(ui: &mut egui::Ui, mod_id: &str, meta: &crate::modman::meta::Meta
 		
 		Grayscale(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(val, o.min..=o.max, name).changed();
-			*val = val.clamp(o.min, o.max);
-			if !desc.is_empty() {
-				draw_help(ui, mod_id, &*desc, md_cache);
-			}
+			ui.horizontal(|ui| {
+				changed |= ui.slider(val, o.min..=o.max, name).changed();
+				*val = val.clamp(o.min, o.max);
+				if !desc.is_empty() {
+					draw_help(ui, mod_id, &*desc, md_cache);
+				}
+			});
 		}
 		
 		Opacity(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(val, o.min..=o.max, name).changed();
-			*val = val.clamp(o.min, o.max);
-			if !desc.is_empty() {
-				draw_help(ui, mod_id, &*desc, md_cache);
-			}
+			ui.horizontal(|ui| {
+				changed |= ui.slider(val, o.min..=o.max, name).changed();
+				*val = val.clamp(o.min, o.max);
+				if !desc.is_empty() {
+					draw_help(ui, mod_id, &*desc, md_cache);
+				}
+			});
 		}
 		
 		Mask(val) => {
 			let OptionSettings::Grayscale(o) = &option.settings else {ui.label(format!("Invalid setting type for {setting_id}")); return false};
-			changed |= ui.slider(val, o.min..=o.max, name).changed();
-			*val = val.clamp(o.min, o.max);
-			if !desc.is_empty() {
-				draw_help(ui, mod_id, &*desc, md_cache);
-			}
+			ui.horizontal(|ui| {
+				changed |= ui.slider(val, o.min..=o.max, name).changed();
+				*val = val.clamp(o.min, o.max);
+				if !desc.is_empty() {
+					draw_help(ui, mod_id, &*desc, md_cache);
+				}
+			});
 		}
 		
 		Path(val) => {

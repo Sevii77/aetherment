@@ -101,6 +101,25 @@ impl super::ResourceView for MdlView {
 				}
 			}
 			
+			// camera defaults
+			let mut min = glam::Vec3::MAX;
+			let mut max = glam::Vec3::MIN;
+			for lod in &self.mdl.lods {
+				for mesh in &lod.meshes {
+					for submesh in &mesh.submeshes {
+						for vertex in &submesh.vertices {
+							for i in 0..3 {
+								min[i] = min[i].min(vertex.position[i]);
+								max[i] = max[i].max(vertex.position[i]);
+							}
+						}
+					}
+				}
+			}
+			
+			let size = max - min;
+			scene.set_camera_defaults(min * 0.5 + max * 0.5, (size.x.max(size.y).max(size.z) * 2.0).max(1.0));
+			
 			scene
 		});
 		
@@ -145,7 +164,7 @@ impl super::ResourceView for MdlView {
 				}
 				
 				for (mesh_index, mesh) in self.mdl.lods[self.lod].meshes.iter_mut().enumerate() {
-					ui.collapsing(format!("Mesh {mesh_index}"), |ui| {
+					let resp = ui.collapsing(format!("Mesh {mesh_index}"), |ui| {
 						ui.label("Material");
 						let resp = ui.text_edit_singleline(&mut mesh.material);
 						resp.context_menu(|ui| {
@@ -191,6 +210,22 @@ impl super::ResourceView for MdlView {
 							});
 						}
 					});
+					
+					let sublen = mesh.submeshes.len();
+					if sublen > 0 {
+						resp.header_response.context_menu(|ui| {
+							let all_visible = (0..sublen)
+								.all(|i| scene.get_object(self.objects[&(self.lod, mesh_index, i)]).unwrap().get_visible());
+							
+							if ui.button(if all_visible {"Hide All"} else {"Show All"}).clicked() {
+								for i in 0..sublen {
+									*scene.get_object_mut(self.objects[&(self.lod, mesh_index, i)])
+										.unwrap()
+										.get_visible_mut() = !all_visible;
+								}
+							}
+						});
+					}
 				}
 			});
 		});

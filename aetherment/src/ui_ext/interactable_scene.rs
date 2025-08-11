@@ -1,14 +1,15 @@
-// TODO: the coordinate system of the scene is quite fucked, fix that to be in line with xiv
-
 pub struct InteractableScene {
 	scene: renderer::Scene,
-	camera_origin: glam::Vec3,
-	camera_zoom: f32,
-	camera_pitch: f32,
-	camera_yaw: f32,
 	texture_id: egui::TextureId,
 	width: usize,
 	height: usize,
+	
+	pub camera_origin_default: glam::Vec3,
+	pub camera_origin: glam::Vec3,
+	pub camera_zoom_default: f32,
+	pub camera_zoom: f32,
+	pub camera_pitch: f32,
+	pub camera_yaw: f32,
 }
 
 impl std::ops::Deref for InteractableScene {
@@ -30,15 +31,25 @@ impl InteractableScene {
 		let scene = renderer::Scene::new(renderer, 32, 32);
 		
 		Self {
-			camera_origin: glam::Vec3::ZERO,
-			camera_zoom: 4.0,
-			camera_pitch: -0.2,
-			camera_yaw: 0.0,
 			texture_id: egui::TextureId::User(renderer.register_texture(scene.get_render_target())),
 			scene,
 			width: 32,
 			height: 32,
+			
+			camera_origin_default: glam::Vec3::ZERO,
+			camera_zoom_default: 4.0,
+			camera_origin: glam::Vec3::ZERO,
+			camera_zoom: 4.0,
+			camera_pitch: -0.2,
+			camera_yaw: 0.0,
 		}
+	}
+	
+	pub fn set_camera_defaults(&mut self, origin: glam::Vec3, distance: f32) {
+		self.camera_origin_default = origin;
+		self.camera_zoom_default = distance;
+		self.camera_origin = origin;
+		self.camera_zoom = distance;
 	}
 	
 	pub fn render(&mut self, renderer: &renderer::Renderer, width: usize, height: usize, ui: &mut egui::Ui) {
@@ -63,8 +74,8 @@ impl InteractableScene {
 		
 		resp.context_menu(|ui| {
 			if ui.button("Reset Camera").clicked() {
-				self.camera_origin = glam::Vec3::ZERO;
-				self.camera_zoom = 4.0;
+				self.camera_origin = self.camera_origin_default;
+				self.camera_zoom = self.camera_zoom_default;
 				self.camera_pitch = -0.2;
 				self.camera_yaw = 0.0;
 				
@@ -84,13 +95,14 @@ impl InteractableScene {
 				self.camera_origin += glam::Quat::from_euler(glam::EulerRot::YXZ, self.camera_yaw, self.camera_pitch, 0.0) * glam::vec3(-drag.x, drag.y, 0.0) / 500.0 * self.camera_zoom;
 			}
 		} else if resp.hovered() {
+			let zoom_speed_mul = (self.camera_zoom / 4.0).clamp(0.5, 10.0);
 			let scroll = ctx.input(|v| v.smooth_scroll_delta);
 			if scroll.y != 0.0 {
 				ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
-				self.camera_zoom = (self.camera_zoom - scroll.y / 500.0).max(0.01);
+				self.camera_zoom = (self.camera_zoom - scroll.y / 500.0 * zoom_speed_mul).max(0.01);
 			} else if scroll.x != 0.0 {
 				ctx.set_cursor_icon(egui::CursorIcon::ResizeVertical);
-				self.camera_zoom = (self.camera_zoom - scroll.x / 100.0).max(0.01);
+				self.camera_zoom = (self.camera_zoom - scroll.x / 100.0 * zoom_speed_mul).max(0.01);
 			} else {
 				ctx.set_cursor_icon(egui::CursorIcon::Grab);
 			}

@@ -195,7 +195,12 @@ impl Texture {
 		
 		let mut data = D3D11_MAPPED_SUBRESOURCE::default();
 		d3d11_ctx.Map(&self.texture, 0, D3D11_MAP_WRITE_DISCARD, 0, Some(&mut data)).unwrap();
-		core::ptr::copy_nonoverlapping(self.data.as_ptr(), data.pData as _, self.data.len());
+		
+		let pixels_ptr = data.pData as *mut u32;
+		let height = self.data.len() / self.w as usize;
+		for y in 0..height {
+			core::ptr::copy_nonoverlapping(self.data[y * self.w as usize..].as_ptr(), pixels_ptr.add(y * (data.RowPitch / 4) as usize), self.w as usize);
+		}
 	}
 }
 

@@ -67,8 +67,7 @@ pub struct Core {
 	
 	backend_last_error: bool,
 	
-	install_progress: crate::modman::backend::InstallProgress,
-	apply_progress: crate::modman::backend::ApplyProgress,
+	progress: crate::modman::backend::TaskProgress,
 }
 
 #[cfg(any(feature = "plugin", feature = "client"))]
@@ -94,14 +93,12 @@ impl Core {
 			service::initialize(services_initializers);
 		}
 		
-		let mut install_progress = crate::modman::backend::InstallProgress::new();
-		let apply_progress = crate::modman::backend::ApplyProgress::new();
-		install_progress.apply = apply_progress.clone();
+		let progress = crate::modman::backend::TaskProgress::new();
 		
 		let s = Self {
 			views: egui_dock::DockState::new(vec![
-				Box::new(view::mods::Mods::new(install_progress.clone(), apply_progress.clone())),
-				Box::new(view::browser::Browser::new(install_progress.clone())),
+				Box::new(view::mods::Mods::new(progress.clone())),
+				Box::new(view::browser::Browser::new(progress.clone())),
 				Box::new(view::settings::Settings::new()),
 				Box::new(view::tool::Tools::new()),
 				Box::new(view::explorer::Explorer::new()),
@@ -110,15 +107,16 @@ impl Core {
 			
 			backend_last_error: matches!(backend().get_status(), modman::backend::Status::Error(_)),
 			
-			install_progress,
-			apply_progress,
+			progress,
 		};
 		
 		if !s.backend_last_error {
-			let progress = s.install_progress.clone();
+			let progress = s.progress.clone();
 			std::thread::spawn(move || {
+				progress.add_task_count(1);
 				backend().apply_services();
-				remote::check_updates(progress);
+				remote::check_updates(progress.clone());
+				progress.progress_task();
 			});
 		}
 		
@@ -130,10 +128,12 @@ impl Core {
 		match status {
 			modman::backend::Status::Ok => {
 				if self.backend_last_error {
-					let progress = self.install_progress.clone();
+					let progress = self.progress.clone();
 					std::thread::spawn(move || {
+						progress.add_task_count(1);
 						backend().apply_services();
-						remote::check_updates(progress);
+						remote::check_updates(progress.clone());
+						progress.progress_task();
 					});
 					
 					// self.mods_tab.refresh();
@@ -150,23 +150,15 @@ impl Core {
 			let rounding = ui.visuals().widgets.noninteractive.corner_radius;
 			let top = egui::CornerRadius{ne: rounding.ne, nw: rounding.nw, ..Default::default()};
 			
-			if self.install_progress.is_busy() {
-				ui.add(egui::ProgressBar::new(self.install_progress.mods.get())
-					.text(format!("{:.0}% Installing {}", self.install_progress.mods.get() * 100.0, self.install_progress.mods.get_msg()))
+			if !self.progress.is_finished() {
+				let progress = self.progress.get_task_progress();
+				ui.add(egui::ProgressBar::new(progress)
+					.text(format!("{:.0}% {}", progress * 100.0, self.progress.get_task_msg()))
 					.corner_radius(top));
 				
-				ui.add(egui::ProgressBar::new(self.install_progress.current_mod.get())
-					.text(format!("{:.0}% Working on {}", self.install_progress.current_mod.get() * 100.0, self.install_progress.current_mod.get_msg()))
-					.corner_radius(egui::CornerRadius::same(0)));
-			}
-			
-			if self.apply_progress.is_busy() {
-				ui.add(egui::ProgressBar::new(self.apply_progress.mods.get())
-					.text(format!("{:.0}% Applying {}", self.apply_progress.mods.get() * 100.0, self.apply_progress.mods.get_msg()))
-					.corner_radius(if self.install_progress.is_busy() {egui::CornerRadius::same(0)} else {top}));
-				
-				ui.add(egui::ProgressBar::new(self.apply_progress.current_mod.get())
-					.text(format!("{:.0}% Working on {}", self.apply_progress.current_mod.get() * 100.0, self.apply_progress.current_mod.get_msg()))
+				let progress = self.progress.sub_task.get();
+				ui.add(egui::ProgressBar::new(progress)
+					.text(format!("{:.0}% {}", progress * 100.0, self.progress.sub_task.get_msg()))
 					.corner_radius(egui::CornerRadius::same(0)));
 			}
 		});

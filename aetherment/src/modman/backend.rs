@@ -1,4 +1,4 @@
-use std::{io::{Read, Seek}, sync::{atomic::{AtomicBool, AtomicU32}, Arc, RwLock, RwLockReadGuard}};
+use std::{io::{Read, Seek}, sync::{atomic::AtomicU32, Arc, RwLock, RwLockReadGuard}};
 
 #[allow(non_snake_case)]
 pub mod penumbra_ipc;
@@ -23,54 +23,49 @@ pub enum SettingsType {
 }
 
 #[derive(Clone)]
-pub struct InstallProgress {
-	busy: Arc<AtomicBool>,
-	pub mods: Progress,
-	pub current_mod: Progress,
-	pub apply: ApplyProgress
+pub struct TaskProgress {
+	task_count: Arc<AtomicU32>,
+	task_progress: Arc<AtomicU32>,
+	task_msg: Arc<RwLock<String>>,
+	pub sub_task: Progress,
 }
 
-impl InstallProgress {
+impl TaskProgress {
 	pub fn new() -> Self {
 		Self {
-			busy: Arc::new(AtomicBool::new(false)),
-			mods: Progress::new(),
-			current_mod: Progress::new(),
-			apply: ApplyProgress::new(),
+			task_count: Arc::new(AtomicU32::new(0)),
+			task_progress: Arc::new(AtomicU32::new(0)),
+			task_msg: Arc::new(RwLock::new(String::new())),
+			sub_task :Progress::new(),
 		}
 	}
 	
-	pub fn is_busy(&self) -> bool {
-		self.busy.load(std::sync::atomic::Ordering::Relaxed)
+	pub fn is_finished(&self) -> bool {
+		self.task_progress.load(std::sync::atomic::Ordering::Relaxed) == self.task_count.load(std::sync::atomic::Ordering::Relaxed)
 	}
 	
-	pub fn set_busy(&self, value: bool) {
-		self.busy.store(value, std::sync::atomic::Ordering::Relaxed)
-	}
-}
-
-#[derive(Clone)]
-pub struct ApplyProgress {
-	busy: Arc<AtomicBool>,
-	pub mods: Progress,
-	pub current_mod: Progress,
-}
-
-impl ApplyProgress {
-	pub fn new() -> Self {
-		Self {
-			busy: Arc::new(AtomicBool::new(false)),
-			mods: Progress::new(),
-			current_mod: Progress::new(),
-		}
+	pub fn set_task_count(&self, value: usize) {
+		self.task_count.store(value as u32, std::sync::atomic::Ordering::Relaxed);
 	}
 	
-	pub fn is_busy(&self) -> bool {
-		self.busy.load(std::sync::atomic::Ordering::Relaxed)
+	pub fn add_task_count(&self, value: usize) {
+		self.task_count.fetch_add(value as u32, std::sync::atomic::Ordering::Relaxed);
 	}
 	
-	pub fn set_busy(&self, value: bool) {
-		self.busy.store(value, std::sync::atomic::Ordering::Relaxed)
+	pub fn progress_task(&self) {
+		self.task_progress.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+	}
+	
+	pub fn get_task_progress(&self) -> f32 {
+		self.task_progress.load(std::sync::atomic::Ordering::Relaxed) as f32 / self.task_count.load(std::sync::atomic::Ordering::Relaxed) as f32
+	}
+	
+	pub fn get_task_msg(&self) -> RwLockReadGuard<String> {
+		self.task_msg.read().unwrap()
+	}
+	
+	pub fn set_task_msg(&self, value: impl Into<String>) {
+		*self.task_msg.write().unwrap() = value.into();
 	}
 }
 
@@ -84,7 +79,7 @@ impl Progress {
 	pub fn new() -> Self {
 		Self {
 			inner: Arc::new(AtomicU32::new(0)),
-			msg: Arc::new(RwLock::new(String::new()))
+			msg: Arc::new(RwLock::new(String::new())),
 		}
 	}
 	
@@ -100,8 +95,8 @@ impl Progress {
 		self.msg.read().unwrap()
 	}
 	
-	pub fn set_msg(&self, value: &str) {
-		*self.msg.write().unwrap() = value.to_string();
+	pub fn set_msg(&self, value: impl Into<String>) {
+		*self.msg.write().unwrap() = value.into();
 	}
 }
 
@@ -127,7 +122,7 @@ pub trait Backend {
 	fn get_active_collection(&self) -> String;
 	fn get_collections(&self) -> Vec<Collection>;
 	// fn install_mod(&mut self, file: &std::path::Path) -> Result<String, crate::resource_loader::BacktraceError>;
-	fn install_mods_path(&mut self, progress: InstallProgress, files: Vec<std::path::PathBuf>) {
+	fn install_mods_path(&mut self, progress: TaskProgress, files: Vec<std::path::PathBuf>) {
 		self.install_mods(progress,files.into_iter()
 			// .filter_map(|v| std::fs::File::open(&v).ok().map(|f| (v.file_name().map_or_else(|| String::new(), |v| v.to_string_lossy().to_string()), f)))
 			.filter_map(|v| {
@@ -143,10 +138,10 @@ pub trait Backend {
 				Some((meta.name, pack))
 			}).collect())
 	}
-	fn install_mods(&mut self, progress: InstallProgress, files: Vec<(String, std::fs::File)>);
+	fn install_mods(&mut self, progress: TaskProgress, files: Vec<(String, std::fs::File)>);
 	
 	fn apply_mod_settings(&mut self, mod_id: &str, collection_id: &str, settings: SettingsType);
-	fn finalize_apply(&mut self, progress: ApplyProgress);
+	fn finalize_apply(&mut self, progress: TaskProgress);
 	fn apply_queue_size(&self) -> usize;
 	
 	fn apply_services(&self);

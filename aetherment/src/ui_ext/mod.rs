@@ -12,6 +12,13 @@ pub use coloredit::ColorEditValue;
 mod interactable_scene;
 pub use interactable_scene::InteractableScene;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Axis {
+	Horizontal,
+	Vertical,
+	Both,
+}
+
 pub trait UiExt {
 	fn texture(&mut self, img: &egui::TextureHandle, max_size: impl Into<egui::Vec2>, uv: impl Into<egui::Rect>) -> Response;
 	fn num_edit<Num: egui::emath::Numeric>(&mut self, value: &mut Num, label: impl Into<WidgetText>) -> Response;
@@ -30,6 +37,7 @@ pub trait UiExt {
 	fn free_textures(&mut self, prefix: &str);
 	fn filled_reserved_vertical(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui, &mut Ui));
 	fn filled_reserved_horizontal(&mut self, id: impl std::hash::Hash, contents: impl FnOnce(&mut Ui, &mut Ui));
+	fn centered(&mut self, id: impl std::hash::Hash, axis: Axis, content: impl FnOnce(&mut Ui));
 	fn splitter(&mut self, id: impl std::hash::Hash, axis: SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut Ui, &mut Ui));
 	fn color_edit(&mut self, color: &mut impl ColorEditValue) -> Response;
 	fn spacer(&mut self);
@@ -212,6 +220,25 @@ impl UiExt for Ui {
 			let reserved_size = ui_reserved.min_rect().width();
 			ui.data_mut(|v| v.insert_temp(id, reserved_size));
 		});
+	}
+	
+	fn centered(&mut self, id: impl std::hash::Hash, axis: Axis, content: impl FnOnce(&mut Ui)) {
+		let id = self.id().with(id);
+		let available = self.available_size();
+		let size = self.data(|v| v.get_temp(id).unwrap_or(available));
+		let offset = match axis {
+			Axis::Horizontal => egui::vec2((available.x - size.x) / 2.0, 0.0),
+			Axis::Vertical => egui::vec2(0.0, (available.y - size.y) / 2.0),
+			Axis::Both => (available - size) / 2.0,
+		};
+		let mut ui = self.new_child(egui::UiBuilder::new()
+			.max_rect(egui::Rect::from_min_size(self.next_widget_position() + offset, size)));
+		
+		content(&mut ui);
+		
+		let rect = ui.min_rect();
+		self.allocate_rect(rect, egui::Sense::empty());
+		self.data_mut(|v| v.insert_temp(id, rect.size()));
 	}
 	
 	fn splitter(&mut self, id: impl std::hash::Hash, axis: splitter::SplitterAxis, default_pos: f32, contents: impl FnOnce(&mut Ui, &mut Ui)) {

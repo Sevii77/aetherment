@@ -586,7 +586,7 @@ impl BinRead for Mtrl {
 					texture: if v.texture_id == 255 {String::new()} else {strings[texture_infos[v.texture_id as usize].0 as usize..].null_terminated().unwrap()},
 					u_address_mode: (v.flags & 0x3).into(),
 					v_address_mode: (v.flags >> 2 & 0x3).into(),
-					lod_bias: ((v.flags << 12 >> 22) as f32) / 64.0,
+					lod_bias: ((v.flags as i32) << 12 >> 22) as f32 / 64.0,
 					min_lod: v.flags >> 20 & 0xF,
 				}).collect(),
 			shader_keys,

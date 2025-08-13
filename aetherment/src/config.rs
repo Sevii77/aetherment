@@ -58,6 +58,8 @@ pub struct Config {
 	pub plugin_open_on_launch: bool,
 	pub game_install: Option<String>,
 	pub repos: Vec<String>,
+	pub browser_default_origin: String,
+	pub browser_content_rating: crate::remote::ContentRating,
 	
 	pub mod_paths: Vec<PathBuf>,
 	pub file_dialog_path: PathBuf,
@@ -69,6 +71,8 @@ impl Default for Config {
 			plugin_open_on_launch: false,
 			game_install: None,
 			repos: Vec::new(),
+			browser_default_origin: "Aetherment".to_string(),
+			browser_content_rating: crate::remote::ContentRating::Sfw,
 			
 			mod_paths: Vec::new(),
 			file_dialog_path: dirs::document_dir().unwrap_or(PathBuf::new()),

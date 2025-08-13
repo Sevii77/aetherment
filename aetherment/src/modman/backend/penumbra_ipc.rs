@@ -136,205 +136,190 @@ impl super::Backend for Penumbra {
 	// only mods that originally started with ui/ with be considered, game paths are not checked
 	// we only rewrite "remap" as this way we dont have to rewrite any other files
 	// TODO: possibly change this?
-	fn install_mods(&mut self, progress: super::InstallProgress, files: Vec<(String, std::fs::File)>) {
-		progress.set_busy(true);
-		progress.mods.set(0.0);
-		progress.mods.set_msg("Installing Mods");
-		progress.current_mod.set_msg("");
-		
+	// TODO: this now freezes up doing auto update, fix that when the rewrite
+	fn install_mods(&mut self, progress: super::TaskProgress, files: Vec<(String, std::fs::File)>) {
 		let apply_queue = self.apply_queue.clone();
 		let mods = self.mods.clone();
-		std::thread::spawn(move || {
-			if let Err(err) = (|| -> Result<(), crate::resource_loader::BacktraceError> {
-				let total_mods = files.len();
-				// for (mod_index, file) in files.into_iter().enumerate() {
-				for (mod_index, (mod_id, file)) in files.into_iter().enumerate() {
-					progress.mods.set(mod_index as f32 / total_mods as f32);
-					// progress.mods.set_msg(&file.to_string_lossy());
-					// let mut pack = zip::ZipArchive::new(std::io::BufReader::new(std::fs::File::open(file)?))?;
-					progress.mods.set_msg(&mod_id);
-					let mut pack = zip::ZipArchive::new(file)?;
-					
-					let mut meta_buf = Vec::new();
-					pack.by_name("meta.json")?.read_to_end(&mut meta_buf)?;
-					let meta = serde_json::from_slice::<meta::Meta>(&meta_buf)?;
-					
-					// get all files that are used directly, so we can keep the rest zipped
-					let mut direct_files = HashSet::new();
-					for (_, path) in meta.files.iter() {
-						if !path.ends_with(".comp") {
-							direct_files.insert(path.as_str());
-						}
+		if let Err(err) = (|| -> Result<(), crate::resource_loader::BacktraceError> {
+			let total_mods = files.len();
+			for (mod_index, (mod_id, file)) in files.into_iter().enumerate() {
+				progress.set_task_msg(format!("Installing '{mod_id}'"));
+				
+				let mut pack = zip::ZipArchive::new(file)?;
+				
+				let mut meta_buf = Vec::new();
+				pack.by_name("meta.json")?.read_to_end(&mut meta_buf)?;
+				let meta = serde_json::from_slice::<meta::Meta>(&meta_buf)?;
+				
+				// get all files that are used directly, so we can keep the rest zipped
+				let mut direct_files = HashSet::new();
+				for (_, path) in meta.files.iter() {
+					if !path.ends_with(".comp") {
+						direct_files.insert(path.as_str());
 					}
-					for opt in meta.options.options_iter() {
-						if let crate::modman::meta::OptionSettings::SingleFiles(v) |
-							crate::modman::meta::OptionSettings::MultiFiles(v) = &opt.settings {
-							for sub in v.options.iter() {
-								for (_, path) in sub.files.iter() {
-									if !path.ends_with(".comp") {
-										direct_files.insert(path.as_str());
-									}
+				}
+				for opt in meta.options.options_iter() {
+					if let crate::modman::meta::OptionSettings::SingleFiles(v) |
+						crate::modman::meta::OptionSettings::MultiFiles(v) = &opt.settings {
+						for sub in v.options.iter() {
+							for (_, path) in sub.files.iter() {
+								if !path.ends_with(".comp") {
+									direct_files.insert(path.as_str());
 								}
 							}
 						}
 					}
-					
-					// let mod_id = meta.name.clone();
-					let mod_dir = root_path().join(&mod_id);
-					_ = std::fs::create_dir(&mod_dir);
-					let aeth_dir = mod_dir.join("aetherment");
-					_ = std::fs::create_dir(&aeth_dir);
-					let files_dir = mod_dir.join("files");
-					_ = std::fs::create_dir(&files_dir);
-					let assets_dir = mod_dir.join("assets");
-					File::create(aeth_dir.join("meta.json"))?.write_all(&meta_buf)?;
-					// buf.clear();
-					
-					let mut compdata_used = false;
-					let mut compdata = zip::ZipWriter::new(std::io::BufWriter::new(File::create(files_dir.join("_compdata"))?));
-					compdata.add_directory("files", zip::write::FileOptions::default()
-						.compression_method(zip::CompressionMethod::Deflated)
-						.compression_level(Some(9))
-						.large_file(true))?;
-					
-					File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&PMeta {
-						FileVersion: 3,
-						Name: meta.name.clone(),
-						Author: meta.author.clone(),
-						Description: meta.description.clone(),
-						Version: meta.version.clone(),
-						Website: meta.website.clone(),
-						ModTags: meta.tags.iter().map(|v| v.to_owned()).collect(),
-					})?.as_bytes())?;
-					
-					File::create(mod_dir.join("default_mod.json"))?.write_all(crate::json_pretty(&PDefaultMod {
-						// Name: String::new(),
-						// Description: String::new(),
-						Files: HashMap::new(),
-						FileSwaps: HashMap::new(),
-						Manipulations: Vec::new(),
-					})?.as_bytes())?;
-					
-					// std::io::copy(&mut file.by_name("remap")?, &mut File::create(aeth_dir.join("remap"))?)?;
-					let mut remap_buf = Vec::new();
-					pack.by_name("remap")?.read_to_end(&mut remap_buf)?;
-					let mut remap = serde_json::from_slice::<HashMap<String, String>>(&remap_buf)?;
-					// std::fs::write(aeth_dir.join("remap"), remap_buf)?;
-					let mut remap_rev = HashMap::new();
-					for (org, hash) in &remap {
-						remap_rev.entry(hash.to_owned()).or_insert_with(|| Vec::new()).push(org.to_owned());
-					}
-					
-					if let Ok(mut hashes) = pack.by_name("hashes") {
-						std::io::copy(&mut hashes, &mut File::create(aeth_dir.join("hashes"))?)?;
-					}
-					
-					let pack_len = pack.len();
-					for i in 0..pack_len {
-						progress.current_mod.set(i as f32 / pack_len as f32);
-						let mut f = pack.by_index(i)?;
-						if f.is_dir() {continue};
-						let Some(name) = f.enclosed_name() else {continue};
-						match name.components().next().unwrap().as_os_str().to_str().unwrap() {
-							"assets" => {
-								let Ok(name) = name.strip_prefix("assets/") else {continue};
-								let path = assets_dir.join(name);
-								_ = std::fs::create_dir_all(&path.parent().unwrap());
-								let mut buf = Vec::new();
-								f.read_to_end(&mut buf)?;
-								std::fs::write(path, &buf)?;
-							}
-							
-							"files" => {
-								let Ok(name) = name.strip_prefix("files/") else {continue};
-								if name.components().count() > 1 {continue};
-								let name = name.to_owned();
-								let hash = name.to_string_lossy().to_string();
-								let ext = if let Some(p) = hash.find(".") {&hash[p + 1..]} else {""};
-								
-								let org_paths = remap_rev.get(&hash).ok_or("Remap does not contain hash")?;
-								let is_direct = org_paths.iter().any(|v| direct_files.contains(v.as_str()));
-								if is_direct {
-									let mut buf = Vec::new();
-									f.read_to_end(&mut buf)?;
-									
-									let mut write_org = false;
-									for org_path in org_paths {
-										if org_path.starts_with("ui/") {
-											let hashed_path = crate::hash_str(blake3::hash(org_path.as_bytes()));
-											let new_name = format!("{hashed_path}.{ext}");
-											// std::io::copy(&mut f, &mut File::create(files_dir.join(&new_name))?)?;
-											std::fs::write(files_dir.join(&new_name), &buf)?;
-											remap.insert(org_path.to_owned(), new_name);
-										} else {
-											write_org = true;
-										}
-									}
-									
-									if write_org {
-										// std::io::copy(&mut f, &mut File::create(files_dir.join(name))?)?;
-										std::fs::write(files_dir.join(&name), &buf)?;
-									}
-								} else {
-									compdata_used = true;
-									compdata.raw_copy_file(f)?;
-								}
-							}
-							
-							_ => {}
-						}
-					}
-					
-					std::fs::write(aeth_dir.join("remap"), crate::json_pretty(&remap)?.as_bytes())?;
-					
-					if !compdata_used {
-						_ = std::fs::remove_file(files_dir.join("_compdata"));
-					}
-					
-					add_mod_entry(&mod_id);
-					
-					for c in get_collections() {
-						let s = get_mod_settings(&c.id, &mod_id, false);
-						if s.enabled && !s.inherit {
-							let settings = crate::modman::settings::Settings::open(&meta, &mod_id).get_collection(&meta, &c.id).to_owned();
-							apply_queue.lock().unwrap().insert((mod_id.to_owned(), c.id), (super::SettingsType::Some(settings), None));
-						}
-					}
-					// let settings = crate::modman::settings::Settings::from_meta(&meta);
-					// apply_queue.lock().unwrap().insert((mod_id.to_owned(), current_collection().id), (super::SettingsType::Some(settings), None));
-					
-					mods.lock().unwrap().push(mod_id.to_owned());
 				}
 				
-				progress.mods.set(1.0);
+				// let mod_id = meta.name.clone();
+				let mod_dir = root_path().join(&mod_id);
+				_ = std::fs::create_dir(&mod_dir);
+				let aeth_dir = mod_dir.join("aetherment");
+				_ = std::fs::create_dir(&aeth_dir);
+				let files_dir = mod_dir.join("files");
+				_ = std::fs::create_dir(&files_dir);
+				let assets_dir = mod_dir.join("assets");
+				File::create(aeth_dir.join("meta.json"))?.write_all(&meta_buf)?;
+				// buf.clear();
 				
-				Ok(())
-			})() {
-				log!(err, "{err}");
-				progress.current_mod.set_msg(&err.to_string());
+				let mut compdata_used = false;
+				let mut compdata = zip::ZipWriter::new(std::io::BufWriter::new(File::create(files_dir.join("_compdata"))?));
+				compdata.add_directory("files", zip::write::FileOptions::default()
+					.compression_method(zip::CompressionMethod::Deflated)
+					.compression_level(Some(9))
+					.large_file(true))?;
+				
+				File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&PMeta {
+					FileVersion: 3,
+					Name: meta.name.clone(),
+					Author: meta.author.clone(),
+					Description: meta.description.clone(),
+					Version: meta.version.clone(),
+					Website: meta.website.clone(),
+					ModTags: meta.tags.iter().map(|v| v.to_owned()).collect(),
+				})?.as_bytes())?;
+				
+				File::create(mod_dir.join("default_mod.json"))?.write_all(crate::json_pretty(&PDefaultMod {
+					// Name: String::new(),
+					// Description: String::new(),
+					Files: HashMap::new(),
+					FileSwaps: HashMap::new(),
+					Manipulations: Vec::new(),
+				})?.as_bytes())?;
+				
+				// std::io::copy(&mut file.by_name("remap")?, &mut File::create(aeth_dir.join("remap"))?)?;
+				let mut remap_buf = Vec::new();
+				pack.by_name("remap")?.read_to_end(&mut remap_buf)?;
+				let mut remap = serde_json::from_slice::<HashMap<String, String>>(&remap_buf)?;
+				// std::fs::write(aeth_dir.join("remap"), remap_buf)?;
+				let mut remap_rev = HashMap::new();
+				for (org, hash) in &remap {
+					remap_rev.entry(hash.to_owned()).or_insert_with(|| Vec::new()).push(org.to_owned());
+				}
+				
+				if let Ok(mut hashes) = pack.by_name("hashes") {
+					std::io::copy(&mut hashes, &mut File::create(aeth_dir.join("hashes"))?)?;
+				}
+				
+				progress.sub_task.set_msg("Unpacking mod");
+				let pack_len = pack.len();
+				for i in 0..pack_len {
+					progress.sub_task.set(i as f32 / pack_len as f32);
+					
+					let mut f = pack.by_index(i)?;
+					if f.is_dir() {continue};
+					let Some(name) = f.enclosed_name() else {continue};
+					match name.components().next().unwrap().as_os_str().to_str().unwrap() {
+						"assets" => {
+							let Ok(name) = name.strip_prefix("assets/") else {continue};
+							let path = assets_dir.join(name);
+							_ = std::fs::create_dir_all(&path.parent().unwrap());
+							let mut buf = Vec::new();
+							f.read_to_end(&mut buf)?;
+							std::fs::write(path, &buf)?;
+						}
+						
+						"files" => {
+							let Ok(name) = name.strip_prefix("files/") else {continue};
+							if name.components().count() > 1 {continue};
+							let name = name.to_owned();
+							let hash = name.to_string_lossy().to_string();
+							let ext = if let Some(p) = hash.find(".") {&hash[p + 1..]} else {""};
+							
+							let org_paths = remap_rev.get(&hash).ok_or("Remap does not contain hash")?;
+							let is_direct = org_paths.iter().any(|v| direct_files.contains(v.as_str()));
+							if is_direct {
+								let mut buf = Vec::new();
+								f.read_to_end(&mut buf)?;
+								
+								let mut write_org = false;
+								for org_path in org_paths {
+									if org_path.starts_with("ui/") {
+										let hashed_path = crate::hash_str(blake3::hash(org_path.as_bytes()));
+										let new_name = format!("{hashed_path}.{ext}");
+										// std::io::copy(&mut f, &mut File::create(files_dir.join(&new_name))?)?;
+										std::fs::write(files_dir.join(&new_name), &buf)?;
+										remap.insert(org_path.to_owned(), new_name);
+									} else {
+										write_org = true;
+									}
+								}
+								
+								if write_org {
+									// std::io::copy(&mut f, &mut File::create(files_dir.join(name))?)?;
+									std::fs::write(files_dir.join(&name), &buf)?;
+								}
+							} else {
+								compdata_used = true;
+								compdata.raw_copy_file(f)?;
+							}
+						}
+						
+						_ => {}
+					}
+				}
+				
+				std::fs::write(aeth_dir.join("remap"), crate::json_pretty(&remap)?.as_bytes())?;
+				
+				if !compdata_used {
+					_ = std::fs::remove_file(files_dir.join("_compdata"));
+				}
+				
+				add_mod_entry(&mod_id);
+				
+				for c in get_collections() {
+					let s = get_mod_settings(&c.id, &mod_id, false);
+					if s.enabled && !s.inherit {
+						let settings = crate::modman::settings::Settings::open(&meta, &mod_id).get_collection(&meta, &c.id).to_owned();
+						apply_queue.lock().unwrap().insert((mod_id.to_owned(), c.id), (super::SettingsType::Some(settings), None));
+					}
+				}
+				progress.progress_task();
+				mods.lock().unwrap().push(mod_id.to_owned());
 			}
 			
-			let mut squeue = apply_queue.lock().unwrap();
-			let queue = squeue.clone();
-			let comp_info = get_composite_info(mods.lock().unwrap().iter().map(|v| v.as_ref()).collect());
-			finalize_apply(queue, comp_info, progress.apply.clone());
-			squeue.clear();
-			
-			progress.set_busy(false);
-		});
+			Ok(())
+		})() {
+			log!(err, "{err}");
+			progress.set_task_msg(err.to_string());
+		}
+		
+		let mut squeue = apply_queue.lock().unwrap();
+		let queue = squeue.clone();
+		let comp_info = get_composite_info(mods.lock().unwrap().iter().map(|v| v.as_ref()).collect());
+		finalize_apply(queue, comp_info, progress.clone());
+		squeue.clear();
 	}
 	
 	fn apply_mod_settings(&mut self, mod_id: &str, collection_id: &str, settings: super::SettingsType) {
 		self.apply_queue.lock().unwrap().insert((mod_id.to_owned(), collection_id.to_owned()), (settings.clone(), None));
 	}
 	
-	fn finalize_apply(&mut self, progress: super::ApplyProgress) {
+	fn finalize_apply(&mut self, progress: super::TaskProgress) {
 		let mut squeue = self.apply_queue.lock().unwrap();
 		let queue = squeue.clone();
 		let comp_info = get_composite_info(self.mods.lock().unwrap().iter().map(|v| v.as_ref()).collect());
-		std::thread::spawn(move || {
-			finalize_apply(queue, comp_info, progress);
-		});
+		finalize_apply(queue, comp_info, progress);
 		squeue.clear();
 	}
 	
@@ -442,14 +427,12 @@ fn apply_ui_colors() {
 }
 
 // TODO: support only updating files of options that just changed (composite_info has info about that)
-fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progress: super::ApplyProgress) {
+fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progress: super::TaskProgress) {
 	// 1. sort the queue based on priority, lowest > highest
 	// 2. apply first mod
 	// 3. check if any mods with a higher priority have the same file of the mod we just applied AND are composite files
 	// 4. if so: add it to the queue and resort it
 	// repeat until queue is empty
-	
-	progress.set_busy(true);
 	
 	type Entry = (String, i32, super::SettingsType, Option<HashSet<String>>);
 	fn sort_queue(queue: &mut Vec<Entry>) {
@@ -464,7 +447,6 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 	
 	let composite_links = &composite_info.composite_links;
 	
-	let mut mods_done = 0;
 	let mut total_mods = 0;
 	let mut queue = HashMap::new();
 	for ((mod_id, collection_id), (settings, whitelist)) in apply_queue {
@@ -476,6 +458,8 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 		}
 	}
 	
+	progress.add_task_count(total_mods);
+	
 	let mut to_cleanup = HashSet::new();
 	for (collection_id, queue) in &mut queue {
 		sort_queue(queue);
@@ -483,13 +467,13 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 		while queue.len() > 0 {
 			let (mod_id, priority, settings, file_whitelist) = queue.pop().unwrap();
 			log!("applying mod {mod_id} in collection {collection_id}");
-			progress.mods.set(mods_done as f32 / total_mods as f32);
-			progress.mods.set_msg(&mod_id);
+			progress.set_task_msg(format!("Applying '{mod_id}'"));
 			
-			let changed_files = match apply_mod(&mod_id, collection_id, settings, file_whitelist, progress.current_mod.clone()) {
+			let changed_files = match apply_mod(&mod_id, collection_id, settings, file_whitelist, progress.sub_task.clone()) {
 				Ok(v) => v,
 				Err(e) => {
 					log!(err, "error applying mod {mod_id} in collection {collection_id} ({e:?})");
+					progress.progress_task();
 					continue;
 				}
 			};
@@ -516,6 +500,7 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 				if push_queue(queue, (to_add_id.to_owned(), to_add_priority, super::SettingsType::Keep, Some(changed_files.clone()))) {
 					do_sort_queue = true;
 					total_mods += 1;
+					progress.add_task_count(1);
 				}
 			}
 			
@@ -523,7 +508,7 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 				sort_queue(queue);
 			}
 			
-			mods_done += 1;
+			progress.progress_task();
 			
 			to_cleanup.insert(mod_id);
 		}
@@ -535,7 +520,7 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 	
 	apply_ui_colors();
 	
-	progress.set_busy(false);
+	// progress.set_busy(false);
 }
 
 // TODO: check last settings so we can avoid re-compositing files which settings didnt change
@@ -703,7 +688,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 		
 		for (game_path, real_path) in files {
 			progress.set(files_done as f32 / total_files as f32);
-			progress.set_msg(game_path);
+			progress.set_msg(*game_path);
 			
 			let game_path_stripped = game_path.strip_suffix(".comp").unwrap_or(game_path);
 			if let Some(whitelist) = &file_whitelist {

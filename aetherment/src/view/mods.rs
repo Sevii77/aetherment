@@ -2,8 +2,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{modman::settings::Settings, ui_ext::UiExt};
 
 pub struct Mods {
-	install_progress: crate::modman::backend::InstallProgress,
-	apply_progress: crate::modman::backend::ApplyProgress,
+	progress: crate::modman::backend::TaskProgress,
 	
 	active_collection: String,
 	selected_mod: String,
@@ -23,10 +22,9 @@ pub struct Mods {
 }
 
 impl Mods {
-	pub fn new(install_progress: crate::modman::backend::InstallProgress, apply_progress: crate::modman::backend::ApplyProgress) -> Self {
+	pub fn new(progress: crate::modman::backend::TaskProgress) -> Self {
 		let mut s = Self {
-			install_progress,
-			apply_progress,
+			progress,
 			
 			active_collection: String::new(),
 			selected_mod: String::new(),
@@ -76,7 +74,7 @@ impl super::View for Mods {
 		let backend = crate::backend();
 		let config = crate::config();
 		config.mark_for_changes();
-		let is_busy = self.install_progress.is_busy() || self.apply_progress.is_busy();
+		let is_busy = !self.progress.is_finished();
 		if self.last_was_busy && !is_busy {
 			self.refresh();
 		}
@@ -105,10 +103,12 @@ impl super::View for Mods {
 				if let Some(picker) = &mut self.import_picker {
 					match picker.show(ui.ctx()).state() {
 						egui_file::State::Selected => {
-							let progress = self.install_progress.clone();
+							let progress = self.progress.clone();
 							let paths = picker.selection().into_iter().map(|v| v.to_path_buf()).collect();
 							std::thread::spawn(move || {
-								crate::backend().install_mods_path(progress, paths);
+								progress.add_task_count(1);
+								crate::backend().install_mods_path(progress.clone(), paths);
+								progress.progress_task();
 							});
 							
 							config.config.file_dialog_path = picker.directory().to_path_buf();
@@ -141,7 +141,12 @@ impl super::View for Mods {
 				ui.add_enabled_ui(!is_busy && queue_size > 0 , |ui| {
 					ui.label(format!("{queue_size} mods have changes that might require an apply"));
 					if ui.button("Apply").clicked() {
-						backend.finalize_apply(self.apply_progress.clone());
+						let progress = self.progress.clone();
+						std::thread::spawn(move || {
+							progress.add_task_count(1);
+							crate::backend().finalize_apply(progress.clone());
+							progress.progress_task();
+						});
 					}
 				});
 				

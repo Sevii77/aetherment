@@ -1,4 +1,4 @@
-#[cfg(not(feature = "plugin"))] use crate::ui_ext::UiExt;
+use crate::ui_ext::UiExt;
 
 pub struct Settings {
 	
@@ -43,6 +43,14 @@ impl super::View for Settings {
 		
 		#[cfg(feature = "plugin")]
 		ui.checkbox(&mut config.plugin_open_on_launch, "Open window on launch");
+		
+		ui.collapsing("Browser", |ui| {
+			ui.horizontal(|ui| {
+				ui.text_edit_singleline(&mut config.browser_default_origin);
+				ui.label("Default origin");
+			});
+			ui.combo_enum(&mut config.browser_content_rating, "Content Rating");
+		});
 		
 		_ = config_manager.save();
 	}

@@ -1,4 +1,4 @@
-mod tattoo;
+pub mod tattoo;
 
 pub struct Tools {
 	views: egui_dock::DockState<Box<dyn super::View>>,

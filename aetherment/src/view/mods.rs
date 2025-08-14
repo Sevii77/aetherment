@@ -189,7 +189,7 @@ impl Mods {
 		
 		let mut enabled = backend.get_mod_enabled(&self.selected_mod, &crate::config().config.active_collection);
 		if ui.checkbox(&mut enabled, "Enabled").changed() {
-			backend.set_mod_enabled(&self.selected_mod, &crate::config().config.active_collection, !enabled);
+			backend.set_mod_enabled(&self.selected_mod, &crate::config().config.active_collection, enabled);
 		}
 		
 		if !remote_settings.origin.is_empty() && ui.checkbox(&mut remote_settings.auto_update, "Auto Update").changed() {

@@ -10,8 +10,8 @@ enum Page {
 
 enum UserInput {
 	None,
-	RequiredPick(tempfile::TempDir),
-	InstallPath(tempfile::TempDir, std::path::PathBuf),
+	RequiredPick(ArchivePicker),
+	InstallFile(std::fs::File),
 	DownloadError(String),
 }
 
@@ -97,37 +97,48 @@ impl Browser {
 				progress.add_task_count(1);
 				progress.set_task_msg(format!("Downloading {mod_id} ({download_url})"));
 				
-				if let crate::remote::FileType::Other(ext) = &file_type {
-					*user_input.lock().unwrap() = UserInput::DownloadError(format!("Unsupported extension '{ext}'"));
-				} else {
-					match crate::remote::download(origin_url, &download_url, &mod_id, progress.sub_task.clone()) {
-						Ok(file) => {
-							match file_type {
-								crate::remote::FileType::Aetherment |
-								crate::remote::FileType::Penumbra =>
-									crate::backend().install_mods(progress.clone(), vec![(mod_id, file)]),
-								
-								crate::remote::FileType::Textools =>
-									*user_input.lock().unwrap() = UserInput::DownloadError("TexTools mods are currently unsupported".to_string()),
-								
-								crate::remote::FileType::Archive =>
-									*user_input.lock().unwrap() = UserInput::DownloadError("Archive mods are currently unsupported".to_string()),
-								
-								crate::remote::FileType::Other(_) => unreachable!()
-							}
+				let mut tempdir_holder = None;
+				if let Err(e) = (|| -> Result<(), crate::resource_loader::BacktraceError> {
+					match file_type {
+						crate::remote::FileType::Aetherment |
+						crate::remote::FileType::Penumbra => {
+							let file = crate::remote::download(origin_url, &download_url, &mod_id, progress.sub_task.clone())?;
+							crate::backend().install_mods(progress.clone(), vec![(mod_id.clone(), file)]);
 						}
 						
-						Err(e) => *user_input.lock().unwrap() = UserInput::DownloadError(e.to_string()),
+						crate::remote::FileType::Textools =>
+							Err("TexTools mods are currently unsupported".to_string())?,
+						
+						crate::remote::FileType::Archive => {
+							let tempdir = tempfile::tempdir()?;
+							let file = crate::remote::download(origin_url, &download_url, &mod_id, progress.sub_task.clone())?;
+							let mut pack = zip::ZipArchive::new(std::io::BufReader::new(file))?;
+							pack.extract(tempdir.path())?;
+							let picker = ArchivePicker::new(&tempdir);
+							tempdir_holder = Some(tempdir);
+							*user_input.lock().unwrap() = UserInput::RequiredPick(picker);
+						}
+						
+						crate::remote::FileType::Other(ext) =>
+							Err(format!("Unsupported extension '{ext}'"))?,
 					}
-				}
+					
+					Ok(())
+				})() {
+					*user_input.lock().unwrap() = UserInput::DownloadError(format!("Failed downloading or installing mod\n{e}"));
+				};
 				
 				loop {
 					let user_input_lock = user_input.lock().unwrap();
 					match user_input_lock.deref() {
 						UserInput::None => break,
 						
-						UserInput::InstallPath(_temp_dir, path) => {
-							todo!()
+						UserInput::InstallFile(file) => {
+							let file = file.try_clone().unwrap();
+							drop(user_input_lock);
+							*user_input.lock().unwrap() = UserInput::None;
+							crate::backend().install_mods(progress.clone(), vec![(mod_id, file)]);
+							break;
 						}
 						
 						_ => {}
@@ -311,8 +322,17 @@ impl super::View for Browser {
 		// user intervention
 		let mut lock = self.download_user_input.lock().unwrap();
 		match lock.deref_mut() {
-			UserInput::RequiredPick(temp_dir) => {
+			UserInput::RequiredPick(archive_picker) => {
+				let resp = egui::Window::new("Select or create modpack").collapsible(false).show(ui.ctx(), |ui| {
+					ui.set_max_width(600.0);
+					archive_picker.ui(ui)
+				});
 				
+				match resp.unwrap().inner.unwrap() {
+					Some(Ok(file)) => *lock = UserInput::InstallFile(file),
+					Some(Err(e)) => *lock = UserInput::DownloadError(format!("Failed picking file from archive {e}")),
+					_ => {}
+				}
 			}
 			
 			UserInput::DownloadError(err) => {
@@ -619,4 +639,99 @@ fn draw_mod_entry(ui: &mut egui::Ui, entry: &crate::remote::ModEntry) -> bool {
 fn free_textures(ui: &mut egui::Ui) {
 	ui.free_textures("http://");
 	ui.free_textures("https://");
+}
+
+enum ArchivePickerTarget {
+	Menu,
+	Modpack,
+	Tattoo,
+}
+
+struct ArchivePicker {
+	path: std::path::PathBuf,
+	target: ArchivePickerTarget,
+	file_picker: egui_file::FileDialog,
+	tattoo_creator: super::tool::tattoo::Tattoo,
+}
+
+impl ArchivePicker {
+	fn new(tempdir: &tempfile::TempDir) -> Self {
+		Self {
+			path: tempdir.path().to_path_buf(),
+			target: ArchivePickerTarget::Menu,
+			file_picker: egui_file::FileDialog::open_file(Some(tempdir.path().to_path_buf()))
+				.title("Select modpack")
+				.filename_filter(Box::new(|name| name.ends_with(".aeth") | name.ends_with(".pmp"))),
+			tattoo_creator: super::tool::tattoo::Tattoo::new(),
+		}
+	}
+	
+	fn ui(&mut self, ui: &mut egui::Ui) -> Option<Result<std::fs::File, crate::resource_loader::BacktraceError>> {
+		match self.target {
+			ArchivePickerTarget::Menu => {
+				if ui.button("Open modpack").clicked() {
+					self.file_picker.set_path(&self.path);
+					self.file_picker.open();
+					self.target = ArchivePickerTarget::Modpack
+				}
+				
+				ui.label("Select a pmp or aeth modpack to import.");
+				
+				ui.spacer();
+				if ui.button("Create overlay/tattoo mod").clicked() {
+					self.target = ArchivePickerTarget::Tattoo;
+				}
+				
+				ui.label("Create an overlay or tattoo mod from raw (transparent) files, this will will automatically overlay it onto your body texture, tattoos, and other mods that modify the body texture. This type of mod will automatically overlay itself onto such texture even if they are changed in the future.");
+			}
+			
+			ArchivePickerTarget::Modpack => {
+				if ui.button("Go Back").clicked() {
+					self.target = ArchivePickerTarget::Menu;
+				}
+				
+				match self.file_picker.show(ui.ctx()).state() {
+					egui_file::State::Selected =>
+						match std::fs::File::open(self.file_picker.path()?) {
+							Ok(v) => return Some(Ok(v)),
+							Err(e) => return Some(Err(Box::new(e))),
+						},
+					
+					egui_file::State::Cancelled =>
+						self.target = ArchivePickerTarget::Menu,
+					
+					_ => {}
+				}
+			}
+			
+			ArchivePickerTarget::Tattoo => {
+				if ui.button("Go Back").clicked() {
+					self.target = ArchivePickerTarget::Menu;
+				}
+				ui.add_space(20.0);
+				
+				self.tattoo_creator.ui_creator(ui, Some(self.path.clone()));
+				
+				ui.add_space(20.0);
+				if ui.button("Confirm").clicked() {
+					let mut file = match tempfile::tempfile() {
+						Ok(v) => v,
+						Err(e) => return Some(Err(Box::new(e))),
+					};
+					
+					if let Err(e) = self.tattoo_creator.create_modpack(&mut file) {
+						return Some(Err(e));
+					}
+					
+					return Some(Ok(file));
+				}
+				
+				if ui.button("Clear").clicked() {
+					self.tattoo_creator = super::tool::tattoo::Tattoo::new();
+				}
+			}
+		}
+		
+		None
+	}
 }

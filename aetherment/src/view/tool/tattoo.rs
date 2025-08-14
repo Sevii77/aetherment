@@ -51,16 +51,9 @@ impl Tattoo {
 			export: None,
 		}
 	}
-}
-
-impl super::super::View for Tattoo {
-	fn title(&self) -> &'static str {
-		"Tattoo Overlay Creator"
-	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	pub fn ui_creator(&mut self, ui: &mut egui::Ui, start_path: Option<std::path::PathBuf>) {
 		let meta = &mut self.meta;
-		
 		ui.horizontal(|ui| {
 			ui.label("What is this");
 			ui.helptext("\
@@ -137,7 +130,7 @@ mods ontop of one another (multiple tattoos for example).");
 		}
 		
 		if let Some((category_i, preset_i)) = import {
-			let mut dialog = egui_file::FileDialog::open_file(Some(crate::config().config.file_dialog_path.clone()))
+			let mut dialog = egui_file::FileDialog::open_file(Some(start_path.clone().unwrap_or(crate::config().config.file_dialog_path.clone())))
 				.title(&format!("Import overlay ({} -  {})", PRESETS[category_i].0, PRESETS[category_i].1[preset_i].0));
 			dialog.open();
 			
@@ -148,8 +141,10 @@ mods ontop of one another (multiple tattoos for example).");
 			let config = crate::config();
 			match dialog.show(ui.ctx()).state() {
 				egui_file::State::Selected => 'outer: {
-					config.config.file_dialog_path = dialog.directory().to_path_buf();
-					_ = config.save_forced();
+					if start_path.is_none() {
+						config.config.file_dialog_path = dialog.directory().to_path_buf();
+						_ = config.save_forced();
+					}
 					
 					let Some(path) = dialog.path() else {break 'outer};
 					
@@ -210,13 +205,76 @@ mods ontop of one another (multiple tattoos for example).");
 				}
 				
 				egui_file::State::Cancelled => {
-					config.config.file_dialog_path = dialog.directory().to_path_buf();
-					_ = config.save_forced();
+					if start_path.is_none() {
+						config.config.file_dialog_path = dialog.directory().to_path_buf();
+						_ = config.save_forced();
+					}
 				}
 				
 				_ => {}
 			}
 		}
+	}
+	
+	pub fn create_modpack(&self, modpack_file: &mut std::fs::File) -> Result<(), crate::resource_loader::BacktraceError> {
+		let mut meta = self.meta.clone();
+		
+		if let Some(color) = self.color {
+			meta.options.push(meta::OptionType::Option(meta::Option {
+				name: "Color".to_string(),
+				description: String::new(),
+				settings: meta::OptionSettings::Rgba(meta::ValueRgba {
+					default: color,
+					min: [0.0; 4],
+					max: [1.0; 4],
+				})
+			}))
+		}
+		
+		// let modpack_file = std::fs::File::create(path.with_extension("aeth"))?;
+		let mut modpack = crate::modman::ModPack::new(std::io::BufWriter::new(modpack_file), crate::modman::ModCreationSettings {
+			current_game_files_hash: true,
+		});
+		
+		for (category, presets) in self.textures.iter() {
+			for (_preset, tfile) in presets.iter() {
+				let mut data = std::io::Cursor::new(Vec::new());
+				tfile.tex.write(&mut data).unwrap();
+				modpack.add_file(&tfile.hash, &data.into_inner()).unwrap();
+				
+				for (path, comp) in &tfile.composites {
+					let mut comp = comp.clone();
+					if *category == 0 { // diffuse
+						if self.color.is_some() {
+							comp.layers[0].modifiers.clear();
+							comp.layers[0].modifiers.push(comp::Modifier::Color{value: comp::OptionOrStatic::Option(comp::ColorOption("Color".to_string()))});
+						}
+						
+						comp.layers[0].blend = self.blend_mode.clone();
+					}
+					
+					let data = serde_json::to_vec(&comp).unwrap();
+					let hash_str = crate::hash_str(blake3::hash(&data));
+					
+					meta.files.insert(format!("{path}.comp"), hash_str.clone());
+					modpack.add_file(&hash_str, &data).unwrap();
+				}
+			}
+		}
+		
+		modpack.add_meta(&meta).unwrap();
+		modpack.finalize()?;
+		Ok(())
+	}
+}
+
+impl super::super::View for Tattoo {
+	fn title(&self) -> &'static str {
+		"Tattoo Overlay Creator"
+	}
+	
+	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+		self.ui_creator(ui, None);
 		
 		ui.add_space(20.0);
 		if ui.button("Export").clicked() {
@@ -227,66 +285,12 @@ mods ontop of one another (multiple tattoos for example).");
 			self.export = Some(dialog);
 		}
 		
+		let mut save = None;
 		if let Some(dialog) = &mut self.export {
 			let config = crate::config();
 			match dialog.show(ui.ctx()).state() {
-				egui_file::State::Selected => 'outer: {
-					if let Some(path) = dialog.path() {
-						let mut meta = self.meta.clone();
-						
-						if let Some(color) = self.color {
-							meta.options.push(meta::OptionType::Option(meta::Option {
-								name: "Color".to_string(),
-								description: String::new(),
-								settings: meta::OptionSettings::Rgba(meta::ValueRgba {
-									default: color,
-									min: [0.0; 4],
-									max: [1.0; 4],
-								})
-							}))
-						}
-						
-						let modpack_file = match std::fs::File::create(path.with_extension("aeth")) {
-							Ok(v) => v,
-							Err(err) => {
-								log!(err, "Failed creating modpack file ({err:?})");
-								break 'outer;
-							}
-						};
-						
-						let mut modpack = crate::modman::ModPack::new(std::io::BufWriter::new(modpack_file), crate::modman::ModCreationSettings {
-							current_game_files_hash: true,
-						});
-						
-						for (category, presets) in self.textures.iter() {
-							for (_preset, tfile) in presets.iter() {
-								let mut data = std::io::Cursor::new(Vec::new());
-								tfile.tex.write(&mut data).unwrap();
-								modpack.add_file(&tfile.hash, &data.into_inner()).unwrap();
-								
-								for (path, comp) in &tfile.composites {
-									let mut comp = comp.clone();
-									if *category == 0 { // diffuse
-										if self.color.is_some() {
-											comp.layers[0].modifiers.clear();
-											comp.layers[0].modifiers.push(comp::Modifier::Color{value: comp::OptionOrStatic::Option(comp::ColorOption("Color".to_string()))});
-										}
-										
-										comp.layers[0].blend = self.blend_mode.clone();
-									}
-									
-									let data = serde_json::to_vec(&comp).unwrap();
-									let hash_str = crate::hash_str(blake3::hash(&data));
-									
-									meta.files.insert(format!("{path}.comp"), hash_str.clone());
-									modpack.add_file(&hash_str, &data).unwrap();
-								}
-							}
-						}
-						
-						modpack.add_meta(&meta).unwrap();
-						modpack.finalize().unwrap();
-					}
+				egui_file::State::Selected => {
+					save = dialog.path().map(|v| v.to_path_buf());
 					
 					config.config.file_dialog_path = dialog.directory().to_path_buf();
 					_ = config.save_forced();
@@ -302,6 +306,20 @@ mods ontop of one another (multiple tattoos for example).");
 				_ => {}
 			}
 		}
+		
+		if let Some(path) = save {'outer: {
+			let mut modpack_file = match std::fs::File::create(path.with_extension("aeth")) {
+				Ok(v) => v,
+				Err(err) => {
+					log!(err, "Failed creating modpack file ({err:?})");
+					break 'outer;
+				}
+			};
+			
+			if let Err(err) = self.create_modpack(&mut modpack_file) {
+				log!(err, "Failed creating modpack file ({err:?})");
+			}
+		}}
 		
 		if ui.button("Clear").clicked() {
 			*self = Self::new();

@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, io::{Read, Write}, sync::{Arc, Mutex}};
+use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, io::{BufReader, Read, Write}, sync::{Arc, Mutex, RwLock}};
 use serde::{Deserialize, Serialize};
 use crate::{log, modman::{meta, OptionOrStatic}, resource_loader::read_json};
 
@@ -82,24 +82,184 @@ struct CompositeInfo {
 
 struct ModInfo {
 	pub is_aeth: bool,
-	pub meta: crate::modman::meta::Meta,
+	pub meta: Arc<crate::modman::meta::Meta>,
 	// pub composite_cache: crate::modman::composite::CompositeCache,
 }
 
 pub struct Penumbra {
-	apply_queue: Arc<Mutex<ApplyQueue>>,
-	// mods: Arc<HashMap<String, ModInfo>>,
-	mods: Arc<Mutex<Vec<String>>>,
-	mod_infos: HashMap<String, ModInfo>,
+	apply_queue: RwLock<ApplyQueue>,
+	
+	mods: RwLock<Vec<Arc<String>>>,
+	mod_infos: RwLock<HashMap<String, ModInfo>>,
 }
 
 impl Penumbra {
 	pub fn new() -> Self {
 		Self {
-			apply_queue: Arc::new(Mutex::new(HashMap::new())),
-			mods: Arc::new(Mutex::new(Vec::new())),
-			mod_infos: HashMap::new(),
+			apply_queue: RwLock::new(HashMap::new()),
+			
+			mods: RwLock::new(Vec::new()),
+			mod_infos: RwLock::new(HashMap::new()),
 		}
+	}
+	
+	fn install_aeth_mod(&self, progress: super::Progress, mod_id: &str, mut pack: zip::ZipArchive<BufReader<File>>) -> Result<meta::Meta, crate::resource_loader::BacktraceError> {
+		let mut meta_buf = Vec::new();
+		pack.by_name("meta.json")?.read_to_end(&mut meta_buf)?;
+		let meta = serde_json::from_slice::<meta::Meta>(&meta_buf)?;
+		
+		// get all files that are used directly, so we can keep the rest zipped
+		let mut direct_files = HashSet::new();
+		for (_, path) in meta.files.iter() {
+			if !path.ends_with(".comp") {
+				direct_files.insert(path.as_str());
+			}
+		}
+		
+		for opt in meta.options.options_iter() {
+			if let crate::modman::meta::OptionSettings::SingleFiles(v) |
+				crate::modman::meta::OptionSettings::MultiFiles(v) = &opt.settings {
+				for sub in v.options.iter() {
+					for (_, path) in sub.files.iter() {
+						if !path.ends_with(".comp") {
+							direct_files.insert(path.as_str());
+						}
+					}
+				}
+			}
+		}
+		
+		// write basic stuff
+		let mod_dir = root_path().join(mod_id);
+		_ = std::fs::create_dir(&mod_dir);
+		let aeth_dir = mod_dir.join("aetherment");
+		_ = std::fs::create_dir(&aeth_dir);
+		let files_dir = mod_dir.join("files");
+		_ = std::fs::create_dir(&files_dir);
+		let assets_dir = mod_dir.join("assets");
+		File::create(aeth_dir.join("meta.json"))?.write_all(&meta_buf)?;
+		// buf.clear();
+		
+		let mut compdata_used = false;
+		let mut compdata = zip::ZipWriter::new(std::io::BufWriter::new(File::create(files_dir.join("_compdata"))?));
+		compdata.add_directory("files", zip::write::FileOptions::default()
+			.compression_method(zip::CompressionMethod::Deflated)
+			.compression_level(Some(9))
+			.large_file(true))?;
+		
+		File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&PMeta {
+			FileVersion: 3,
+			Name: meta.name.clone(),
+			Author: meta.author.clone(),
+			Description: meta.description.clone(),
+			Version: meta.version.clone(),
+			Website: meta.website.clone(),
+			ModTags: meta.tags.iter().map(|v| v.to_owned()).collect(),
+		})?.as_bytes())?;
+		
+		File::create(mod_dir.join("default_mod.json"))?.write_all(crate::json_pretty(&PDefaultMod {
+			Files: HashMap::new(),
+			FileSwaps: HashMap::new(),
+			Manipulations: Vec::new(),
+		})?.as_bytes())?;
+		
+		let mut remap_buf = Vec::new();
+		pack.by_name("remap")?.read_to_end(&mut remap_buf)?;
+		let mut remap = serde_json::from_slice::<HashMap<String, String>>(&remap_buf)?;
+		let mut remap_rev = HashMap::new();
+		for (org, hash) in &remap {
+			remap_rev.entry(hash.to_owned()).or_insert_with(|| Vec::new()).push(org.to_owned());
+		}
+		
+		if let Ok(mut hashes) = pack.by_name("hashes") {
+			std::io::copy(&mut hashes, &mut File::create(aeth_dir.join("hashes"))?)?;
+		}
+		
+		// unpacking
+		progress.set_msg("Unpacking mod");
+		let pack_len = pack.len();
+		for i in 0..pack_len {
+			progress.set(i as f32 / pack_len as f32);
+			
+			let mut f = pack.by_index(i)?;
+			if f.is_dir() {continue};
+			let Some(name) = f.enclosed_name() else {continue};
+			match name.components().next().unwrap().as_os_str().to_str().unwrap() {
+				"assets" => {
+					let Ok(name) = name.strip_prefix("assets/") else {continue};
+					let path = assets_dir.join(name);
+					_ = std::fs::create_dir_all(&path.parent().unwrap());
+					let mut buf = Vec::new();
+					f.read_to_end(&mut buf)?;
+					std::fs::write(path, &buf)?;
+				}
+				
+				"files" => {
+					let Ok(name) = name.strip_prefix("files/") else {continue};
+					if name.components().count() > 1 {continue};
+					let name = name.to_owned();
+					let hash = name.to_string_lossy().to_string();
+					let ext = if let Some(p) = hash.find(".") {&hash[p + 1..]} else {""};
+					
+					let org_paths = remap_rev.get(&hash).ok_or("Remap does not contain hash")?;
+					let is_direct = org_paths.iter().any(|v| direct_files.contains(v.as_str()));
+					if is_direct {
+						let mut buf = Vec::new();
+						f.read_to_end(&mut buf)?;
+						
+						let mut write_org = false;
+						for org_path in org_paths {
+							if org_path.starts_with("ui/") {
+								let hashed_path = crate::hash_str(blake3::hash(org_path.as_bytes()));
+								let new_name = format!("{hashed_path}.{ext}");
+								std::fs::write(files_dir.join(&new_name), &buf)?;
+								remap.insert(org_path.to_owned(), new_name);
+							} else {
+								write_org = true;
+							}
+						}
+						
+						if write_org {
+							std::fs::write(files_dir.join(&name), &buf)?;
+						}
+					} else {
+						compdata_used = true;
+						compdata.raw_copy_file(f)?;
+					}
+				}
+				
+				_ => {}
+			}
+		}
+		
+		std::fs::write(aeth_dir.join("remap"), crate::json_pretty(&remap)?.as_bytes())?;
+		
+		if !compdata_used {
+			_ = std::fs::remove_file(files_dir.join("_compdata"));
+		}
+		
+		Ok(meta)
+	}
+	
+	// this will NOT show up in the aetherment mods list unless: full integration is enabled or it came from a remote origin
+	fn install_pmp_mod(&self, progress: super::Progress, mod_id: &str, mut pack: zip::ZipArchive<BufReader<File>>) -> Result<meta::Meta, crate::resource_loader::BacktraceError> {
+		let mod_dir = root_path().join(mod_id);
+		_ = std::fs::create_dir(&mod_dir);
+		
+		// TODO: manually extract so we can update progress
+		progress.set_msg("Unpacking mod");
+		pack.extract(&mod_dir)?;
+		
+		let pmeta = read_json::<PMeta>(&mod_dir.join("meta.json"))?;
+		Ok(meta::Meta {
+			name: pmeta.Name,
+			description: format!("{}\n\n\nThis is a Penumbra mod, configure it within Penumbra.", pmeta.Description),
+			version: pmeta.Version,
+			author: pmeta.Author,
+			website: pmeta.Website,
+			tags: pmeta.ModTags,
+			..Default::default()
+		})
 	}
 }
 
@@ -120,244 +280,133 @@ impl super::Backend for Penumbra {
 		}
 	}
 	
-	fn get_mods(&self) -> Vec<String> {
-		// self.mods.iter().map(|(m, _)| m.to_owned()).collect()
-		self.mods.lock().unwrap().clone()
+	fn get_mods(&self) -> Vec<Arc<String>> {
+		self.mods.read().unwrap().clone()
 	}
 	
-	fn get_active_collection(&self) -> String {
-		current_collection().id
-	}
+	// fn get_active_collection(&self) -> String {
+	// 	current_collection().id
+	// }
 	
 	fn get_collections(&self) -> Vec<super::Collection> {
 		get_collections()
 	}
 	
-	// only mods that originally started with ui/ with be considered, game paths are not checked
-	// we only rewrite "remap" as this way we dont have to rewrite any other files
-	// TODO: possibly change this?
-	// TODO: this now freezes up doing auto update, fix that when the rewrite
-	fn install_mods(&mut self, progress: super::TaskProgress, files: Vec<(String, std::fs::File)>) {
-		let apply_queue = self.apply_queue.clone();
-		let mods = self.mods.clone();
-		if let Err(err) = (|| -> Result<(), crate::resource_loader::BacktraceError> {
-			let total_mods = files.len();
-			for (mod_index, (mod_id, file)) in files.into_iter().enumerate() {
-				progress.set_task_msg(format!("Installing '{mod_id}'"));
-				
-				let mut pack = zip::ZipArchive::new(file)?;
-				
-				let mut meta_buf = Vec::new();
-				pack.by_name("meta.json")?.read_to_end(&mut meta_buf)?;
-				let meta = serde_json::from_slice::<meta::Meta>(&meta_buf)?;
-				
-				// get all files that are used directly, so we can keep the rest zipped
-				let mut direct_files = HashSet::new();
-				for (_, path) in meta.files.iter() {
-					if !path.ends_with(".comp") {
-						direct_files.insert(path.as_str());
-					}
-				}
-				for opt in meta.options.options_iter() {
-					if let crate::modman::meta::OptionSettings::SingleFiles(v) |
-						crate::modman::meta::OptionSettings::MultiFiles(v) = &opt.settings {
-						for sub in v.options.iter() {
-							for (_, path) in sub.files.iter() {
-								if !path.ends_with(".comp") {
-									direct_files.insert(path.as_str());
-								}
-							}
-						}
-					}
-				}
-				
-				// let mod_id = meta.name.clone();
-				let mod_dir = root_path().join(&mod_id);
-				_ = std::fs::create_dir(&mod_dir);
-				let aeth_dir = mod_dir.join("aetherment");
-				_ = std::fs::create_dir(&aeth_dir);
-				let files_dir = mod_dir.join("files");
-				_ = std::fs::create_dir(&files_dir);
-				let assets_dir = mod_dir.join("assets");
-				File::create(aeth_dir.join("meta.json"))?.write_all(&meta_buf)?;
-				// buf.clear();
-				
-				let mut compdata_used = false;
-				let mut compdata = zip::ZipWriter::new(std::io::BufWriter::new(File::create(files_dir.join("_compdata"))?));
-				compdata.add_directory("files", zip::write::FileOptions::default()
-					.compression_method(zip::CompressionMethod::Deflated)
-					.compression_level(Some(9))
-					.large_file(true))?;
-				
-				File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&PMeta {
-					FileVersion: 3,
-					Name: meta.name.clone(),
-					Author: meta.author.clone(),
-					Description: meta.description.clone(),
-					Version: meta.version.clone(),
-					Website: meta.website.clone(),
-					ModTags: meta.tags.iter().map(|v| v.to_owned()).collect(),
-				})?.as_bytes())?;
-				
-				File::create(mod_dir.join("default_mod.json"))?.write_all(crate::json_pretty(&PDefaultMod {
-					// Name: String::new(),
-					// Description: String::new(),
-					Files: HashMap::new(),
-					FileSwaps: HashMap::new(),
-					Manipulations: Vec::new(),
-				})?.as_bytes())?;
-				
-				// std::io::copy(&mut file.by_name("remap")?, &mut File::create(aeth_dir.join("remap"))?)?;
-				let mut remap_buf = Vec::new();
-				pack.by_name("remap")?.read_to_end(&mut remap_buf)?;
-				let mut remap = serde_json::from_slice::<HashMap<String, String>>(&remap_buf)?;
-				// std::fs::write(aeth_dir.join("remap"), remap_buf)?;
-				let mut remap_rev = HashMap::new();
-				for (org, hash) in &remap {
-					remap_rev.entry(hash.to_owned()).or_insert_with(|| Vec::new()).push(org.to_owned());
-				}
-				
-				if let Ok(mut hashes) = pack.by_name("hashes") {
-					std::io::copy(&mut hashes, &mut File::create(aeth_dir.join("hashes"))?)?;
-				}
-				
-				progress.sub_task.set_msg("Unpacking mod");
-				let pack_len = pack.len();
-				for i in 0..pack_len {
-					progress.sub_task.set(i as f32 / pack_len as f32);
+	fn install_mods(&self, progress: super::TaskProgress, files: Vec<(String, std::fs::File)>) {
+		progress.add_task_count(files.len());
+		
+		for (mod_id, file) in files.into_iter() {
+			progress.set_task_msg(format!("Installing '{mod_id}'"));
+			
+			match zip::ZipArchive::new(BufReader::new(file)) {
+				Ok(mut pack) => {
+					// we dont have access to extensions here (probably should change that)
+					// so we check for these 2 files. im sure nothing can go wrong...
+					let is_aeth = pack.by_name("remap").is_ok() && pack.by_name("default_mod.json").is_err();
 					
-					let mut f = pack.by_index(i)?;
-					if f.is_dir() {continue};
-					let Some(name) = f.enclosed_name() else {continue};
-					match name.components().next().unwrap().as_os_str().to_str().unwrap() {
-						"assets" => {
-							let Ok(name) = name.strip_prefix("assets/") else {continue};
-							let path = assets_dir.join(name);
-							_ = std::fs::create_dir_all(&path.parent().unwrap());
-							let mut buf = Vec::new();
-							f.read_to_end(&mut buf)?;
-							std::fs::write(path, &buf)?;
-						}
-						
-						"files" => {
-							let Ok(name) = name.strip_prefix("files/") else {continue};
-							if name.components().count() > 1 {continue};
-							let name = name.to_owned();
-							let hash = name.to_string_lossy().to_string();
-							let ext = if let Some(p) = hash.find(".") {&hash[p + 1..]} else {""};
+					let r = if is_aeth {
+						self.install_aeth_mod(progress.sub_task.clone(), &mod_id, pack)
+					} else {
+						self.install_pmp_mod(progress.sub_task.clone(), &mod_id, pack)
+					};
+					
+					match r {
+						Ok(meta) => {
+							add_mod_entry(&mod_id);
 							
-							let org_paths = remap_rev.get(&hash).ok_or("Remap does not contain hash")?;
-							let is_direct = org_paths.iter().any(|v| direct_files.contains(v.as_str()));
-							if is_direct {
-								let mut buf = Vec::new();
-								f.read_to_end(&mut buf)?;
-								
-								let mut write_org = false;
-								for org_path in org_paths {
-									if org_path.starts_with("ui/") {
-										let hashed_path = crate::hash_str(blake3::hash(org_path.as_bytes()));
-										let new_name = format!("{hashed_path}.{ext}");
-										// std::io::copy(&mut f, &mut File::create(files_dir.join(&new_name))?)?;
-										std::fs::write(files_dir.join(&new_name), &buf)?;
-										remap.insert(org_path.to_owned(), new_name);
+							for c in get_collections() {
+								let s = get_mod_settings(&c.id, &mod_id, false);
+								if s.enabled && !s.inherit {
+									let settings = if is_aeth {
+										super::SettingsType::Some(crate::modman::settings::Settings::open(&meta, &mod_id).get_collection(&meta, &c.id).to_owned())
 									} else {
-										write_org = true;
-									}
+										super::SettingsType::Keep
+									};
+									
+									self.apply_queue.write().unwrap().insert((mod_id.clone(), c.id), (settings, None));
 								}
-								
-								if write_org {
-									// std::io::copy(&mut f, &mut File::create(files_dir.join(name))?)?;
-									std::fs::write(files_dir.join(&name), &buf)?;
-								}
-							} else {
-								compdata_used = true;
-								compdata.raw_copy_file(f)?;
 							}
+							
+							progress.add_message(format!("Mod '{mod_id}' ({}) has been installed", meta.version), false);
+							
+							self.mods.write().unwrap().push(Arc::new(mod_id.clone()));
+							self.mod_infos.write().unwrap().insert(mod_id, ModInfo {
+								is_aeth,
+								meta: Arc::new(meta)
+							});
 						}
 						
-						_ => {}
+						Err(err) => progress.add_message(format!("Failed installing mod '{mod_id}' {err}"), true),
 					}
 				}
 				
-				std::fs::write(aeth_dir.join("remap"), crate::json_pretty(&remap)?.as_bytes())?;
-				
-				if !compdata_used {
-					_ = std::fs::remove_file(files_dir.join("_compdata"));
-				}
-				
-				add_mod_entry(&mod_id);
-				
-				for c in get_collections() {
-					let s = get_mod_settings(&c.id, &mod_id, false);
-					if s.enabled && !s.inherit {
-						let settings = crate::modman::settings::Settings::open(&meta, &mod_id).get_collection(&meta, &c.id).to_owned();
-						apply_queue.lock().unwrap().insert((mod_id.to_owned(), c.id), (super::SettingsType::Some(settings), None));
-					}
-				}
-				progress.progress_task();
-				mods.lock().unwrap().push(mod_id.to_owned());
+				Err(err) => progress.add_message(format!("Failed opening mod '{mod_id}' file zip {err}"), true),
 			}
 			
-			Ok(())
-		})() {
-			log!(err, "{err}");
-			progress.set_task_msg(err.to_string());
+			progress.progress_task();
 		}
 		
-		let mut squeue = apply_queue.lock().unwrap();
-		let queue = squeue.clone();
-		let comp_info = get_composite_info(mods.lock().unwrap().iter().map(|v| v.as_ref()).collect());
-		finalize_apply(queue, comp_info, progress.clone());
-		squeue.clear();
+		self.finalize_apply(progress);
 	}
 	
-	fn apply_mod_settings(&mut self, mod_id: &str, collection_id: &str, settings: super::SettingsType) {
-		self.apply_queue.lock().unwrap().insert((mod_id.to_owned(), collection_id.to_owned()), (settings.clone(), None));
+	fn apply_mod_settings(&self, mod_id: &str, collection_id: &str, settings: super::SettingsType) {
+		self.apply_queue.write().unwrap().insert((mod_id.to_owned(), collection_id.to_owned()), (settings.clone(), None));
 	}
 	
-	fn finalize_apply(&mut self, progress: super::TaskProgress) {
-		let mut squeue = self.apply_queue.lock().unwrap();
-		let queue = squeue.clone();
-		let comp_info = get_composite_info(self.mods.lock().unwrap().iter().map(|v| v.as_ref()).collect());
+	fn finalize_apply(&self, progress: super::TaskProgress) {
+		let mut queue_lock = self.apply_queue.write().unwrap();
+		let queue = queue_lock.clone();
+		queue_lock.clear();
+		drop(queue_lock);
+		let comp_info = get_composite_info(self.mods.read().unwrap().iter().map(|v| v.as_str()).collect());
 		finalize_apply(queue, comp_info, progress);
-		squeue.clear();
 	}
 	
 	fn apply_queue_size(&self) -> usize {
-		self.apply_queue.lock().unwrap().len()
+		self.apply_queue.read().unwrap().len()
 	}
 	
 	fn apply_services(&self) {
 		apply_ui_colors();
 	}
 	
-	fn load_mods(&mut self) {
+	fn load_mods(&self) {
 		let root = root_path();
-		
-		self.mod_infos = mod_list().into_iter().filter_map(|id| {
+		let infos = mod_list().into_iter().filter_map(|id| {
 			let mod_dir = root.join(&id);
 			let is_aeth = mod_dir.join("aetherment").exists();
 			
 			let meta = if is_aeth {
 				read_json::<meta::Meta>(&mod_dir.join("aetherment").join("meta.json")).ok()?
+			} else if crate::remote::settings::Settings::exists(&id) {
+				let pmeta = read_json::<PMeta>(&mod_dir.join("meta.json")).ok()?;
+				meta::Meta {
+					name: pmeta.Name,
+					description: format!("{}\n\n\nThis is a Penumbra mod, configure it within Penumbra.", pmeta.Description),
+					version: pmeta.Version,
+					author: pmeta.Author,
+					website: pmeta.Website,
+					tags: pmeta.ModTags,
+					..Default::default()
+				}
 			} else {
-				return None;
+				return None
 			};
 			
-			Some((id, ModInfo{
+			Some((id, ModInfo {
 				is_aeth,
-				meta,
+				meta: Arc::new(meta)
 			}))
-		}).collect();
+		}).collect::<HashMap<_, _>>();
 		
-		let mut mods = self.mods.lock().unwrap();
-		*mods = self.mod_infos.iter().map(|(id, _)| id.to_owned()).collect();
-		
-		log!(log, "Loaded mods: {}", mods.len());
+		let mut mods = infos.iter().map(|(v, _)| Arc::new(v.clone())).collect::<Vec<_>>();
+		mods.sort();
+		*self.mods.write().unwrap() = mods;
+		*self.mod_infos.write().unwrap() = infos;
 	}
 	
-	fn get_mod_meta(&self, mod_id: &str) -> Option<&meta::Meta> {
-		self.mod_infos.get(mod_id).map(|m| &m.meta)
+	fn get_mod_meta(&self, mod_id: &str) -> Option<Arc<crate::modman::meta::Meta>> {
+		self.mod_infos.read().unwrap().get(mod_id).map(|v| v.meta.clone())
 	}
 	
 	fn get_mod_asset(&self, mod_id: &str, path: &str) -> std::io::Result<Vec<u8>> {
@@ -374,7 +423,7 @@ impl super::Backend for Penumbra {
 		get_mod_settings(collection_id, mod_id, true).enabled
 	}
 	
-	fn set_mod_enabled(&mut self, mod_id: &str, collection_id: &str, enabled: bool) {
+	fn set_mod_enabled(&self, mod_id: &str, collection_id: &str, enabled: bool) {
 		set_mod_enabled(collection_id, mod_id, enabled);
 	}
 	
@@ -382,7 +431,7 @@ impl super::Backend for Penumbra {
 		get_mod_settings(collection_id, mod_id, true).priority
 	}
 	
-	fn set_mod_priority(&mut self, mod_id: &str, collection_id: &str, priority: i32) {
+	fn set_mod_priority(&self, mod_id: &str, collection_id: &str, priority: i32) {
 		set_mod_priority(collection_id, mod_id, priority);
 	}
 }

@@ -27,8 +27,8 @@ pub fn config() -> &'static mut config::ConfigManager {
 #[cfg(any(feature = "plugin", feature = "client"))] 
 static mut BACKEND: Option<Box<dyn modman::backend::Backend>> = None;
 #[cfg(any(feature = "plugin", feature = "client"))] 
-pub fn backend() -> &'static mut Box<dyn modman::backend::Backend> {
-	unsafe{BACKEND.as_mut().unwrap()}
+pub fn backend() -> &'static Box<dyn modman::backend::Backend> {
+	unsafe{BACKEND.as_ref().unwrap()}
 }
 
 static mut NOUMENON: Option<Option<noumenon::Noumenon>> = None;
@@ -150,7 +150,7 @@ impl Core {
 			let rounding = ui.visuals().widgets.noninteractive.corner_radius;
 			let top = egui::CornerRadius{ne: rounding.ne, nw: rounding.nw, ..Default::default()};
 			
-			if !self.progress.is_finished() {
+			if self.progress.is_busy() {
 				let progress = self.progress.get_task_progress();
 				ui.add(egui::ProgressBar::new(progress)
 					.text(format!("{:.0}% {}", progress * 100.0, self.progress.get_task_msg()))
@@ -160,6 +160,21 @@ impl Core {
 				ui.add(egui::ProgressBar::new(progress)
 					.text(format!("{:.0}% {}", progress * 100.0, self.progress.sub_task.get_msg()))
 					.corner_radius(egui::CornerRadius::same(0)));
+			} else {
+				let messages = self.progress.get_messages();
+				if messages.len() > 0 {
+					for (msg, is_error) in messages {
+						if is_error {
+							ui.label(egui::RichText::new(msg.as_str()).color(egui::Color32::RED));
+						} else {
+							ui.label(msg.as_str());
+						}
+					}
+					
+					if ui.button("Ok").clicked() {
+						self.progress.reset();
+					}
+				}
 			}
 		});
 		

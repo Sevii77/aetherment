@@ -251,7 +251,22 @@ pub fn pretty_size(size: u64) -> String {
 	size.to_string()
 }
 
-// TODO: present a nice status report to the user
+pub fn compare_versions(a: &str, b: &str) -> std::cmp::Ordering {
+	let a = a.split('.').collect::<Vec<_>>();
+	let b = b.split('.').collect::<Vec<_>>();
+	
+	for (a, b) in a.iter().zip(b.iter()) {
+		let Ok(a_num) = a.parse::<u32>() else {return std::cmp::Ordering::Less};
+		let Ok(b_num) = b.parse::<u32>() else {return std::cmp::Ordering::Greater};
+		let cmp = a_num.cmp(&b_num);
+		if cmp != std::cmp::Ordering::Equal {
+			return cmp;
+		}
+	}
+	
+	a.len().cmp(&b.len())
+}
+
 pub fn check_updates(progress: crate::modman::backend::TaskProgress) {
 	progress.set_task_msg("Checking for updates");
 	
@@ -259,7 +274,7 @@ pub fn check_updates(progress: crate::modman::backend::TaskProgress) {
 	let mods = crate::backend().get_mods();
 	progress.add_task_count(mods.len());
 	for mod_id in mods {
-		progress.set_task_msg(format!("Checking for updates for '{}'", mod_id));
+		progress.set_task_msg(format!("Checking for updates for '{mod_id}'"));
 		progress.sub_task.set(0.0);
 		
 		'u: {
@@ -270,14 +285,15 @@ pub fn check_updates(progress: crate::modman::backend::TaskProgress) {
 			let Some(origin) = ORIGINS.iter().find(|(_, v)| v.url() == remote_settings.origin.as_str()) else {break 'u};
 			let origin = origin.1;
 			let origin_url = origin.url();
+			std::thread::sleep(std::time::Duration::from_secs(1));
 			let Ok(mod_page) = origin.mod_page(&mod_id) else {break 'u};
-			if mod_page.version == meta.version {break 'u}
+			// if mod_page.version == meta.version {break 'u}
+			if compare_versions(&mod_page.version, &meta.version) != std::cmp::Ordering::Greater {break 'u}
 			let Some(download_entry) = mod_page.download_options.first() else {break 'u};
 			if !download_entry.is_direct {break 'u}
 			log!("updating {mod_id}");
 			let Ok(file) = download(origin_url, &download_entry.link, &mod_id, progress.sub_task.clone()) else {break 'u};
-			files.push((mod_id, file));
-			std::thread::sleep(std::time::Duration::from_secs(1));
+			files.push((mod_id.to_string(), file));
 		}
 		
 		progress.progress_task();

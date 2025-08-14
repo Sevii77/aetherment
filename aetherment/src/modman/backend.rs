@@ -27,6 +27,7 @@ pub struct TaskProgress {
 	task_count: Arc<AtomicU32>,
 	task_progress: Arc<AtomicU32>,
 	task_msg: Arc<RwLock<String>>,
+	messages: Arc<RwLock<Vec<(Arc<String>, bool)>>>,
 	pub sub_task: Progress,
 }
 
@@ -36,12 +37,28 @@ impl TaskProgress {
 			task_count: Arc::new(AtomicU32::new(0)),
 			task_progress: Arc::new(AtomicU32::new(0)),
 			task_msg: Arc::new(RwLock::new(String::new())),
+			messages: Arc::new(RwLock::new(Vec::new())),
 			sub_task :Progress::new(),
 		}
 	}
 	
+	/// The task is finished and there are no messages
 	pub fn is_finished(&self) -> bool {
-		self.task_progress.load(std::sync::atomic::Ordering::Relaxed) == self.task_count.load(std::sync::atomic::Ordering::Relaxed)
+		!self.is_busy() && self.messages.read().unwrap().len() == 0
+	}
+	
+	/// The task is finished, there may or may not be messages
+	pub fn is_busy(&self) -> bool {
+		self.task_progress.load(std::sync::atomic::Ordering::Relaxed) != self.task_count.load(std::sync::atomic::Ordering::Relaxed)
+	}
+	
+	pub fn reset(&self) {
+		self.task_count.store(0, std::sync::atomic::Ordering::Relaxed);
+		self.task_progress.store(0, std::sync::atomic::Ordering::Relaxed);
+		self.task_msg.write().unwrap().clear();
+		self.messages.write().unwrap().clear();
+		self.sub_task.inner.store(0, std::sync::atomic::Ordering::Relaxed);
+		self.sub_task.msg.write().unwrap().clear();
 	}
 	
 	pub fn set_task_count(&self, value: usize) {
@@ -54,6 +71,7 @@ impl TaskProgress {
 	
 	pub fn progress_task(&self) {
 		self.task_progress.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+		self.sub_task.set(0.0);
 	}
 	
 	pub fn get_task_progress(&self) -> f32 {
@@ -66,6 +84,14 @@ impl TaskProgress {
 	
 	pub fn set_task_msg(&self, value: impl Into<String>) {
 		*self.task_msg.write().unwrap() = value.into();
+	}
+	
+	pub fn add_message(&self, value: impl Into<String>, is_error: bool) {
+		self.messages.write().unwrap().push((Arc::new(value.into()), is_error));
+	}
+	
+	pub fn get_messages(&self) -> Vec<(Arc<String>, bool)> {
+		self.messages.read().unwrap().clone()
 	}
 }
 
@@ -115,16 +141,12 @@ impl Collection {
 pub trait Backend {
 	fn name(&self) -> &'static str;
 	fn description(&self) -> &'static str;
-	// fn is_functional(&self) -> bool {true}
 	fn get_status(&self) -> Status;
-	fn get_mods(&self) -> Vec<String>;
-	// fn get_mods(&mut self) -> HashMap<String, Mod>;
-	fn get_active_collection(&self) -> String;
+	fn get_mods(&self) -> Vec<Arc<String>>;
+	// fn get_active_collection(&self) -> String;
 	fn get_collections(&self) -> Vec<Collection>;
-	// fn install_mod(&mut self, file: &std::path::Path) -> Result<String, crate::resource_loader::BacktraceError>;
-	fn install_mods_path(&mut self, progress: TaskProgress, files: Vec<std::path::PathBuf>) {
+	fn install_mods_path(&self, progress: TaskProgress, files: Vec<std::path::PathBuf>) {
 		self.install_mods(progress,files.into_iter()
-			// .filter_map(|v| std::fs::File::open(&v).ok().map(|f| (v.file_name().map_or_else(|| String::new(), |v| v.to_string_lossy().to_string()), f)))
 			.filter_map(|v| {
 				let f = std::fs::File::open(&v).ok()?;
 				let mut pack = zip::ZipArchive::new(f).ok()?;
@@ -138,26 +160,23 @@ pub trait Backend {
 				Some((meta.name, pack))
 			}).collect())
 	}
-	fn install_mods(&mut self, progress: TaskProgress, files: Vec<(String, std::fs::File)>);
+	fn install_mods(&self, progress: TaskProgress, files: Vec<(String, std::fs::File)>);
 	
-	fn apply_mod_settings(&mut self, mod_id: &str, collection_id: &str, settings: SettingsType);
-	fn finalize_apply(&mut self, progress: TaskProgress);
+	fn apply_mod_settings(&self, mod_id: &str, collection_id: &str, settings: SettingsType);
+	fn finalize_apply(&self, progress: TaskProgress);
 	fn apply_queue_size(&self) -> usize;
 	
 	fn apply_services(&self);
 	
-	// fn get_aeth_meta(&self, mod_id: &str) -> Option<super::meta::Meta>;
-	
-	fn load_mods(&mut self);
-	fn get_mod_meta(&self, mod_id: &str) -> Option<&crate::modman::meta::Meta>;
+	fn load_mods(&self);
+	fn get_mod_meta(&self, mod_id: &str) -> Option<Arc<crate::modman::meta::Meta>>;
 	fn get_mod_asset(&self, mod_id: &str, path: &str) -> std::io::Result<Vec<u8>>;
-	// fn get_mod_settings(&self, mod_id: &str, collection_id: &str) -> Option<crate::modman::settings::Settings>;
 	
 	fn get_mod_enabled(&self, mod_id: &str, collection_id: &str) -> bool;
-	fn set_mod_enabled(&mut self, mod_id: &str, collection_id: &str, enabled: bool);
+	fn set_mod_enabled(&self, mod_id: &str, collection_id: &str, enabled: bool);
 	
 	fn get_mod_priority(&self, mod_id: &str, collection_id: &str) -> i32;
-	fn set_mod_priority(&mut self, mod_id: &str, collection_id: &str, priority: i32);
+	fn set_mod_priority(&self, mod_id: &str, collection_id: &str, priority: i32);
 }
 
 pub enum BackendInitializers {
@@ -165,7 +184,7 @@ pub enum BackendInitializers {
 	None,
 }
 
-pub fn new_backend(backend: BackendInitializers) -> Box<dyn Backend> {
+pub fn new_backend(backend: BackendInitializers) -> Box<dyn Backend + Send + Sync> {
 	match backend {
 		// #[cfg(feature = "plugin")]
 		// BackendInitializers::PenumbraIpc(funcs) => Box::new(penumbra_ipc::Penumbra::new(funcs)),

@@ -189,6 +189,10 @@ impl RemoteOrigin for XivMa {
 	}
 	
 	fn mod_page(&self, mod_id: &str) -> Result<ModPage, Error> {
+		// since we do funky stuff with the save name, we need to undo that for checking for updates
+		let pos = mod_id.rfind('_');
+		let mod_id = if let Some(pos) = pos {&mod_id[pos + 1..]} else {mod_id};
+		
 		#[derive(Deserialize)]
 		struct Result {
 			r#mod: Mod,
@@ -255,11 +259,11 @@ impl RemoteOrigin for XivMa {
 			},
 			version: mod_entry.version.clone(),
 			download_options: vec![{
-				let is_direct = mod_entry.primary_download.link.starts_with("/modid/");
-				let link = if is_direct {format!("{REMOTE_URL}{}", mod_entry.primary_download.link)} else {mod_entry.primary_download.link};
+				let link = if mod_entry.primary_download.link.starts_with("/modid/") {format!("{REMOTE_URL}{}", mod_entry.primary_download.link)} else {mod_entry.primary_download.link};
+				let file_type = FileType::from_path(&link);
 				DownloadOption {
-					is_direct,
-					file_type: FileType::from_path(&link),
+					is_direct: !matches!(file_type, FileType::Other(_)),
+					file_type,
 					link,
 					name: mod_entry.version,
 				}}],

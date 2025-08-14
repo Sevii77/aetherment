@@ -103,12 +103,9 @@ impl Browser {
 					match crate::remote::download(origin_url, &download_url, &mod_id, progress.sub_task.clone()) {
 						Ok(file) => {
 							match file_type {
-								crate::remote::FileType::Aetherment =>
-									crate::backend().install_mods(progress.clone(), vec![(mod_id, file)]),
-								
-								// I'll add support for these once i rewrite the mods viewer
+								crate::remote::FileType::Aetherment |
 								crate::remote::FileType::Penumbra =>
-									*user_input.lock().unwrap() = UserInput::DownloadError("Penumbra mods are currently unsupported".to_string()),
+									crate::backend().install_mods(progress.clone(), vec![(mod_id, file)]),
 								
 								crate::remote::FileType::Textools =>
 									*user_input.lock().unwrap() = UserInput::DownloadError("TexTools mods are currently unsupported".to_string()),

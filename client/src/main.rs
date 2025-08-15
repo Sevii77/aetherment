@@ -4,6 +4,8 @@ extern crate aetherment;
 
 mod cli;
 
+fn set_notification(_progress: f32, _typ: u8, _msg: &str) {}
+
 struct SimpleLogger;
 
 impl log::Log for SimpleLogger {
@@ -86,6 +88,7 @@ fn main() {
 		Ok(Box::new(CoreWrapper {
 			core: aetherment::Core::new(
 				cc.egui_ctx.clone(),
+				set_notification,
 				aetherment::modman::backend::BackendInitializers::None,
 				aetherment::modman::requirement::RequirementInitializers {
 					ui_resolution: Box::new(|| 255),

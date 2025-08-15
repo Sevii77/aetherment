@@ -13,12 +13,18 @@ fn dalamud_add_style(s: &str) {
 	unsafe{ADDSTYLE(FfiStr::new(s))}
 }
 
+static mut NOTIFICATION: fn(f32, u8, FfiStr) = |_, _, _| {};
+fn set_notification(progress: f32, typ: u8, msg: &str) {
+	unsafe{NOTIFICATION(progress, typ, FfiStr::new(msg))}
+}
+
 // ------------------------------
 
 #[repr(C, packed)]
 pub struct Initializers {
 	ffi_str_drop: fn(*const u8, usize),
 	log: fn(u8, FfiStr),
+	set_notification: fn(f32, u8, FfiStr),
 	issue_functions: IssueFunctions,
 	penumbra_functions: PenumbraFunctions,
 	services_functions: ServicesFunctions,
@@ -175,6 +181,7 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 		unsafe {
 			ffi::str::DROP = init.ffi_str_drop;
 			ADDSTYLE = services_funcs.dalamud_add_style;
+			NOTIFICATION = init.set_notification;
 		};
 		
 		let get_collection = Box::new(move |collection_type| {
@@ -203,6 +210,7 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 			// visible: aetherment::config().config.plugin_open_on_launch,
 			core: aetherment::Core::new(
 				renderer_egui.egui_ctx(),
+				set_notification,
 				backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
 					redraw: Box::new(funcs.redraw),
 					redraw_self: Box::new(funcs.redraw_self),

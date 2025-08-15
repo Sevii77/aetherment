@@ -29,6 +29,14 @@ impl RemoteOrigin for Aetherment {
 		REMOTE_URL
 	}
 	
+	fn disclaimer(&self) -> &'static str {
+		""
+	}
+	
+	fn default_auto_update(&self) -> bool {
+		true
+	}
+	
 	fn search(&self, options: SearchOptions) -> Result<SearchResult, Error> {
 		let query = options.query.to_ascii_lowercase();
 		Ok(SearchResult {

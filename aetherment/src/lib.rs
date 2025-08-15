@@ -17,10 +17,10 @@ pub fn config() -> &'static mut config::ConfigManager {
 	unsafe{CONFIG.get_or_insert_with(|| config::ConfigManager::load(&dirs::config_dir().unwrap().join("Aetherment").join("config.json")))}
 }
 
-// static mut BACKEND: Option<std::sync::Mutex<Box<dyn modman::backend::Backend>>> = None;
-// pub fn backend() -> std::sync::MutexGuard<'static, Box<dyn modman::backend::Backend>> {
-// 	unsafe{BACKEND.as_mut().unwrap().lock().unwrap()}
-// }
+static mut NOTIFICATION: fn(f32, u8, &str) = |_, _, _| {};
+pub fn set_notification(progress: f32, typ: u8, msg: &str) {
+	unsafe{NOTIFICATION(progress, typ, msg)}
+}
 
 // not thread safe (probably), being used across threads, it will bite me in the ass
 // TODO: fix
@@ -74,6 +74,7 @@ pub struct Core {
 impl Core {
 	pub fn new(
 	ui_ctx: egui::Context,
+	notification: fn(f32, u8, &str),
 	backend_initializers: modman::backend::BackendInitializers,
 	requirement_initializers: modman::requirement::RequirementInitializers,
 	optional_initializers: modman::meta::OptionalInitializers,
@@ -83,6 +84,7 @@ impl Core {
 		
 		unsafe {
 			// BACKEND = Some(std::sync::Mutex::new(modman::backend::new_backend(backend_initializers)));
+			NOTIFICATION = notification;
 			BACKEND = Some(modman::backend::new_backend(backend_initializers));
 			modman::requirement::initialize(requirement_initializers);
 			

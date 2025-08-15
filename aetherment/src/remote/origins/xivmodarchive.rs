@@ -48,6 +48,14 @@ impl RemoteOrigin for XivMa {
 		REMOTE_URL
 	}
 	
+	fn disclaimer(&self) -> &'static str {
+		"XIV Mod Archive © Out Of Nothing Designs LLC\\\nAetherment is not affiliated in any way with Out Of Nothing Designs LLC\n\nBy using this you are agreeing to its [Terms of Service](https://www.xivmodarchive.com/tos.txt) and [Privacy Policy](https://www.xivmodarchive.com/privacy_policy)"
+	}
+	
+	fn default_auto_update(&self) -> bool {
+		false
+	}
+	
 	fn search(&self, options: SearchOptions) -> Result<SearchResult, Error> {
 		#[derive(Debug, Deserialize)]
 		struct Result {

@@ -1,5 +1,4 @@
 use std::{collections::VecDeque, ops::{Deref, DerefMut}, sync::{atomic::AtomicBool, Arc, Mutex}};
-
 use crate::{remote::ORIGINS, ui_ext::UiExt};
 
 enum Page {
@@ -563,13 +562,11 @@ impl super::View for Browser {
 							ui.add(egui::Spinner::new());
 						});
 					});
-					ui.add_space(32.0);
 				} else if self.search_options.page >= result.total_pages - 1 {
 					ui.add_space(32.0);
 					ui.centered("loading", crate::ui_ext::Axis::Horizontal, |ui| {
 						ui.heading("You've reached the end");
 					});
-					ui.add_space(32.0);
 				}
 			}
 			
@@ -577,6 +574,11 @@ impl super::View for Browser {
 				ui.label(format!("{e:#?}"));
 			}
 		}
+		
+		ui.add_space(32.0);
+		egui_commonmark::CommonMarkViewer::new()
+			.explicit_image_uri_scheme(true)
+			.show(ui, &mut self.mod_markdown_cache, ORIGINS.get(self.selected_origin.as_str()).unwrap().disclaimer());
 	}
 }
 

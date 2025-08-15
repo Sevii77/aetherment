@@ -50,6 +50,8 @@ pub enum Error {
 pub trait RemoteOrigin {
 	fn name(&self) -> &'static str;
 	fn url(&self) -> &'static str;
+	fn disclaimer(&self) -> &'static str;
+	fn default_auto_update(&self) -> bool;
 	fn search(&self, options: SearchOptions) -> Result<SearchResult, Error>;
 	fn search_sort_types(&self) -> &'static [(&'static str, &'static str)];
 	fn home(&self) -> Result<Vec<HomeResultEntry>, Error>;
@@ -196,8 +198,10 @@ pub enum TextFormatting {
 pub fn download(origin_url: &str, download_url: &str, mod_id: &str, progress: crate::modman::backend::Progress) -> Result<std::fs::File, crate::resource_loader::BacktraceError> {
 	progress.set_msg("");
 	
+	let Some((_, origin)) = ORIGINS.iter().find(|(_, v)| v.url() == origin_url) else {return Err("Invalid origin".into())};
 	let mut s = crate::remote::settings::Settings::open(mod_id);
 	s.origin = origin_url.to_string();
+	s.auto_update = origin.default_auto_update();
 	s.save(mod_id);
 	
 	let resp = ureq::get(download_url)
@@ -277,6 +281,8 @@ pub fn check_updates(progress: crate::modman::backend::TaskProgress) {
 		progress.set_task_msg(format!("Checking for updates for '{mod_id}'"));
 		progress.sub_task.set(0.0);
 		
+		crate::set_notification(progress.get_task_progress(), 0, "Checking for updates");
+		
 		'u: {
 			if !settings::Settings::exists(&mod_id) {break 'u}
 			let remote_settings = settings::Settings::open(&mod_id);
@@ -299,7 +305,16 @@ pub fn check_updates(progress: crate::modman::backend::TaskProgress) {
 		progress.progress_task();
 	}
 	
-	if files.len() > 0 {
-		crate::backend().install_mods(progress, files);
+	let files_len = files.len();
+	if files_len > 0 {
+		crate::set_notification(1.0, 0, "Installing updates");
+		crate::backend().install_mods(progress.clone(), files);
+		if progress.get_messages().iter().any(|v| v.1) {
+			crate::set_notification(1.0, 2, "There were issues updating mods");
+		} else {
+			crate::set_notification(1.0, 1, &format!("{} mods have been successfully updated", files_len));
+		}
+	} else {
+		crate::set_notification(1.0, 1, "No updates found");
 	}
 }

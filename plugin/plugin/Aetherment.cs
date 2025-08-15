@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Dalamud.Game;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Textures.TextureWraps;
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
@@ -26,6 +27,7 @@ public class Aetherment: IDalamudPlugin {
 	[PluginService] public static ITextureProvider        Textures   {get; private set;} = null!;
 	[PluginService] public static ISigScanner             SigScanner {get; private set;} = null!;
 	[PluginService] public static IGameInteropProvider    HookProv   {get; private set;} = null!;
+	[PluginService] public static INotificationManager    NotifMan   {get; private set;} = null!;
 	
 	private const string maincommand = "/aetherment";
 	private const string texfindercommand = "/texfinder";
@@ -36,7 +38,8 @@ public class Aetherment: IDalamudPlugin {
 	internal static nint state;
 	private static string? error;
 	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? title_entry;
-	
+	private IActiveNotification? notification;
+
 	// idfc, entry changed to some other bs that always returns a texture wrap but cant be provided a texture wrap.
 	// i'm not going to dive into the docs to figure out a "proper way"
 	private struct TextureWrap: Dalamud.Interface.Textures.ISharedImmediateTexture {
@@ -78,6 +81,7 @@ public class Aetherment: IDalamudPlugin {
 	public unsafe struct Initializers {
 		public nint ffi_str_drop;
 		public nint log;
+		public nint setNotification;
 		public RequirementFunctions requirement;
 		public PenumbraFunctions penumbra;
 		public ServicesFunctions services;
@@ -140,6 +144,7 @@ public class Aetherment: IDalamudPlugin {
 		// }
 		
 		log = Log;
+		setNotification = SetNotification;
 		requirement = new();
 		penumbra = new();
 		dalamud = new();
@@ -151,6 +156,7 @@ public class Aetherment: IDalamudPlugin {
 		var init = new Initializers {
 			ffi_str_drop = Marshal.GetFunctionPointerForDelegate(FFI.Str.drop),
 			log = Marshal.GetFunctionPointerForDelegate(log),
+			setNotification = Marshal.GetFunctionPointerForDelegate(setNotification),
 			requirement = new RequirementFunctions {
 				ui_resolution = Marshal.GetFunctionPointerForDelegate(requirement.getUiResolution),
 				ui_theme = Marshal.GetFunctionPointerForDelegate(requirement.getUiTheme),
@@ -379,5 +385,20 @@ public class Aetherment: IDalamudPlugin {
 			Logger.Error(str);
 		else
 			Logger.Debug(str);
+	}
+	
+	private SetNotificationDelegate setNotification;
+	private unsafe delegate void SetNotificationDelegate(float progress, byte state, FFI.Str msg);
+	private unsafe void SetNotification(float progress, byte state, FFI.Str msg) {
+		notification ??= NotifMan.AddNotification(new Notification());
+		notification.MinimizedText = msg;
+		notification.Title = msg;
+		notification.Progress = progress;
+		if(state == 1)
+			notification.Type = NotificationType.Success;
+		else if(state == 2)
+			notification.Type = NotificationType.Error;
+		else
+			notification.Type = NotificationType.None;
 	}
 }

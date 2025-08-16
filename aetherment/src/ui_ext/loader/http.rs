@@ -59,7 +59,6 @@ impl egui::load::BytesLoader for HttpLoader {
 					let Ok(data) = std::fs::read(path) else {break 'c};
 					cache.lock().insert(uri, Poll::Ready(Ok(data.into())));
 					ctx.request_repaint();
-					log!("loading image from cache");
 					return;
 				}
 				

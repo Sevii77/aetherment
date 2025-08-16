@@ -10,6 +10,7 @@ struct RemoteModEntry {
 	description: String,
 	id: String,
 	versions: Vec<String>,
+	images: usize,
 }
 
 pub struct Aetherment;
@@ -49,8 +50,8 @@ impl RemoteOrigin for Aetherment {
 				.map(|v| ModEntry {
 					name: v.name,
 					author: v.author,
+					thumbnail_url: format!("{REMOTE_URL}/mod/{}/image/thumbnail", v.id),
 					id: v.id,
-					thumbnail_url: String::new(),
 					content_rating: ContentRating::Sfw,
 				})
 				.collect(),
@@ -77,8 +78,8 @@ impl RemoteOrigin for Aetherment {
 					.map(|v| ModEntry {
 						name: v.name,
 						author: v.author,
+						thumbnail_url: format!("{REMOTE_URL}/mod/{}/image/thumbnail", v.id),
 						id: v.id,
-						thumbnail_url: String::new(),
 						content_rating: ContentRating::Sfw,
 					})
 					.collect()
@@ -108,11 +109,14 @@ impl RemoteOrigin for Aetherment {
 				.into_iter()
 				.map(|version| DownloadOption {
 					is_direct: true,
-					link: format!("{REMOTE_URL}/mod/{mod_id}/{version}"),
+					link: format!("{REMOTE_URL}/mod/{mod_id}/download/{version}"),
 					name: version,
 					file_type: FileType::Aetherment,
 				}).collect(),
-			images: Vec::new(),
+			images: (0..mod_entry.images)
+				.into_iter()
+				.map(|v| format!("{REMOTE_URL}/mod/{mod_id}/image/{v}"))
+				.collect(),
 			content_rating: ContentRating::Sfw,
 			tags: Vec::new(),
 		})

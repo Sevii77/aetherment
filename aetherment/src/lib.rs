@@ -194,4 +194,14 @@ impl Core {
 			.tab_context_menus(false)
 			.show_inside(ui, &mut view::Viewer{renderer: renderer});
 	}
+	
+	pub fn tick(&mut self) {
+		for surface in self.views.iter_surfaces_mut() {
+			for node in surface.iter_nodes_mut() {
+				for tab in node.iter_tabs_mut() {
+					tab.tick();
+				}
+			}
+		}
+	}
 }

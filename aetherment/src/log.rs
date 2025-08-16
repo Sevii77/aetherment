@@ -8,6 +8,10 @@ macro_rules! log {
 		::log::debug!(target: "aetherment", $($e)*);
 	}};
 	
+	(inf, $($e:tt)*) => {{
+		::log::info!(target: "aetherment", $($e)*);
+	}};
+	
 	(err, $($e:tt)*) => {{
 		::log::warn!(target: "aetherment", $($e)*);
 	}};

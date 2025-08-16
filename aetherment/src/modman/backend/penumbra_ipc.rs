@@ -527,10 +527,10 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 				}
 			};
 			
-			log!("changed files:");
-			for v in &changed_files {
-				log!("\t{v}");
-			}
+			// log!(inf, "changed files:");
+			// for v in &changed_files {
+			// 	log!(inf, "\t{v}");
+			// }
 			
 			let mut add_queue = HashSet::new();
 			for f in &changed_files {

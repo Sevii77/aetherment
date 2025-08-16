@@ -8,6 +8,7 @@ pub mod debug;
 pub trait View {
 	fn title(&self) -> &'static str;
 	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer);
+	fn tick(&mut self) {}
 }
 
 pub struct Viewer<'r> {

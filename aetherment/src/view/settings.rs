@@ -52,6 +52,24 @@ impl super::View for Settings {
 			ui.combo_enum(&mut config.browser_content_rating, "Content Rating");
 		});
 		
+		ui.collapsing("Auto Apply", |ui| {
+			ui.horizontal(|ui| {
+				let mut val = config.auto_apply_last_viewed.as_secs();
+				if ui.num_edit(&mut val, "Seconds since last viewed").changed() {
+					config.auto_apply_last_viewed = std::time::Duration::from_secs(val);
+				}
+				ui.helptext("Time in seconds since the mods page was last seen in order to auto apply.");
+			});
+			
+			ui.horizontal(|ui| {
+				let mut val = config.auto_apply_last_interacted.as_secs();
+				if ui.num_edit(&mut val, "Seconds since last interaction").changed() {
+					config.auto_apply_last_interacted = std::time::Duration::from_secs(val);
+				}
+				ui.helptext("Time in seconds since a change to a mod setting was made in order to auto apply.");
+			});
+		});
+		
 		_ = config_manager.save();
 	}
 }

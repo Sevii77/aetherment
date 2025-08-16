@@ -17,6 +17,9 @@ pub struct Mods {
 	mod_settings: HashMap<Arc<String>, Settings>,
 	mod_settings_remote: HashMap<Arc<String>, crate::remote::settings::Settings>,
 	markdown_cache: egui_commonmark::CommonMarkCache,
+	
+	last_viewed: std::time::Instant,
+	last_interacted: std::time::Instant,
 }
 
 impl Mods {
@@ -37,6 +40,9 @@ impl Mods {
 			mod_settings: HashMap::new(),
 			mod_settings_remote: HashMap::new(),
 			markdown_cache: Default::default(),
+			
+			last_viewed: std::time::Instant::now(),
+			last_interacted: std::time::Instant::now(),
 		};
 		
 		s.refresh();
@@ -54,6 +60,45 @@ impl Mods {
 		self.collections = backend.get_collections().into_iter().map(|v| (v.id, v.name)).collect();
 		self.mod_settings = self.mods.iter().map(|m| (m.to_owned(), crate::modman::settings::Settings::open(&backend.get_mod_meta(m).unwrap(), m))).collect();
 		self.mod_settings_remote = self.mods.iter().map(|m| (m.to_owned(), crate::remote::settings::Settings::open(m))).collect();
+	}
+	
+	fn check_apply(&self) {
+		let config = &crate::config().config;
+		if !self.progress.is_finished()  {return}
+		if crate::backend().apply_queue_size() == 0 {return}
+		if self.last_viewed.elapsed() < config.auto_apply_last_viewed && self.last_interacted.elapsed() < config.auto_apply_last_interacted {return}
+		
+		let progress = self.progress.clone();
+		progress.add_task_count(1);
+		std::thread::spawn(move || {
+			crate::backend().finalize_apply(progress.clone());
+			progress.progress_task();
+			if progress.get_messages().iter().any(|v| v.1) {
+				crate::set_notification(1.0, 2, "There were issues applying mods");
+				return;
+			}
+			progress.reset();
+		});
+		
+		let progress = self.progress.clone();
+		std::thread::spawn(move || {
+			// we don't know if a changed mod will actually require us to composite files
+			// we check that within the apply, so if it is done within 1 seconds dont
+			// bother notifying the user, it'd just be spam
+			std::thread::sleep(std::time::Duration::from_secs(1));
+			if !progress.is_busy() && !progress.get_messages().iter().any(|v| v.1) {return}
+			
+			while progress.is_busy() {
+				crate::set_notification(progress.get_task_progress(), 0, "Applying mods");
+				std::thread::sleep(std::time::Duration::from_secs_f32(0.5));
+			}
+			
+			if progress.get_messages().iter().any(|v| v.1) {
+				crate::set_notification(1.0, 2, "There were issues applying mods");
+			} else {
+				crate::set_notification(1.0, 1, &format!("Mods have been successfully applied"));
+			}
+		});
 	}
 	
 	fn draw_modlist_simple(&mut self, ui: &mut egui::Ui) {
@@ -116,7 +161,7 @@ impl Mods {
 		let queue_size = backend.apply_queue_size();
 		ui.add_enabled_ui(!is_busy && queue_size > 0 , |ui| {
 			ui.label(format!("{queue_size} mods have changes that might require an apply"));
-			if ui.button("Apply").clicked() {
+			if ui.button("Manually Apply Now").clicked() {
 				let progress = self.progress.clone();
 				std::thread::spawn(move || {
 					progress.add_task_count(1);
@@ -383,6 +428,7 @@ impl Mods {
 			backend.apply_mod_settings(&self.selected_mod, &crate::config().config.active_collection, SettingsType::Some(settings.clone()));
 			mod_settings.presets = presets;
 			mod_settings.save(&self.selected_mod);
+			self.last_interacted = std::time::Instant::now();
 		}
 	}
 }
@@ -410,6 +456,12 @@ impl super::View for Mods {
 				.auto_shrink(false)
 				.show(ui_right, |ui| self.draw_modpage(ui));
 		});
+		
+		self.last_viewed = std::time::Instant::now();
+	}
+	
+	fn tick(&mut self) {
+		self.check_apply();
 	}
 }
 

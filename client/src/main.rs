@@ -23,7 +23,7 @@ impl log::Log for SimpleLogger {
 		let level = match record.level() {
 			log::Level::Error => "FATAL",
 			log::Level::Warn => "ERROR",
-			log::Level::Info => "LOG",
+			log::Level::Info => "INFO",
 			log::Level::Debug => "LOG",
 			log::Level::Trace => "LOG",
 		};

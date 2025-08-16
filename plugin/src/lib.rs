@@ -329,6 +329,12 @@ pub extern "C" fn draw(state: *mut State, d3d11_device: usize, io: Io) -> usize 
 }
 
 #[no_mangle]
+pub extern "C" fn tick(state: *mut State) {
+	let state = unsafe{&mut *state};
+	state.core.tick();
+}
+
+#[no_mangle]
 pub extern "C" fn config_plugin_open_on_launch(_state: *mut State) -> u8 {
 	aetherment::config().config.plugin_open_on_launch as u8
 }

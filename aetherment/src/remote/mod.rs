@@ -281,7 +281,7 @@ pub fn check_updates(progress: crate::modman::backend::TaskProgress) {
 		progress.set_task_msg(format!("Checking for updates for '{mod_id}'"));
 		progress.sub_task.set(0.0);
 		
-		crate::set_notification(progress.get_task_progress(), 0, "Checking for updates");
+		crate::set_notification(progress.get_task_progress(), 0, "Checking for mod updates");
 		
 		'u: {
 			if !settings::Settings::exists(&mod_id) {break 'u}
@@ -307,14 +307,14 @@ pub fn check_updates(progress: crate::modman::backend::TaskProgress) {
 	
 	let files_len = files.len();
 	if files_len > 0 {
-		crate::set_notification(1.0, 0, "Installing updates");
+		crate::set_notification(1.0, 0, "Installing mod updates");
 		crate::backend().install_mods(progress.clone(), files);
 		if progress.get_messages().iter().any(|v| v.1) {
 			crate::set_notification(1.0, 2, "There were issues updating mods");
 		} else {
-			crate::set_notification(1.0, 1, &format!("{} mods have been successfully updated", files_len));
+			crate::set_notification(1.0, 1, &format!("{files_len} mods have been successfully updated"));
 		}
 	} else {
-		crate::set_notification(1.0, 1, "No updates found");
+		crate::set_notification(1.0, 1, "No mod updates found");
 	}
 }

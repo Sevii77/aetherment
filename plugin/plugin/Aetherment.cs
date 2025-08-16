@@ -331,6 +331,8 @@ public class Aetherment: IDalamudPlugin {
 			ImGui.End();
 		}
 		
+		Native.tick(state);
+		
 		texfinder.Draw();
 	}
 	
@@ -383,6 +385,8 @@ public class Aetherment: IDalamudPlugin {
 			Kill(str, 2);
 		} else if(mode == 1)
 			Logger.Error(str);
+		else if(mode == 2)
+			Logger.Info(str);
 		else
 			Logger.Debug(str);
 	}
@@ -390,7 +394,17 @@ public class Aetherment: IDalamudPlugin {
 	private SetNotificationDelegate setNotification;
 	private unsafe delegate void SetNotificationDelegate(float progress, byte state, FFI.Str msg);
 	private unsafe void SetNotification(float progress, byte state, FFI.Str msg) {
-		notification ??= NotifMan.AddNotification(new Notification());
+		if(notification == null) {
+			notification = NotifMan.AddNotification(new Notification() {
+				InitialDuration = TimeSpan.MaxValue,
+			});
+			notification.Click += (_) => {open = true;};
+			notification.Dismiss += (_) => {notification = null;};
+		}
+		
+		if(state != 0)
+			notification.HardExpiry = DateTime.Now.AddSeconds(5);
+		
 		notification.MinimizedText = msg;
 		notification.Title = msg;
 		notification.Progress = progress;

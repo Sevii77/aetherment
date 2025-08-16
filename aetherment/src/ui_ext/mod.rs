@@ -3,8 +3,14 @@
 use egui::{Response, Ui, WidgetText};
 use crate::EnumTools;
 
-mod asset_loader;
-pub use asset_loader::*;
+// mod asset_loader;
+mod loader {
+	pub mod asset;
+	pub mod http;
+}
+pub use loader::asset::*;
+pub use loader::http::*;
+
 mod splitter;
 pub use splitter::*;
 mod coloredit;

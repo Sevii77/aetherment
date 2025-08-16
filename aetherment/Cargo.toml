@@ -12,7 +12,7 @@ egui = "0.31"
 egui_dock = "0.16"
 egui_file = "0.22"
 egui_dnd = "0.12"
-egui_extras = {version = "0.31", features = ["image", "http"]}
+egui_extras = {version = "0.31", features = ["image"]}
 egui_commonmark = {version = "0.20", default-features = false}
 
 serde = {version = "1.0.171", features = ["derive"]}

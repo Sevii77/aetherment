@@ -79,7 +79,9 @@ impl Core {
 	requirement_initializers: modman::requirement::RequirementInitializers,
 	optional_initializers: modman::meta::OptionalInitializers,
 	services_initializers: service::ServicesInitializers) -> Self {
+		ui_ext::HttpLoader::clear_cache();
 		ui_ctx.add_bytes_loader(std::sync::Arc::new(ui_ext::AssetLoader::default()));
+		ui_ctx.add_bytes_loader(std::sync::Arc::new(ui_ext::HttpLoader::default()));
 		egui_extras::install_image_loaders(&ui_ctx);
 		
 		unsafe {

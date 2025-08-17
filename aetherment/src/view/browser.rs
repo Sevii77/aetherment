@@ -108,7 +108,7 @@ impl Browser {
 						crate::remote::FileType::Textools =>
 							Err("TexTools mods are currently unsupported".to_string())?,
 						
-						crate::remote::FileType::Archive => {
+						crate::remote::FileType::Zip => {
 							let tempdir = tempfile::tempdir()?;
 							let file = crate::remote::download(origin_url, &download_url, &mod_id, progress.sub_task.clone())?;
 							let mut pack = zip::ZipArchive::new(std::io::BufReader::new(file))?;
@@ -117,6 +117,9 @@ impl Browser {
 							tempdir_holder = Some(tempdir);
 							*user_input.lock().unwrap() = UserInput::RequiredPick(picker);
 						}
+						
+						crate::remote::FileType::Rar =>
+							Err("Rar files are currently unsupported".to_string())?,
 						
 						crate::remote::FileType::Other(ext) =>
 							Err(format!("Unsupported extension '{ext}'"))?,
@@ -465,9 +468,18 @@ impl super::View for Browser {
 									let download_text = if let Some(size) = size {format!("{download_text} ({})", size)} else {download_text};
 									let resp = ui.button(egui::RichText::new(download_text).heading());
 									if resp.clicked() {
-										println!("{}", download_option.link);
-										self.download_mod(&download_option.link, &entry.id, download_option.file_type.clone());
+										if download_option.is_direct {
+											self.download_mod(&download_option.link, &entry.id, download_option.file_type.clone());
+										} else {
+											ui.ctx().open_url(egui::OpenUrl::new_tab(&download_option.link));
+										}
 									}
+									
+									resp.context_menu(|ui| {
+										if ui.button("Open link in browser").clicked() {
+											ui.ctx().open_url(egui::OpenUrl::new_tab(&download_option.link));
+										}
+									});
 									
 									if !download_option.is_direct {
 										resp.on_hover_text(format!("{}\nAetherment is unable to download non direct files automatically.\nYou'll be directed towards the download in your webbrowser.", download_option.link));

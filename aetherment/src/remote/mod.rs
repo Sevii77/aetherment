@@ -119,7 +119,8 @@ pub enum FileType {
 	Aetherment,
 	Penumbra,
 	Textools,
-	Archive,
+	Zip,
+	Rar,
 	Other(String),
 }
 
@@ -132,7 +133,8 @@ impl FileType {
 			"aeth" => Self::Aetherment,
 			"pmp" => Self::Penumbra,
 			"ttmp" | "ttmp2" => Self::Textools, // are these the extensions? i honestly havent seen one in ages
-			"7z" | "zip" | "rar" => Self::Archive,
+			"7z" | "zip" => Self::Zip,
+			"rar" => Self::Rar,
 			_ => Self::Other(ext.to_string()),
 		}
 	}

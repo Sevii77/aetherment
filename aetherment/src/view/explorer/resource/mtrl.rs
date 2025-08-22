@@ -24,7 +24,6 @@ impl EnumTools for AddressMode {
 }
 
 pub struct MtrlView {
-	changed: bool,
 	mtrl: Mtrl,
 	view_row: usize,
 }
@@ -34,7 +33,6 @@ impl MtrlView {
 		let data = super::read_file(path)?;
 		
 		Ok(Self {
-			changed: false,
 			mtrl: Mtrl::read(&mut std::io::Cursor::new(&data))?,
 			view_row: 0,
 		})
@@ -46,26 +44,23 @@ impl super::ResourceView for MtrlView {
 		"Material".to_string()
 	}
 	
-	fn has_changes(&self) -> bool {
-		self.changed
-	}
-	
 	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> Action {
 		let mut act = Action::None;
+		let mut changed = false;
 		
 		egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
 			ui.label("Shader");
 			ui.combo(self.mtrl.shader.to_string(), "", |ui| {
 				for v in mtrl::USED_SHADERS {
-					self.changed |= ui.selectable_value(&mut self.mtrl.shader, v.to_string(), v).changed();
+					changed |= ui.selectable_value(&mut self.mtrl.shader, v.to_string(), v).changed();
 				}
-				self.changed |= ui.text_edit_singleline(&mut self.mtrl.shader).changed();
+				changed |= ui.text_edit_singleline(&mut self.mtrl.shader).changed();
 			});
 			
 			ui.spacer();
 			ui.label("Uv Sets");
 			for name in &mut self.mtrl.uvsets {
-				self.changed |= ui.text_edit_singleline(name).changed();
+				changed |= ui.text_edit_singleline(name).changed();
 			}
 			
 			for colorset in &mut self.mtrl.colorsets {
@@ -113,78 +108,78 @@ impl super::ResourceView for MtrlView {
 						let row = &mut colorset.regular[self.view_row];
 						
 						ui.label("Diffuse");
-						self.changed |= ui.color_edit(&mut row.diffuse).changed();
-						self.changed |= ui.num_edit(&mut row._diffuse_alpha, "").changed();
+						changed |= ui.color_edit(&mut row.diffuse).changed();
+						changed |= ui.num_edit(&mut row._diffuse_alpha, "").changed();
 						ui.end_row();
 						
 						ui.label("Specular");
-						self.changed |= ui.color_edit(&mut row.specular).changed();
-						self.changed |= ui.num_edit(&mut row._specular_alpha, "").changed();
+						changed |= ui.color_edit(&mut row.specular).changed();
+						changed |= ui.num_edit(&mut row._specular_alpha, "").changed();
 						ui.end_row();
 						
 						ui.label("Emmisive");
-						self.changed |= ui.color_edit(&mut row.emmisive).changed();
-						self.changed |= ui.num_edit(&mut row._emmisive_alpha, "").changed();
+						changed |= ui.color_edit(&mut row.emmisive).changed();
+						changed |= ui.num_edit(&mut row._emmisive_alpha, "").changed();
 						ui.end_row();
 						
 						ui.label("Sheen");
-						self.changed |= ui.num_edit(&mut row.sheen_rate, "")
+						changed |= ui.num_edit(&mut row.sheen_rate, "")
 							.on_hover_text("Rate").changed();
-						self.changed |= ui.num_edit(&mut row.sheen_tint_rate, "")
+						changed |= ui.num_edit(&mut row.sheen_tint_rate, "")
 							.on_hover_text("Tint Rate").changed();
-						self.changed |= ui.num_edit(&mut row.sheen_aperature, "")
+						changed |= ui.num_edit(&mut row.sheen_aperature, "")
 							.on_hover_text("Aperature").changed();
 						ui.end_row();
 						
 						ui.label("Roughness");
-						self.changed |= ui.num_edit(&mut row.roughness, "").changed();
+						changed |= ui.num_edit(&mut row.roughness, "").changed();
 						ui.end_row();
 						
 						ui.label("Metalic");
-						self.changed |= ui.num_edit(&mut row.metalic, "").changed();
+						changed |= ui.num_edit(&mut row.metalic, "").changed();
 						ui.end_row();
 						
 						ui.label("Anisotropy");
-						self.changed |= ui.num_edit(&mut row.anisotropy, "").changed();
+						changed |= ui.num_edit(&mut row.anisotropy, "").changed();
 						ui.end_row();
 						
 						ui.label("Shader ID");
-						self.changed |= ui.num_edit(&mut row.shader_id, "").changed();
+						changed |= ui.num_edit(&mut row.shader_id, "").changed();
 						ui.end_row();
 						
 						ui.label("Sphere Map");
-						self.changed |= ui.num_edit(&mut row.sphere_map_index, "")
+						changed |= ui.num_edit(&mut row.sphere_map_index, "")
 							.on_hover_text("Index").changed();
-						self.changed |= ui.num_edit(&mut row.sphere_map_mask, "")
+						changed |= ui.num_edit(&mut row.sphere_map_mask, "")
 							.on_hover_text("Mask").changed();
 						ui.end_row();
 						
 						ui.label("Unknowns");
-						self.changed |= ui.num_edit(&mut row._unknown15, "")
+						changed |= ui.num_edit(&mut row._unknown15, "")
 							.on_hover_text("_unknown15").changed();
-						self.changed |= ui.num_edit(&mut row._unknown17, "")
+						changed |= ui.num_edit(&mut row._unknown17, "")
 							.on_hover_text("_unknown17").changed();
-						self.changed |= ui.num_edit(&mut row._unknown20, "")
+						changed |= ui.num_edit(&mut row._unknown20, "")
 							.on_hover_text("_unknown20").changed();
-						self.changed |= ui.num_edit(&mut row._unknown22, "")
+						changed |= ui.num_edit(&mut row._unknown22, "")
 							.on_hover_text("_unknown22").changed();
-						self.changed |= ui.num_edit(&mut row._unknown23, "")
+						changed |= ui.num_edit(&mut row._unknown23, "")
 							.on_hover_text("_unknown23").changed();
 						ui.end_row();
 						
 						// TODO: make this nicer, tile preview and shit
 						ui.label("Tilemap");
-						self.changed |= ui.num_edit(&mut row.tile_index, "")
+						changed |= ui.num_edit(&mut row.tile_index, "")
 							.on_hover_text("Index").changed();
-						self.changed |= ui.num_edit(&mut row.tile_alpha, "")
+						changed |= ui.num_edit(&mut row.tile_alpha, "")
 							.on_hover_text("Alpha").changed();
-						self.changed |= ui.num_edit(&mut row.tile_transform.x_axis.x, "")
+						changed |= ui.num_edit(&mut row.tile_transform.x_axis.x, "")
 							.on_hover_text("Transformation XX").changed();
-						self.changed |= ui.num_edit(&mut row.tile_transform.x_axis.y, "")
+						changed |= ui.num_edit(&mut row.tile_transform.x_axis.y, "")
 							.on_hover_text("Transformation XY").changed();
-						self.changed |= ui.num_edit(&mut row.tile_transform.y_axis.x, "")
+						changed |= ui.num_edit(&mut row.tile_transform.y_axis.x, "")
 							.on_hover_text("Transformation YX").changed();
-						self.changed |= ui.num_edit(&mut row.tile_transform.y_axis.y, "")
+						changed |= ui.num_edit(&mut row.tile_transform.y_axis.y, "")
 							.on_hover_text("Transformation YY").changed();
 						ui.end_row();
 					});
@@ -197,57 +192,57 @@ impl super::ResourceView for MtrlView {
 							let row = &mut dyes[self.view_row];
 							
 							ui.label("Template");
-							self.changed |= ui.num_edit(&mut row.template, "").changed();
+							changed |= ui.num_edit(&mut row.template, "").changed();
 							ui.end_row();
 							
 							ui.label("Channel");
-							self.changed |= ui.num_edit(&mut row.channel, "").changed();
+							changed |= ui.num_edit(&mut row.channel, "").changed();
 							ui.end_row();
 							
 							ui.label("Diffuse");
-							self.changed |= ui.checkbox(&mut row.diffuse, "").changed();
+							changed |= ui.checkbox(&mut row.diffuse, "").changed();
 							ui.end_row();
 							
 							ui.label("Specular");
-							self.changed |= ui.checkbox(&mut row.specular, "").changed();
+							changed |= ui.checkbox(&mut row.specular, "").changed();
 							ui.end_row();
 							
 							ui.label("Emmisive");
-							self.changed |= ui.checkbox(&mut row.emmisive, "").changed();
+							changed |= ui.checkbox(&mut row.emmisive, "").changed();
 							ui.end_row();
 							
 							ui.label("Scalar3");
-							self.changed |= ui.checkbox(&mut row.scalar3, "").changed();
+							changed |= ui.checkbox(&mut row.scalar3, "").changed();
 							ui.end_row();
 							
 							ui.label("Roughness");
-							self.changed |= ui.checkbox(&mut row.roughness, "").changed();
+							changed |= ui.checkbox(&mut row.roughness, "").changed();
 							ui.end_row();
 							
 							ui.label("Metalic");
-							self.changed |= ui.checkbox(&mut row.metalic, "").changed();
+							changed |= ui.checkbox(&mut row.metalic, "").changed();
 							ui.end_row();
 							
 							ui.label("Anisotropy");
-							self.changed |= ui.checkbox(&mut row.anisotropy, "").changed();
+							changed |= ui.checkbox(&mut row.anisotropy, "").changed();
 							ui.end_row();
 							
 							ui.label("Sheen");
 							ui.horizontal(|ui| {
-								self.changed |= ui.checkbox(&mut row.sheen_rate, "")
+								changed |= ui.checkbox(&mut row.sheen_rate, "")
 									.on_hover_text("Rate").changed();
-								self.changed |= ui.checkbox(&mut row.sheen_tint_rate, "")
+								changed |= ui.checkbox(&mut row.sheen_tint_rate, "")
 									.on_hover_text("Tint Rate").changed();
-								self.changed |= ui.checkbox(&mut row.sheen_aperature, "")
+								changed |= ui.checkbox(&mut row.sheen_aperature, "")
 									.on_hover_text("Aperature").changed();
 							});
 							ui.end_row();
 							
 							ui.label("Sphere Map");
 							ui.horizontal(|ui| {
-								self.changed |= ui.checkbox(&mut row.sphere_map_index, "")
+								changed |= ui.checkbox(&mut row.sphere_map_index, "")
 									.on_hover_text("Index").changed();
-								self.changed |= ui.checkbox(&mut row.sphere_map_mask, "")
+								changed |= ui.checkbox(&mut row.sphere_map_mask, "")
 									.on_hover_text("Mask").changed();
 							});
 							ui.end_row();
@@ -262,7 +257,7 @@ impl super::ResourceView for MtrlView {
 				for (i, sampler) in self.mtrl.samplers.iter_mut().enumerate() {
 					ui.combo_id(shader_param_name(sampler.id), i, |ui| {
 						for v in mtrl::USED_SAMPLERS {
-							self.changed |= ui.selectable_value(&mut sampler.id, v, shader_param_name(v)).changed();
+							changed |= ui.selectable_value(&mut sampler.id, v, shader_param_name(v)).changed();
 						}
 					});
 					
@@ -279,16 +274,16 @@ impl super::ResourceView for MtrlView {
 						let resp = ui.text_edit_singleline(&mut sampler.texture);
 						resp.context_menu(|ui| {
 							if ui.button("Open in new tab").clicked() {
-								act = Action::OpenNew(sampler.texture.clone());
+								act = Action::OpenNew(crate::view::explorer::TabType::Resource(super::Path::Game(sampler.texture.clone())));
 								ui.close_menu();
 							}
 						});
-						self.changed |= resp.changed();
+						changed |= resp.changed();
 						
-						self.changed |= ui.combo_enum(&mut sampler.u_address_mode, "U Address Mode").changed();
-						self.changed |= ui.combo_enum(&mut sampler.v_address_mode, "V Address Mode").changed();
-						self.changed |= ui.num_edit_range(&mut sampler.lod_bias, "Lod Bias", -8.0..=7.984375).changed();
-						self.changed |= ui.num_edit_range(&mut sampler.min_lod, "Minimum Lod", 0..=15).changed();
+						changed |= ui.combo_enum(&mut sampler.u_address_mode, "U Address Mode").changed();
+						changed |= ui.combo_enum(&mut sampler.v_address_mode, "V Address Mode").changed();
+						changed |= ui.num_edit_range(&mut sampler.lod_bias, "Lod Bias", -8.0..=7.984375).changed();
+						changed |= ui.num_edit_range(&mut sampler.min_lod, "Minimum Lod", 0..=15).changed();
 						
 						if ui.button("🗑 Delete texture").clicked() {
 							delete = Some(i);
@@ -319,9 +314,9 @@ impl super::ResourceView for MtrlView {
 				for constant in &mut self.mtrl.constants {
 					ui.horizontal(|ui| {
 						if constant.value.len() % 4 == 0 {
-							self.changed |= ui.num_multi_edit(constant.value_as::<f32>(), "").changed();
+							changed |= ui.num_multi_edit(constant.value_as::<f32>(), "").changed();
 						} else {
-							self.changed |= ui.num_multi_edit(&mut constant.value, "").changed();
+							changed |= ui.num_multi_edit(&mut constant.value, "").changed();
 						}
 						ui.label(shader_param_name(constant.id));
 					});
@@ -332,16 +327,20 @@ impl super::ResourceView for MtrlView {
 			ui.collapsing("Shader Keys", |ui| {
 				for (k, v) in &mut self.mtrl.shader_keys {
 					ui.horizontal(|ui| {
-						self.changed |= ui.num_edit(k, "").changed();
-						self.changed |= ui.num_edit(v, "").changed();
+						changed |= ui.num_edit(k, "").changed();
+						changed |= ui.num_edit(v, "").changed();
 					});
 				}
 			});
 			
 			ui.spacer();
 			ui.label("Shader Flags");
-			self.changed |= ui.num_edit(&mut self.mtrl.shader_flags, "").changed();
+			changed |= ui.num_edit(&mut self.mtrl.shader_flags, "").changed();
 		});
+		
+		if changed {
+			act.or(Action::Changed);
+		}
 		
 		act
 	}

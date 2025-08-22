@@ -190,6 +190,10 @@ impl ironworks::file::File for Uld {
 	}
 }
 
+impl super::Extension for Uld {
+	const EXT: &[&str] = EXT;
+}
+
 impl crate::format::external::Bytes<Error> for Uld {
 	fn read<T>(reader: &mut T) -> Result<Self, Error>
 	where T: Read + Seek {

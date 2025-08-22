@@ -16,6 +16,10 @@ pub mod external {
 }
 
 pub mod game {
+	pub trait Extension {
+		const EXT: &[&str];
+	}
+	
 	pub mod tex;
 	pub use tex::Tex;
 	pub mod mtrl;

@@ -8,32 +8,55 @@ pub trait ExplorerView {
 	fn as_any(&self) -> &dyn std::any::Any;
 	fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
 	fn title(&self) -> String;
-	fn path(&self) -> Option<&str>;
+	fn path(&self) -> Option<&resource::Path>;
 	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> Action;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Action {
 	None,
-	OpenNew(String),
-	OpenExisting(String),
+	OpenNew(TabType),
+	OpenExisting(TabType),
 	OpenComplex((TabType, (egui_dock::SurfaceIndex, egui_dock::NodeIndex))),
 	Close(String),
-	Export((String, usize)),
+	Save,
+	#[doc(hidden)] SaveTab(usize),
+	ModAssign,
+	#[doc(hidden)] ModAssignTab(usize),
+	Changed,
+	Export((resource::Path, usize)),
+	Import((resource::Path, usize)),
 }
 
 impl Action {
 	pub fn or(&mut self, other: Self) {
-		if *self == Self::None {
+		if matches!(*self, Self::None) {
 			*self = other;
 		}
 	}
 }
 
-#[derive(Debug, Clone, PartialEq)]
+pub struct ModInfo {
+	pub root: std::path::PathBuf,
+	pub meta: std::rc::Rc<std::cell::RefCell<crate::modman::meta::Meta>>,
+	pub option: Option<(String, String)>,
+}
+
+#[derive(Debug, Clone)]
 pub enum TabType {
 	Tree,
-	Resource,
+	Resource(resource::Path),
+	Meta(std::rc::Rc<std::cell::RefCell<crate::modman::meta::Meta>>, std::path::PathBuf)
+}
+
+impl Into<Box<dyn ExplorerView>> for TabType {
+	fn into(self) -> Box<dyn ExplorerView> {
+		match self {
+			TabType::Tree => Box::new(tree::Tree::new()),
+			TabType::Resource(path) => Box::new(resource::Resource::new(path)),
+			TabType::Meta(meta, root) => Box::new(workspace::Workspace::new(meta, root)),
+		}
+	}
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -66,7 +89,11 @@ impl<'r> egui_dock::TabViewer for Viewer<'r> {
 	
 	fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
 		ui.push_id(tab.id, |ui| {
-			self.action.or(tab.tab.ui(ui, self.renderer));
+			match tab.tab.ui(ui, self.renderer) {
+				Action::Save => self.action = Action::SaveTab(tab.id),
+				Action::ModAssign => self.action = Action::ModAssignTab(tab.id),
+				act => self.action.or(act),
+			}
 		});
 	}
 	
@@ -78,13 +105,13 @@ impl<'r> egui_dock::TabViewer for Viewer<'r> {
 		}
 		
 		if ui.selectable_label(false, "Add Resource View").clicked() {
-			self.action = Action::OpenComplex((TabType::Resource, (surface, node)));
+			self.action = Action::OpenComplex((TabType::Resource(resource::Path::Game("ui/uld/logo_sqex_hr1.tex".to_string())), (surface, node)));
 		}
 	}
 	
 	fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
 		if let Some(path) = tab.tab.path() {
-			self.action = Action::Close(path.to_owned());
+			self.action = Action::Close(path.as_path().to_owned());
 		}
 		
 		true
@@ -94,7 +121,12 @@ impl<'r> egui_dock::TabViewer for Viewer<'r> {
 		let Some(path) = tab.tab.path() else {return};
 		
 		if ui.button("Export").clicked() {
-			self.action = Action::Export((path.to_owned(), tab.id));
+			self.action = Action::Export((path.clone(), tab.id));
+			ui.close_menu();
+		}
+		
+		if ui.button("Import").clicked() {
+			self.action = Action::Import((path.clone(), tab.id));
 			ui.close_menu();
 		}
 	}
@@ -103,7 +135,7 @@ impl<'r> egui_dock::TabViewer for Viewer<'r> {
 enum FileDialogStatus {
 	Idle,
 	Exporting(egui_file::FileDialog, usize),
-	Importing(egui_file::FileDialog, usize),
+	Importing(crate::ui_ext::ImporterDialog, usize),
 	Result(egui::RichText),
 }
 
@@ -123,17 +155,19 @@ impl Explorer {
 			file_dialog: FileDialogStatus::Idle,
 		};
 		
-		s.add_tab(Box::new(tree::Tree::new()), Split::None, None);
-		s.add_tab(Box::new(resource::Resource::new("chara/monster/m0934/obj/body/b0001/model/m0934b0001.mdl")), Split::Horizontal(0.2), None);
-		s.add_tab(Box::new(resource::Resource::new("chara/human/c1401/obj/face/f0001/model/c1401f0001_fac.mdl")), Split::None, None);
-		s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/texture/fun_b0_m0080_1a_d.tex")), Split::None, None);
-		s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/bgparts/fun_b0_m0080.mdl")), Split::None, None);
-		s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/model/c0201e6100_top.mdl")), Split::None, None);
+		s.add_tab(TabType::Tree, Split::None, None);
+		s.add_tab(TabType::Resource(resource::Path::Game("bgcommon/hou/indoor/general/0080/texture/fun_b0_m0080_1a_d.tex".to_string())), Split::Horizontal(0.2), None);
 		
-		s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb")), Split::Vertical(0.5), None);
-		
-		s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/material/fun_b0_m0080_1a.mtrl")), Split::Horizontal(0.4), None);
-		s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/material/v0001/mt_c0201e6100_top_a.mtrl")), Split::None, None);
+		// s.add_tab(Box::new(resource::Resource::new("chara/monster/m0934/obj/body/b0001/model/m0934b0001.mdl")), Split::Horizontal(0.2), None);
+		// s.add_tab(Box::new(resource::Resource::new("chara/human/c1401/obj/face/f0001/model/c1401f0001_fac.mdl")), Split::None, None);
+		// s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/texture/fun_b0_m0080_1a_d.tex")), Split::None, None);
+		// s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/bgparts/fun_b0_m0080.mdl")), Split::None, None);
+		// s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/model/c0201e6100_top.mdl")), Split::None, None);
+		// 
+		// s.add_tab(Box::new(resource::Resource::new("chara/human/c0201/skeleton/base/b0001/skl_c0201b0001.sklb")), Split::Vertical(0.5), None);
+		// 
+		// s.add_tab(Box::new(resource::Resource::new("bgcommon/hou/indoor/general/0080/material/fun_b0_m0080_1a.mtrl")), Split::Horizontal(0.4), None);
+		// s.add_tab(Box::new(resource::Resource::new("chara/equipment/e6100/material/v0001/mt_c0201e6100_top_a.mtrl")), Split::None, None);
 		
 		s
 	}
@@ -144,7 +178,7 @@ impl Explorer {
 			for node in surface.iter_nodes() {
 				for tab in node.iter_tabs() {
 					if let Some(path) = tab.tab.path() {
-						open_paths.insert(path.to_owned());
+						open_paths.insert(path.as_path().to_owned());
 					}
 				}
 			}
@@ -156,12 +190,23 @@ impl Explorer {
 		}
 	}
 	
-	fn add_tab(&mut self, tab: Box<dyn ExplorerView>, split: Split, surface_node: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex)>) {
+	fn get_mod_info(&self) -> Option<ModInfo> {
+		for (_, tab) in self.views.iter_all_tabs() {
+			let Some(tree) = tab.tab.as_any().downcast_ref::<tree::Tree>() else {continue};
+			let Some(mod_info) = tree.get_mod_info() else {continue};
+			return Some(mod_info);
+		}
+		
+		None
+	}
+	
+	// fn add_tab(&mut self, tab: Box<dyn ExplorerView>, split: Split, surface_node: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex)>) {
+	fn add_tab(&mut self, tab: impl Into<Box<dyn ExplorerView>>, split: Split, surface_node: Option<(egui_dock::SurfaceIndex, egui_dock::NodeIndex)>) {
 		self.last_focused_resource = None;
 		self.id_counter += 1;
 		let tab = ExplorerTab {
 			id: self.id_counter,
-			tab
+			tab: tab.into(),
 		};
 		
 		'split: {
@@ -184,6 +229,86 @@ impl Explorer {
 		
 		self.views.push_to_focused_leaf(tab);
 		self.update_trees();
+	}
+	
+	fn get_tab(&self, tab_id: usize) -> Option<&ExplorerTab> {
+		for surface in self.views.iter_surfaces() {
+			for node in surface.iter_nodes() {
+				let Some(tabs) = node.tabs() else {continue};
+				for tab in tabs {
+					if tab.id == tab_id {
+						return Some(tab);
+					}
+				}
+			}
+		}
+		
+		None
+	}
+	
+	fn get_tab_mut(&mut self, tab_id: usize) -> Option<&mut ExplorerTab> {
+		for surface in self.views.iter_surfaces_mut() {
+			for node in surface.iter_nodes_mut() {
+				let Some(tabs) = node.tabs_mut() else {continue};
+				for tab in tabs {
+					if tab.id == tab_id {
+						return Some(tab);
+					}
+				}
+			}
+		}
+		
+		None
+	}
+	
+	fn save_data(&self, path: &resource::Path, is_composite: bool, data: Vec<u8>) -> Result<(), String> {
+		let (root, meta, option) = match path {
+			resource::Path::Mod{mod_root, mod_meta, option, ..} =>
+				(mod_root.clone(), mod_meta.clone(), option.clone()),
+			
+			_ => match self.get_mod_info() {
+				Some(v) => (v.root, v.meta, v.option),
+				None => return Err("There is no active mod, open a tree if needed and open a mod".to_string())
+			}
+		};
+		
+		let hash = crate::hash_str(blake3::hash(&data));
+		let ext = if is_composite {format!("{}.comp", path.ext())} else {path.ext()};
+		// let option_dirs = option.as_ref().map_or(String::new(), |(a, b)| format!("{a}/{b}/"));
+		// let path_rel = format!("{}/{option_dirs}{hash}.{ext}", path.as_path());
+		let path_rel = format!("{hash}.{ext}");
+		let game_path = if is_composite {format!("{}.comp", path.as_path().trim_end_matches(".comp"))} else {path.as_path().to_string()};
+		
+		match &option {
+			Some((option_name, suboption_name)) => 's: {
+				use crate::modman::meta;
+				for opt in meta.borrow_mut().options.iter_mut() {
+					let meta::OptionType::Option(opt) = opt else {continue};
+					if opt.name != *option_name {continue};
+					let (meta::OptionSettings::MultiFiles(sub) | meta::OptionSettings::SingleFiles(sub)) = &mut opt.settings else {continue};
+					for sub in &mut sub.options {
+						if sub.name != *suboption_name {continue};
+						sub.files.insert(game_path, path_rel.clone());
+						break 's;
+					}
+				}
+				
+				return Err("Option to import for no longer exists".to_string())
+			}
+			
+			None => _ = meta.borrow_mut().files.insert(game_path, path_rel.clone()),
+		}
+		
+		let file_path = root.join("files").join(path_rel);
+		_ = std::fs::create_dir_all(file_path.parent().unwrap());
+		
+		if let Err(err) = std::fs::write(file_path, data) {
+			return Err(format!("Failed writing imported file to disk {err:?}"));
+		}
+		
+		_ = meta.borrow().save(&root.join("meta.json"));
+		
+		Ok(())
 	}
 }
 
@@ -210,7 +335,7 @@ impl super::View for Explorer {
 		if let Some(focused) = self.views.focused_leaf() {
 			if let Some((_, tab)) = self.views.find_active_focused() {
 				if let Some(path) = tab.tab.path() {
-					let path = path.to_string();
+					let path = path.as_path().to_string();
 					let tab_id = tab.id;
 					let node = self.views.iter_all_nodes().nth(focused.1.0).unwrap();
 					if let Some(index) = node.1.iter_tabs().position(|v| v.id == tab_id) {
@@ -221,35 +346,84 @@ impl super::View for Explorer {
 		}
 		
 		match viewer.action {
-			Action::OpenNew(path) => self.add_tab(Box::new(resource::Resource::new(&path)), Split::None, self.last_focused_resource.as_ref().map(|v| (v.0, v.1))),
-			Action::OpenExisting(path) => {
-				if !'s: {
-					let Some(focused) = &mut self.last_focused_resource else {break 's false};
+			Action::OpenNew(tab) =>
+				self.add_tab(tab, Split::None, self.last_focused_resource.as_ref().map(|v| (v.0, v.1))),
+			
+			Action::OpenExisting(tab) => 'o: {
+				's: {
+					let Some(focused) = &mut self.last_focused_resource else {break 's};
 					let node = &mut self.views[focused.0][focused.1];
-					let Some(tabs) = node.tabs_mut() else {break 's false};
-					if tabs.len() <= focused.2.0 {break 's false};
-					tabs[focused.2.0].tab = Box::new(resource::Resource::new(&path));
+					let Some(tabs) = node.tabs_mut() else {break 's};
+					if tabs.len() <= focused.2.0 {break 's};
+					tabs[focused.2.0].tab = tab.into();
 					self.update_trees();
-					
-					true
-				} {
-					self.add_tab(Box::new(resource::Resource::new(&path)), Split::None, self.last_focused_resource.as_ref().map(|v| (v.0, v.1)));
+					break 'o;
 				}
+				
+				self.add_tab(tab, Split::None, self.last_focused_resource.as_ref().map(|v| (v.0, v.1)));
 			}
-			Action::OpenComplex((TabType::Tree, v)) => self.add_tab(Box::new(tree::Tree::new()), Split::None, Some(v)),
-			Action::OpenComplex((TabType::Resource, v)) => self.add_tab(Box::new(resource::Resource::new("ui/uld/logo_sqex_hr1.tex")), Split::None, Some(v)),
-			Action::Close(_path) =>{
-				self.update_trees();
+			
+			Action::OpenComplex((tab, v)) =>
+				self.add_tab(tab, Split::None, Some(v)),
+			
+			Action::Close(_path) =>
+				self.update_trees(),
+			
+			Action::SaveTab(tab_id) => 'o: {
+				let Some(tab) = self.get_tab_mut(tab_id) else {break 'o};
+				let Some(resource) = tab.tab.as_any_mut().downcast_mut::<resource::Resource>() else {break 'o};
+				let Some(path) = resource.path() else {break 'o};
+				let path = path.clone();
+				let ext = path.ext();
+				
+				let mut writer = std::io::Cursor::new(Vec::new());
+				match resource.resource.export() {
+					resource::Export::Converter(converter) =>
+						if let Err(_) = converter.convert(&ext, &mut writer, None, None::<fn(&str) -> Option<Vec<u8>>>) {break 'o},
+					
+					resource::Export::Bytes(bytes) =>
+						if let Err(_) = writer.write_all(&bytes) {break 'o},
+					
+					resource::Export::Invalid =>
+						break 'o,
+				}
+				
+				resource.changed_content = false;
+				
+				let is_composite = resource.resource.is_composite();
+				_ = self.save_data(&path, is_composite, writer.into_inner());
 			}
+			
+			Action::ModAssignTab(tab_id) => 'o: {
+				let Some(info) = self.get_mod_info() else {break 'o};
+				let Some(tab) = self.get_tab_mut(tab_id) else {break 'o};
+				let Some(resource) = tab.tab.as_any_mut().downcast_mut::<resource::Resource>() else {break 'o};
+				resource.resource.assign_mod(info);
+			}
+			
 			Action::Export((path, tab_id)) => {
 				if let FileDialogStatus::Idle = self.file_dialog {
 					let mut dialog = egui_file::FileDialog::save_file(Some(crate::config().config.file_dialog_path.clone()))
-						.title(&format!("Exporting {}", path.split("/").last().unwrap()));
+						.title(&format!("Exporting {}", path.as_path().split("/").last().unwrap()));
 					dialog.open();
 					
 					self.file_dialog = FileDialogStatus::Exporting(dialog, tab_id);
 				}
 			}
+			
+			Action::Import((path, tab_id)) => {
+				if let FileDialogStatus::Idle = self.file_dialog {
+					let dialog = crate::ui_ext::ImporterDialog::new(format!("Importing {}", path.as_path().split("/").last().unwrap()), path.ext());
+					self.file_dialog = FileDialogStatus::Importing(dialog, tab_id);
+				}
+			}
+			
+			// used for inner tabs to indicate they want to save their data, will be converted to SaveTab(tab_id)
+			Action::Save |
+			// same as save
+			Action::ModAssign |
+			// used for inner resource tabs to indicate their content changed
+			Action::Changed |
 			Action::None => {}
 		}
 		
@@ -273,7 +447,7 @@ impl super::View for Explorer {
 											if tab.id == id {
 												let Some(resource) = tab.tab.as_any().downcast_ref::<resource::Resource>() else {break 'x "Resource to export is somehow not a resource".to_string()};
 												let Some(game_path) = resource.path() else {break 'x "Resource to export somehow does not have a path".to_string()};
-												break 'd (resource.resource.export(), game_path);
+												break 'd (resource.resource.export(), game_path.as_path());
 											}
 										}
 									}
@@ -331,21 +505,38 @@ impl super::View for Explorer {
 				}
 			}
 			
-			FileDialogStatus::Importing(dialog, _id) => {
-				match dialog.show(ui.ctx()).state() {
-					egui_file::State::Selected => {
-						save_path(dialog.directory().to_path_buf());
-						self.file_dialog = FileDialogStatus::Idle;
+			FileDialogStatus::Importing(dialog, tab_id) => {
+				match dialog.show(ui) {
+					Ok(crate::ui_ext::DialogResult::Success(data)) => {
+						let msg = 'x: {
+							let tab_id = *tab_id;
+							let Some(tab) = self.get_tab(tab_id) else {break 'x "Tab to import is no longer valid".to_string()};
+							let Some(resource) = tab.tab.as_any().downcast_ref::<resource::Resource>() else {break 'x "Resource to import is somehow not a resource".to_string()};
+							let Some(path) = resource.path() else {break 'x "Resource to import somehow does not have a path".to_string()};
+							
+							if let Err(err) = self.save_data(path, resource.resource.is_composite(), data) {
+								break 'x err;
+							}
+							
+							String::new()
+						};
 						
-						// TODO
+						let msg = if msg.is_empty() {
+							egui::RichText::new("Import successful").heading()
+						} else {
+							egui::RichText::new(msg).color(egui::Color32::RED).heading()
+						};
+						
+						self.file_dialog = FileDialogStatus::Result(msg);
 					}
 					
-					egui_file::State::Cancelled => {
-						save_path(dialog.directory().to_path_buf());
-						self.file_dialog = FileDialogStatus::Idle;
-					}
+					Ok(crate::ui_ext::DialogResult::Cancelled) =>
+						self.file_dialog = FileDialogStatus::Idle,
 					
-					_ => {}
+					Ok(crate::ui_ext::DialogResult::Busy) => {}
+					
+					Err(err) =>
+						self.file_dialog = FileDialogStatus::Result(egui::RichText::new(err.to_string()).color(egui::Color32::RED).heading()),
 				}
 			}
 			

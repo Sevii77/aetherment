@@ -623,6 +623,10 @@ impl crate::format::external::Bytes<Error> for Mtrl {
 	}
 }
 
+impl super::Extension for Mtrl {
+	const EXT: &[&str] = EXT;
+}
+
 // ----------
 
 #[derive(Debug, Clone)]

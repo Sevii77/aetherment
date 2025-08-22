@@ -66,6 +66,7 @@ pub struct Config {
 	pub mod_paths: Vec<PathBuf>,
 	pub file_dialog_path: PathBuf,
 	pub active_collection: String,
+	pub explorer_open_mod: Option<PathBuf>,
 }
 
 impl Default for Config {
@@ -82,6 +83,7 @@ impl Default for Config {
 			mod_paths: Vec::new(),
 			file_dialog_path: dirs::document_dir().unwrap_or(PathBuf::new()),
 			active_collection: "Default".to_string(),
+			explorer_open_mod: None,
 		}
 	}
 }

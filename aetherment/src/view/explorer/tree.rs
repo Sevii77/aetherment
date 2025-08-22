@@ -1,7 +1,7 @@
-use std::{cmp::Ordering, collections::{HashMap, HashSet}, fs::File, io::{Read, Seek, SeekFrom}, ops::{Deref, DerefMut}, rc::Rc};
+use std::{cmp::Ordering, collections::{HashMap, HashSet}, fs::File, io::{Read, Seek, SeekFrom}, ops::{Deref, DerefMut}, path::PathBuf, rc::Rc};
 use binrw::BinWrite;
 use flate2::read::GzDecoder;
-use crate::{ui_ext::UiExt, view::explorer::Action};
+use crate::{modman::meta, ui_ext::UiExt, view::explorer::Action};
 
 struct LazyBranch {
 	name: Rc<str>,
@@ -9,7 +9,7 @@ struct LazyBranch {
 	branches: Option<Vec<LazyBranch>>,
 }
 
-pub struct LazyTree {
+struct LazyTree {
 	data: Vec<u8>,
 	branches: Vec<LazyBranch>,
 }
@@ -80,17 +80,184 @@ impl LazyTree {
 		} else {
 			let resp = ui.selectable_label(selected_paths.contains(&path), branch.name.as_ref());
 			if resp.clicked() {
-				act = Action::OpenExisting(path.clone());
+				act = Action::OpenExisting(super::TabType::Resource(super::resource::Path::Game(path.clone())));
 			}
 			
 			resp.context_menu(|ui| {
 				if ui.button("Open in new tab").clicked() {
-					act = Action::OpenNew(path.clone());
+					act = Action::OpenNew(super::TabType::Resource(super::resource::Path::Game(path.clone())));
 					ui.close_menu();
 				}
 				
 				if ui.button("Replace open tab").clicked() {
-					act = Action::OpenExisting(path);
+					act = Action::OpenExisting(super::TabType::Resource(super::resource::Path::Game(path)));
+					ui.close_menu();
+				}
+			});
+		}
+		
+		act
+	}
+}
+
+// ----------
+
+struct ModTree {
+	name: String,
+	root: PathBuf,
+	meta: Rc<std::cell::RefCell<crate::modman::meta::Meta>>,
+	/// [(game_path, <(option, sub_option), real_path>)]
+	files: Vec<(String, HashMap<Option<(String, String)>, String>)>,
+	default_option: Option<(String, String)>,
+	
+	last_files_refresh: std::time::Instant,
+}
+
+impl ModTree {
+	pub fn new(root: PathBuf) -> Option<Self> {
+		let meta_path = root.join("meta.json");
+		let meta = if !meta_path.exists() {
+			let dir = std::fs::read_dir(&root).ok()?;
+			if dir.count() != 0 {return None};
+			let meta = meta::Meta::default();
+			meta.save(&meta_path).ok()?;
+			meta
+		} else {
+			crate::resource_loader::read_json::<meta::Meta>(&meta_path).ok()?
+		};
+		
+		let mut s = Self {
+			name: root.file_name().map_or("Mod".to_string(), |v| v.to_string_lossy().to_string()),
+			root,
+			meta: Rc::new(std::cell::RefCell::new(meta)),
+			files: Vec::new(),
+			default_option: None,
+			
+			last_files_refresh: std::time::Instant::now()
+		};
+		
+		s.refresh_files();
+		Some(s)
+	}
+	
+	fn refresh_files(&mut self) {
+		let mut files = HashMap::new();
+		for opt in self.meta.borrow().options.iter() {
+			let meta::OptionType::Option(opt) = opt else {continue};
+			let (meta::OptionSettings::MultiFiles(sub) | meta::OptionSettings::SingleFiles(sub)) = &opt.settings else {continue};
+			for sub in &sub.options {
+				for (game_path, real_path) in &sub.files {
+					let entry = files.entry(game_path.to_string()).or_insert_with(|| HashMap::new());
+					entry.insert(Some((opt.name.clone(), sub.name.clone())), real_path.to_string());
+				}
+			}
+		}
+		
+		for (game_path, real_path) in &self.meta.borrow().files {
+			let entry = files.entry(game_path.to_string()).or_insert_with(|| HashMap::new());
+			entry.insert(None, real_path.to_string());
+		}
+		
+		let mut files = files.into_iter().collect::<Vec<_>>();
+		files.sort_by(|(a, _), (b, _)| a.cmp(b));
+		self.files = files;
+	}
+	
+	pub fn render(&mut self, ui: &mut egui::Ui, selected_paths: &HashSet<String>) -> Action {
+		let mut act = Action::None;
+		
+		{ // Default option select
+			ui.label("Default selected option");
+			let selected_label = self.default_option.as_ref().map_or("None".to_string(), |(a, b)| format!("{a}/{b}"));
+			ui.combo_id(&selected_label, "option", |ui| {
+				if ui.selectable_label(self.default_option.is_none(), format!("None")).clicked() {
+					self.default_option = None;
+				}
+				
+				for opt in self.meta.borrow().options.iter() {
+					let meta::OptionType::Option(opt) = opt else {continue};
+					let (meta::OptionSettings::MultiFiles(sub) | meta::OptionSettings::SingleFiles(sub)) = &opt.settings else {continue};
+					for sub in &sub.options {
+						let label = format!("{}/{}", opt.name, sub.name);
+						if ui.selectable_label(selected_label == label, label).clicked() {
+							self.default_option = Some((opt.name.clone(), sub.name.clone()));
+						}
+					}
+				}
+			});
+		}
+		
+		ui.spacer();
+		
+		{ // Meta button
+			let resp = ui.selectable_label(selected_paths.contains("/meta"), "Meta");
+			if resp.clicked() {
+				act = Action::OpenExisting(super::TabType::Meta(self.meta.clone(), self.root.clone()));
+			}
+			
+			resp.context_menu(|ui| {
+				if ui.button("Open in new tab").clicked() {
+					act = Action::OpenNew(super::TabType::Meta(self.meta.clone(), self.root.clone()));
+					ui.close_menu();
+				}
+				
+				if ui.button("Replace open tab").clicked() {
+					act = Action::OpenExisting(super::TabType::Meta(self.meta.clone(), self.root.clone()));
+					ui.close_menu();
+				}
+			});
+		}
+		
+		ui.collapsing("Files", |ui| {
+			if self.last_files_refresh.elapsed() > std::time::Duration::from_secs(5) {
+				self.refresh_files();
+				self.last_files_refresh = std::time::Instant::now();
+			}
+			
+			act.or(self.render_files(ui, selected_paths));
+		});
+		
+		act
+	}
+	
+	// TODO: option for tree, instead of all flat
+	fn render_files(&mut self, ui: &mut egui::Ui, selected_paths: &HashSet<String>) -> Action {
+		let mut act = Action::None;
+		for (game_path, _info) in &self.files {
+			let resp = ui.selectable_label(selected_paths.contains(game_path), game_path);
+			if resp.clicked() {
+				act = Action::OpenExisting(super::TabType::Resource(super::resource::Path::from_mod(self.meta.clone(), &self.root, game_path, self.default_option.clone())));
+			}
+			
+			resp.context_menu(|ui| {
+				if ui.button("Open in new tab").clicked() {
+					act = Action::OpenNew(super::TabType::Resource(super::resource::Path::from_mod(self.meta.clone(), &self.root, game_path, self.default_option.clone())));
+					ui.close_menu();
+				}
+				
+				if ui.button("Replace open tab").clicked() {
+					act = Action::OpenExisting(super::TabType::Resource(super::resource::Path::from_mod(self.meta.clone(), &self.root, game_path, self.default_option.clone())));
+					ui.close_menu();
+				}
+				
+				ui.spacer();
+				
+				if ui.button("Delete").clicked() {
+					match &self.default_option {
+						Some((option, suboption)) => {
+							for opt in self.meta.borrow_mut().options.iter_mut() {
+								let meta::OptionType::Option(opt) = opt else {continue};
+								if opt.name != *option {continue}
+								let (meta::OptionSettings::SingleFiles(opt) | meta::OptionSettings::MultiFiles(opt)) = &mut opt.settings else {continue};
+								let Some(sub) = opt.options.iter_mut().find(|v| v.name == *suboption) else {continue};
+								sub.files.remove(game_path);
+								break;
+							}
+						}
+						
+						None => _ = self.meta.borrow_mut().files.remove(game_path),
+					}
+					
 					ui.close_menu();
 				}
 			});
@@ -105,6 +272,9 @@ impl LazyTree {
 pub struct Tree {
 	pub(crate) open_paths: HashSet<String>,
 	
+	mod_tree: Option<ModTree>,
+	mod_tree_dialog: Option<egui_file::FileDialog>,
+	
 	game_paths: LazyTree,
 	game_paths_exist: bool,
 	game_paths_error: Option<crate::resource_loader::BacktraceError>,
@@ -116,6 +286,9 @@ impl Tree {
 		let mut s = Self {
 			open_paths: HashSet::new(),
 			
+			mod_tree: None,
+			mod_tree_dialog: None,
+			
 			game_paths: LazyTree::new(),
 			game_paths_exist: false,
 			game_paths_error: None,
@@ -123,6 +296,10 @@ impl Tree {
 		};
 		
 		s.load_game_tree();
+		
+		if let Some(path) = &crate::config().config.explorer_open_mod {
+			s.load_mod_tree(path.to_path_buf());
+		}
 		
 		s
 	}
@@ -145,6 +322,19 @@ impl Tree {
 			self.game_paths_error = Some(e);
 		}
 	}
+	
+	fn load_mod_tree(&mut self, path: PathBuf) {
+		self.mod_tree = ModTree::new(path);
+	}
+	
+	pub fn get_mod_info(&self) -> Option<super::ModInfo> {
+		let Some(mod_tree) = &self.mod_tree else {return None};
+		Some(super::ModInfo {
+			root: mod_tree.root.clone(),
+			meta: mod_tree.meta.clone(),
+			option: mod_tree.default_option.clone(),
+		})
+	}
 }
 
 impl super::ExplorerView for Tree {
@@ -160,13 +350,75 @@ impl super::ExplorerView for Tree {
 		"Tree".to_string()
 	}
 	
-	fn path(&self) -> Option<&str> {
+	fn path(&self) -> Option<&super::resource::Path> {
 		None
 	}
 	
 	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> Action {
 		let mut act = Action::None;
-		ui.collapsing("Files", |ui| {
+		
+		let collections = crate::backend().get_collections();
+		if collections.len() > 0 {
+			ui.horizontal(|ui| {
+				let config = crate::config();
+				ui.combo_id(collections.iter().find(|v| v.id == config.config.active_collection).map_or("Invalid Collection", |v| v.name.as_str()), "collection", |ui| {
+					for collection in &collections {
+						if ui.selectable_label(config.config.active_collection == collection.id, &collection.name).clicked() {
+							config.config.active_collection = collection.id.clone();
+							_ = config.save_forced();
+						}
+					}
+				});
+				
+				ui.helptext("Active collection to load modded files from");
+			});
+			
+			ui.spacer();
+		}
+		
+		if let Some(mod_tree) = &mut self.mod_tree {
+			ui.collapsing(mod_tree.name.clone(), |ui| {
+				act.or(mod_tree.render(ui, &self.open_paths));
+			});
+		}
+		
+		if ui.button("Open Mod Directory").clicked() {
+			let mut dialog = egui_file::FileDialog::select_folder(Some(crate::config().config.file_dialog_path.clone()))
+				.title("Select Aetherment mod directory");
+			dialog.open();
+			
+			self.mod_tree_dialog = Some(dialog);
+		}
+		
+		ui.spacer();
+		
+		if let Some(dialog) = &mut self.mod_tree_dialog {
+			let config = crate::config();
+			match dialog.show(ui.ctx()).state() {
+				egui_file::State::Selected => {
+					config.config.file_dialog_path = dialog.directory().to_path_buf();
+					
+					if let Some(path) = dialog.path() {
+						let path = path.to_path_buf();
+						config.config.explorer_open_mod = Some(path.clone());
+						self.load_mod_tree(path);
+					}
+					
+					_ = config.save_forced();
+					self.mod_tree_dialog = None;
+				}
+				
+				egui_file::State::Cancelled => {
+					config.config.file_dialog_path = dialog.directory().to_path_buf();
+					_ = config.save_forced();
+					self.mod_tree_dialog = None;
+				}
+				
+				_ => {}
+			}
+		}
+		
+		ui.collapsing("Game Files", |ui| {
 			let progress = self.game_paths_download_progress.get();
 			if progress != 0.0 {
 				ui.add(egui::ProgressBar::new(progress)

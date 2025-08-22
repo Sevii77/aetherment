@@ -4,7 +4,6 @@ use noumenon::format::{external::Bytes, game::Mdl};
 use crate::{ui_ext::{InteractableScene, UiExt}, view::explorer::Action};
 
 pub struct MdlView {
-	changed: bool,
 	mdl: Mdl,
 	scene: Option<InteractableScene>,
 	lod: usize,
@@ -18,7 +17,6 @@ impl MdlView {
 		let data = super::read_file(path)?;
 		
 		Ok(Self {
-			changed: false,
 			mdl: Mdl::read(&mut std::io::Cursor::new(&data))?,
 			scene: None,
 			lod: 0,
@@ -32,10 +30,6 @@ impl MdlView {
 impl super::ResourceView for MdlView {
 	fn title(&self) -> String {
 		"Model".to_string()
-	}
-	
-	fn has_changes(&self) -> bool {
-		self.changed
 	}
 	
 	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> Action {
@@ -169,11 +163,14 @@ impl super::ResourceView for MdlView {
 						let resp = ui.text_edit_singleline(&mut mesh.material);
 						resp.context_menu(|ui| {
 							if ui.button("Open in new tab").clicked() {
-								act = Action::OpenNew(Mdl::absolute_mtrl_path(&mesh.material, 1));
+								act = Action::OpenNew(crate::view::explorer::TabType::Resource(super::Path::Game(Mdl::absolute_mtrl_path(&mesh.material, 1))));
 								ui.close_menu();
 							}
 						});
-						self.changed |= resp.changed();
+						
+						if resp.changed() {
+							act.or(Action::Changed);
+						}
 						
 						for (submesh_index, submesh) in mesh.submeshes.iter_mut().enumerate() {
 							let obj = scene.get_object_mut(self.objects[&(self.lod, mesh_index, submesh_index)]).unwrap();
@@ -195,14 +192,14 @@ impl super::ResourceView for MdlView {
 								
 								if let Some(i) = delete {
 									submesh.attributes.remove(i);
-									self.changed = true;
+									act.or(Action::Changed);
 								}
 								
 								ui.horizontal(|ui| {
 									if ui.button("➕").clicked() {
 										submesh.attributes.push(self.add_attr.clone());
 										self.add_attr.clear();
-										self.changed = true;
+										act.or(Action::Changed);
 									}
 									
 									ui.text_edit_singleline(&mut self.add_attr);

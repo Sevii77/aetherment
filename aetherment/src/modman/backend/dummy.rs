@@ -37,4 +37,8 @@ impl Backend for Dummy {
 	
 	fn get_mod_priority(&self, _mod_id: &str, _collection_id: &str) -> i32 {0}
 	fn set_mod_priority(&self, _mod_id: &str, _collection_id: &str, _priority: i32) {}
+	
+	fn get_file(&self, path: &str, _collection: &str, _priority: i32) -> Option<Vec<u8>> {
+		crate::noumenon_instance()?.file(path).ok()
+	}
 }

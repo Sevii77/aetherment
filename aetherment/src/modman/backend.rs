@@ -177,6 +177,8 @@ pub trait Backend {
 	
 	fn get_mod_priority(&self, mod_id: &str, collection_id: &str) -> i32;
 	fn set_mod_priority(&self, mod_id: &str, collection_id: &str, priority: i32);
+	
+	fn get_file(&self, path: &str, collection: &str, priority: i32) -> Option<Vec<u8>>;
 }
 
 pub enum BackendInitializers {

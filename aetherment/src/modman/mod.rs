@@ -196,6 +196,23 @@ pub enum Path {
 	Option(String, String),
 }
 
+impl Path {
+	pub fn resolve_option(&self, meta: &meta::Meta, settings: &settings::CollectionSettings) -> Option<String> {
+		let Self::Option(id, sub_id) = self else {return None};
+		let Some(setting) = settings.get(id) else {return None};
+		let crate::modman::settings::Value::Path(i) = setting else {return None};
+		let Some(option) = meta.options.options_iter().find(|v| v.name == *id) else {return None};
+		let meta::OptionSettings::Path(v) = &option.settings else {return None};
+		let Some((_, paths)) = v.options.get(*i as usize) else {return None};
+		let Some(path) = paths.iter().find(|v| v.0 == *sub_id) else {return None};
+		match &path.1 {
+			crate::modman::meta::ValuePathPath::Mod(path) => {
+				return Some(path.to_owned())
+			}
+		}
+	}
+}
+
 impl EnumTools for Path {
 	type Iterator = std::array::IntoIter<Self, 3>;
 	

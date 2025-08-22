@@ -1,10 +1,10 @@
-use std::{collections::HashMap, io::Write, ops::{Deref, DerefMut}, path::Path};
+use std::{collections::{BTreeMap, HashMap}, io::Write, ops::{Deref, DerefMut}, path::Path};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
-pub struct CollectionSettings(HashMap<String, Value>);
+pub struct CollectionSettings(BTreeMap<String, Value>);
 impl Deref for CollectionSettings {
-	type Target = HashMap<String, Value>;
+	type Target = BTreeMap<String, Value>;
 	
 	fn deref(&self) -> &Self::Target {
 		&self.0
@@ -17,6 +17,12 @@ impl DerefMut for CollectionSettings {
 	}
 }
 
+impl CollectionSettings {
+	pub fn from_meta(meta: &super::meta::Meta) -> Self {
+		Self(meta.options.options_iter().map(|option| (option.name.clone(), Value::from_meta_option(option))).collect())
+	}
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Deserialize, Serialize)]
 pub struct Settings {
 	pub collections: HashMap<String, CollectionSettings>,
@@ -26,7 +32,7 @@ pub struct Settings {
 impl Settings {
 	pub fn get_collection(&mut self, meta: &super::meta::Meta, collection_id: &str) -> &mut CollectionSettings {
 		let collection_hash = crate::hash_str(blake3::hash(collection_id.as_bytes()));
-		self.collections.entry(collection_hash).or_insert_with(|| CollectionSettings(meta.options.options_iter().map(|option| (option.name.clone(), Value::from_meta_option(option))).collect()))
+		self.collections.entry(collection_hash).or_insert_with(|| CollectionSettings::from_meta(meta))
 	}
 	
 	pub fn open_from(meta: &super::meta::Meta, path: &Path) -> Self {

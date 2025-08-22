@@ -17,6 +17,29 @@ mod coloredit;
 pub use coloredit::ColorEditValue;
 mod interactable_scene;
 pub use interactable_scene::InteractableScene;
+mod importer_dialog;
+pub use importer_dialog::{ImporterDialog, DialogResult};
+
+pub trait ResponseExt {
+	/// Element was changed before it lost focus
+	fn changed_lost_focus(&self) -> bool;
+}
+
+impl ResponseExt for Response {
+	fn changed_lost_focus(&self) -> bool {
+		if self.has_focus() && self.changed() {
+			self.ctx.data_mut(|v| v.insert_temp(self.id.with("changed_lost_focus"), ()))
+		}
+		
+		if self.lost_focus() {
+			let r = self.ctx.data_mut(|v| v.get_temp::<()>(self.id.with("changed_lost_focus")));
+			self.ctx.data_mut(|v| v.remove::<()>(self.id.with("changed_lost_focus")));
+			return r.is_some()
+		}
+		
+		false
+	}
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Axis {
@@ -113,27 +136,37 @@ impl UiExt for Ui {
 	}
 	
 	fn combo_enum<S: Into<WidgetText>, Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, label: S) -> Response {
-		egui::ComboBox::from_label(label)
+		let mut changed = false;
+		let mut resp = egui::ComboBox::from_label(label)
 			.height(300.0)
 			.selected_text(val.to_str())
 			.show_ui(self, |ui| {
 				for item in Enum::iter() {
 					let name = item.to_str();
-					ui.selectable_value(val, item, name);
+					changed |= ui.selectable_value(val, item, name).clicked();
 				}
-			}).response
+			}).response;
+		if changed {
+			resp.flags |= egui::response::Flags::CHANGED;
+		}
+		resp
 	}
 	
 	fn combo_enum_id<Enum: EnumTools + PartialEq>(&mut self, val: &mut Enum, id: impl std::hash::Hash) -> Response {
-		egui::ComboBox::from_id_salt(id)
+		let mut changed = false;
+		let mut resp = egui::ComboBox::from_id_salt(id)
 			.height(300.0)
 			.selected_text(val.to_str())
 			.show_ui(self, |ui| {
 				for item in Enum::iter() {
 					let name = item.to_str();
-					ui.selectable_value(val, item, name);
+					changed |= ui.selectable_value(val, item, name).clicked();
 				}
-			}).response
+			}).response;
+		if changed {
+			resp.flags |= egui::response::Flags::CHANGED;
+		}
+		resp
 	}
 	
 	fn helptext<S: Into<WidgetText>>(&mut self, text: S) {

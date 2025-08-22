@@ -268,6 +268,10 @@ impl ironworks::file::File for Tex {
 	}
 }
 
+impl super::Extension for Tex {
+	const EXT: &[&str] = EXT;
+}
+
 // ----------
 
 impl crate::format::external::Bytes<Error> for Tex {

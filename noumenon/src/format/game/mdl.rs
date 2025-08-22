@@ -464,6 +464,10 @@ impl ironworks::file::File for Mdl {
 	}
 }
 
+impl super::Extension for Mdl {
+	const EXT: &[&str] = EXT;
+}
+
 impl crate::format::external::Bytes<Error> for Mdl {
 	fn read<T>(reader: &mut T) -> Result<Self, Error>
 	where T: Read + Seek {

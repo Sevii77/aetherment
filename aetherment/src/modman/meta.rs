@@ -122,7 +122,7 @@ impl std::ops::DerefMut for Options {
 	}
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize)]
 #[serde(untagged)]
 pub enum OptionType {
 	Category(String),

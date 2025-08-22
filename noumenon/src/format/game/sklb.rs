@@ -60,6 +60,10 @@ impl ironworks::file::File for Sklb {
 	}
 }
 
+impl super::Extension for Sklb {
+	const EXT: &[&str] = EXT;
+}
+
 impl crate::format::external::Bytes<Error> for Sklb {
 	fn read<T>(reader: &mut T) -> Result<Self, Error>
 	where T: Read + Seek {

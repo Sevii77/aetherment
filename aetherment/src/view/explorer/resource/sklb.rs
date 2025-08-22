@@ -23,10 +23,6 @@ impl super::ResourceView for SklbView {
 		"Skeleton".to_string()
 	}
 	
-	fn has_changes(&self) -> bool {
-		false
-	}
-	
 	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) -> crate::view::explorer::Action {
 		let scene = self.scene.get_or_insert_with(|| {
 			let mut scene = InteractableScene::new(renderer);

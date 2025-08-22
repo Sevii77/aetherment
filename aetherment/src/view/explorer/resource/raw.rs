@@ -85,10 +85,6 @@ impl super::ResourceView for RawView {
 		}
 	}
 	
-	fn has_changes(&self) -> bool {
-		false
-	}
-	
 	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) -> crate::view::explorer::Action {
 		if self.text.is_some() {
 			self.ui_text(ui);

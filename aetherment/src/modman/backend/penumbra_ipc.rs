@@ -434,6 +434,12 @@ impl super::Backend for Penumbra {
 	fn set_mod_priority(&self, mod_id: &str, collection_id: &str, priority: i32) {
 		set_mod_priority(collection_id, mod_id, priority);
 	}
+	
+	fn get_file(&self, path: &str, collection: &str, priority: i32) -> Option<Vec<u8>> {
+		// generating a cache every fucking time and not caching it is really dumb
+		// TODO: CACHE IT!!!
+		get_file(&root_path(), &get_mod_cache(), path, collection, priority)
+	}
 }
 
 fn apply_ui_colors() {
@@ -472,6 +478,29 @@ fn apply_ui_colors() {
 	crate::service::uicolor::clear_colors();
 	for ((use_theme, index), (_, color)) in final_ui_colors {
 		crate::service::uicolor::set_color(use_theme, index, color);
+	}
+}
+
+fn get_file(root: &std::path::Path, mod_file_cache: &ModFileCache, path: &str, collection: &str, priority: i32) -> Option<Vec<u8>> {
+	let mut real_path = None;
+	let mut real_path_prio = i32::MIN;
+	if let Some(collection) = mod_file_cache.get(collection) {
+		if let Some(files) = collection.get(path) {
+			for (rpath, mod_id, prio) in files {
+				if *prio >= priority {continue}
+				if *prio < real_path_prio {continue}
+				real_path = Some((mod_id, rpath));
+				real_path_prio = *prio;
+			}
+		}
+	}
+	
+	if let Some((mod_id, path)) = real_path {
+		// log!("Loading file {path} from mod {mod_id} to overlay onto");
+		crate::resource_loader::load_file_disk(&root.join(&mod_id).join(path)).ok()
+	} else {
+		// log!("Loading file {path} from game to overlay onto");
+		crate::noumenon_instance()?.file(path).ok()
 	}
 }
 
@@ -613,26 +642,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	// TODO: store this and update it properly after every mod apply, this is increddibly inefficient
 	let mod_file_cache = get_mod_cache();
 	let get_file = |path: &str, collection: &str, priority: i32| -> Option<Vec<u8>> {
-		let mut real_path = None;
-		let mut real_path_prio = i32::MIN;
-		if let Some(collection) = mod_file_cache.get(collection) {
-			if let Some(files) = collection.get(path) {
-				for (rpath, mod_id, prio) in files {
-					if *prio >= priority {continue}
-					if *prio < real_path_prio {continue}
-					real_path = Some((mod_id, rpath));
-					real_path_prio = *prio;
-				}
-			}
-		}
-		
-		if let Some((mod_id, path)) = real_path {
-			// log!("Loading file {path} from mod {mod_id} to overlay onto");
-			crate::resource_loader::load_file_disk(&root.join(&mod_id).join(path)).ok()
-		} else {
-			// log!("Loading file {path} from game to overlay onto");
-			crate::noumenon_instance()?.file(path).ok()
-		}
+		get_file(&root, &mod_file_cache, path, collection, priority)
 	};
 	
 	let files_compdata = std::rc::Rc::new(std::cell::RefCell::new(File::open(files_dir.join("_compdata")).ok().and_then(|v| zip::ZipArchive::new(std::io::BufReader::new(v)).ok())));
@@ -666,25 +676,36 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 				get_file(&path, &collection_id, priority).map(|v| Cow::Owned(v))
 			}
 			
-			crate::modman::Path::Option(id, sub_id) => {
-				let Some(setting) = settings.get(id) else {return None};
-				let crate::modman::settings::Value::Path(i) = setting else {return None};
-				let Some(option) = meta.options.options_iter().find(|v| v.name == *id) else {return None};
-				let meta::OptionSettings::Path(v) = &option.settings else {return None};
-				let Some((_, paths)) = v.options.get(*i as usize) else {return None};
-				let Some(path) = paths.iter().find(|v| v.0 == *sub_id) else {return None};
-				match &path.1 {
-					crate::modman::meta::ValuePathPath::Mod(path) => {
-						let Some(true_path) = remap.get(path) else {return None};
-						
-						if let Some(data) = read_compdata(&true_path) {
-							return Some(Cow::Owned(data));
-						}
-						
-						crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).ok().map(|v| Cow::Owned(v))
-					}
+			crate::modman::Path::Option(..) => {
+				let Some(path) = path.resolve_option(&meta, &settings) else {return None};
+				let Some(true_path) = remap.get(&path) else {return None};
+				
+				if let Some(data) = read_compdata(&true_path) {
+					return Some(Cow::Owned(data));
 				}
+				
+				crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).ok().map(|v| Cow::Owned(v))
 			}
+			
+			// crate::modman::Path::Option(id, sub_id) => {
+			// 	let Some(setting) = settings.get(id) else {return None};
+			// 	let crate::modman::settings::Value::Path(i) = setting else {return None};
+			// 	let Some(option) = meta.options.options_iter().find(|v| v.name == *id) else {return None};
+			// 	let meta::OptionSettings::Path(v) = &option.settings else {return None};
+			// 	let Some((_, paths)) = v.options.get(*i as usize) else {return None};
+			// 	let Some(path) = paths.iter().find(|v| v.0 == *sub_id) else {return None};
+			// 	match &path.1 {
+			// 		crate::modman::meta::ValuePathPath::Mod(path) => {
+			// 			let Some(true_path) = remap.get(path) else {return None};
+			// 			
+			// 			if let Some(data) = read_compdata(&true_path) {
+			// 				return Some(Cow::Owned(data));
+			// 			}
+			// 			
+			// 			crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).ok().map(|v| Cow::Owned(v))
+			// 		}
+			// 	}
+			// }
 		}
 	};
 	

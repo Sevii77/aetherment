@@ -440,6 +440,74 @@ impl super::Backend for Penumbra {
 		// TODO: CACHE IT!!!
 		get_file(&root_path(), &get_mod_cache(), path, collection, priority)
 	}
+	
+	fn get_collection_merged(&self, collection: &str) -> (HashMap<String, std::path::PathBuf>, HashMap<String, String>, Vec<serde_json::Value>) {
+		let mut files = HashMap::<String, (i32, std::path::PathBuf)>::new();
+		let mut swaps = HashMap::<String, (i32, String)>::new();
+		let mut manips = Vec::new();
+		
+		let root = root_path();
+		for mod_id in mod_list() {
+			let settings = get_mod_settings(collection, &mod_id, true);
+			if !settings.exists || !settings.enabled {continue}
+			let Some(groups) = get_mod_groups(&root.join(&mod_id)) else {continue};
+			
+			let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
+				Ok(v) => v,
+				Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); continue},
+			};
+			
+			let priority = settings.priority;
+			
+			for (game_path, real_path) in default.Files {
+				if files.get(&game_path).map_or(i32::MIN, |v| v.0) < priority {
+					files.insert(game_path, (priority, root.join(&mod_id).join(real_path)));
+				}
+			}
+			
+			for (a, b) in default.FileSwaps {
+				if swaps.get(&a).map_or(i32::MIN, |v| v.0) < priority {
+					swaps.insert(a, (priority, b));
+				}
+			}
+			
+			for m in default.Manipulations {
+				manips.push(m);
+			}
+			
+			let options = settings.options;
+			for (option, enabled_sub_options) in &options {
+				if enabled_sub_options.len() == 0 {continue}
+				let Some(group) = groups.get(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
+				
+				for o in &group.Options {
+					if enabled_sub_options.contains(&o.Name) {
+						for (game_path, real_path) in &o.Files {
+							if files.get(game_path).map_or(i32::MIN, |v| v.0) < priority {
+								files.insert(game_path.clone(), (priority, root.join(&mod_id).join(real_path)));
+							}
+						}
+						
+						for (a, b) in &o.FileSwaps {
+							if swaps.get(a).map_or(i32::MIN, |v| v.0) < priority {
+								swaps.insert(a.clone(), (priority, b.clone()));
+							}
+						}
+						
+						for m in &o.Manipulations {
+							manips.push(m.clone());
+						}
+					}
+				}
+			}
+		}
+		
+		(
+			files.into_iter().map(|(k, v)| (k, v.1)).collect(),
+			swaps.into_iter().map(|(k, v)| (k, v.1)).collect(),
+			manips
+		)
+	}
 }
 
 fn apply_ui_colors() {

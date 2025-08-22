@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use super::{TaskProgress, Backend, Collection, SettingsType, Status};
 
 pub struct Dummy;
@@ -41,4 +41,6 @@ impl Backend for Dummy {
 	fn get_file(&self, path: &str, _collection: &str, _priority: i32) -> Option<Vec<u8>> {
 		crate::noumenon_instance()?.file(path).ok()
 	}
+	
+	fn get_collection_merged(&self, _collection: &str) -> (HashMap<String, std::path::PathBuf>, HashMap<String, String>, Vec<serde_json::Value>) {(HashMap::new(), HashMap::new(), Vec::new())}
 }

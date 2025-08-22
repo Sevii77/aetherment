@@ -1,4 +1,5 @@
 pub mod tattoo;
+mod collection_modpack;
 
 pub struct Tools {
 	views: egui_dock::DockState<Box<dyn super::View>>,
@@ -9,6 +10,7 @@ impl Tools {
 		Self {
 			views: egui_dock::DockState::new(vec![
 				Box::new(tattoo::Tattoo::new()),
+				Box::new(collection_modpack::Creator::new()),
 			]),
 		}
 	}

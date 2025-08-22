@@ -1,4 +1,4 @@
-use std::{io::{Read, Seek}, sync::{atomic::AtomicU32, Arc, RwLock, RwLockReadGuard}};
+use std::{collections::HashMap, io::{Read, Seek}, sync::{atomic::AtomicU32, Arc, RwLock, RwLockReadGuard}};
 
 #[allow(non_snake_case)]
 pub mod penumbra_ipc;
@@ -179,6 +179,7 @@ pub trait Backend {
 	fn set_mod_priority(&self, mod_id: &str, collection_id: &str, priority: i32);
 	
 	fn get_file(&self, path: &str, collection: &str, priority: i32) -> Option<Vec<u8>>;
+	fn get_collection_merged(&self, collection: &str) -> (HashMap<String, std::path::PathBuf>, HashMap<String, String>, Vec<serde_json::Value>);
 }
 
 pub enum BackendInitializers {

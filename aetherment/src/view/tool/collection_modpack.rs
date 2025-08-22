@@ -171,6 +171,7 @@ impl super::super::View for Creator {
 			for collection in &collections {
 				if ui.selectable_label(self.collection == collection.id, &collection.name).clicked() {
 					self.collection = collection.id.clone();
+					self.refresh_mods();
 				}
 			}
 		});

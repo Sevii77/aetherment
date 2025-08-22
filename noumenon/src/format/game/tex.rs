@@ -88,17 +88,17 @@ impl Format {
 		surface.decode_rgba8().unwrap().data
 	}
 	
-	pub fn convert_to(&self, width: u32, height: u32, depth: u32, data: &[u8]) -> Vec<u8> {
+	pub fn convert_to(&self, width: u32, height: u32, depth: u32, mipmaps: u32, data: &[u8]) -> Vec<u8> {
 		let surface = image_dds::SurfaceRgba8 {
 			width,
 			height,
 			depth,
 			layers: 1,
-			mipmaps: 1,
+			mipmaps,
 			data,
 		};
 		
-		surface.encode((*self).into(), image_dds::Quality::Normal, image_dds::Mipmaps::Disabled).unwrap().data
+		surface.encode((*self).into(), image_dds::Quality::Normal, image_dds::Mipmaps::GeneratedExact(mipmaps)).unwrap().data
 	}
 	
 	pub fn bits_per_pixel(&self) -> usize {
@@ -244,19 +244,27 @@ impl BinWrite for Tex {
 	type Args<'a> = ();
 	
 	fn write_options<W: Write + Seek>(&self, writer: &mut W, endian: binrw::Endian, _args: Self::Args<'_>,) -> binrw::BinResult<()> {
+		let mut mip_offsets = [0u32; 13];
+		let mut offset = 80;
+		let mut mip_count = 0;
+		for i in 0..13 {
+			let w = self.width / 2u32.pow(i);
+			let h = self.height / 2u32.pow(i);
+			if if self.format.is_block() {w < 4 || h < 4} else {w == 0 || h == 0} {break}
+			mip_offsets[i as usize] = offset;
+			offset += w * h * self.format.bits_per_pixel() as u32 / 8;
+			mip_count += 1;
+		}
+		
 		self.flags.write_options(writer, endian, ())?;
 		self.format.write_options(writer, endian, ())?;
 		(self.width as u16).write_options(writer, endian, ())?;
 		(self.height as u16).write_options(writer, endian, ())?;
 		(self.depth as u16).write_options(writer, endian, ())?;
-		(self.mip_levels as u16).write_options(writer, endian, ())?;
+		(mip_count as u16).write_options(writer, endian, ())?;
 		if self.lods {[0u32, 1, 2]} else {[0u32; 3]}.write_options(writer, endian, ())?;
-		let mut mip_offsets = [0u32; 13];
-		for i in 0..self.mip_levels as usize {
-			mip_offsets[i] = 80 + self.width as u32 * self.height as u32 * self.depth as u32 * (8u32.pow(i as u32) - 1) / if i == 0 {1} else {7 * 8u32.pow(i as u32 - 1)};
-		}
 		mip_offsets.write_options(writer, endian, ())?;
-		writer.write_all(&self.format.convert_to(self.width, self.height, self.depth, &self.pixels))?;
+		writer.write_all(&self.format.convert_to(self.width, self.height, self.depth, mip_count, &self.pixels[..(self.width * self.height * self.depth * 4) as usize]))?;
 		
 		Ok(())
 	}

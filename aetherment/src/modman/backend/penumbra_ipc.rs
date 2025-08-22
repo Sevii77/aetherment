@@ -441,9 +441,9 @@ impl super::Backend for Penumbra {
 		get_file(&root_path(), &get_mod_cache(), path, collection, priority)
 	}
 	
-	fn get_collection_merged(&self, collection: &str) -> (HashMap<String, std::path::PathBuf>, HashMap<String, String>, Vec<serde_json::Value>) {
-		let mut files = HashMap::<String, (i32, std::path::PathBuf)>::new();
-		let mut swaps = HashMap::<String, (i32, String)>::new();
+	fn get_collection_merged(&self, collection: &str) -> (HashMap<String, (String, std::path::PathBuf)>, HashMap<String, (String, String)>, Vec<(String, serde_json::Value)>) {
+		let mut files = HashMap::<String, (i32, (String, std::path::PathBuf))>::new();
+		let mut swaps = HashMap::<String, (i32, (String, String))>::new();
 		let mut manips = Vec::new();
 		
 		let root = root_path();
@@ -461,18 +461,18 @@ impl super::Backend for Penumbra {
 			
 			for (game_path, real_path) in default.Files {
 				if files.get(&game_path).map_or(i32::MIN, |v| v.0) < priority {
-					files.insert(game_path, (priority, root.join(&mod_id).join(real_path)));
+					files.insert(game_path, (priority, (mod_id.clone(), root.join(&mod_id).join(real_path))));
 				}
 			}
 			
 			for (a, b) in default.FileSwaps {
 				if swaps.get(&a).map_or(i32::MIN, |v| v.0) < priority {
-					swaps.insert(a, (priority, b));
+					swaps.insert(a, (priority, (mod_id.clone(), b)));
 				}
 			}
 			
 			for m in default.Manipulations {
-				manips.push(m);
+				manips.push((mod_id.clone(), m));
 			}
 			
 			let options = settings.options;
@@ -484,18 +484,18 @@ impl super::Backend for Penumbra {
 					if enabled_sub_options.contains(&o.Name) {
 						for (game_path, real_path) in &o.Files {
 							if files.get(game_path).map_or(i32::MIN, |v| v.0) < priority {
-								files.insert(game_path.clone(), (priority, root.join(&mod_id).join(real_path)));
+								files.insert(game_path.clone(), (priority, (mod_id.clone(), root.join(&mod_id).join(real_path))));
 							}
 						}
 						
 						for (a, b) in &o.FileSwaps {
 							if swaps.get(a).map_or(i32::MIN, |v| v.0) < priority {
-								swaps.insert(a.clone(), (priority, b.clone()));
+								swaps.insert(a.clone(), (priority, (mod_id.clone(), b.clone())));
 							}
 						}
 						
 						for m in &o.Manipulations {
-							manips.push(m.clone());
+							manips.push((mod_id.clone(), m.clone()));
 						}
 					}
 				}

@@ -42,5 +42,5 @@ impl Backend for Dummy {
 		crate::noumenon_instance()?.file(path).ok()
 	}
 	
-	fn get_collection_merged(&self, _collection: &str) -> (HashMap<String, std::path::PathBuf>, HashMap<String, String>, Vec<serde_json::Value>) {(HashMap::new(), HashMap::new(), Vec::new())}
+	fn get_collection_merged(&self, _collection: &str) -> (HashMap<String, (String, std::path::PathBuf)>, HashMap<String, (String, String)>, Vec<(String, serde_json::Value)>) {(HashMap::new(), HashMap::new(), Vec::new())}
 }

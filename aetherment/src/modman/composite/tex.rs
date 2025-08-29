@@ -256,8 +256,7 @@ impl super::Composite for Tex {
 		
 		let mut data = std::io::Cursor::new(Vec::new());
 		noumenon::format::game::Tex::new(width, height, pixels)
-			.write(&mut data)
-			.map_err(|err| noumenon::Error::Tex(err))?;
+			.write(&mut data)?;
 		
 		Ok(data.into_inner())
 	}

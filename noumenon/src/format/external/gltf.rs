@@ -24,7 +24,7 @@ pub struct Bone {
 	pub scale: glam::Vec3,
 }
 
-pub trait Gltf<E: std::error::Error> {
-	fn read<T>(reader: &mut T) -> Result<Self, E> where Self: Sized, T: Read + Seek;
-	fn write<T>(&self, writer: &mut T, materials: HashMap<String, MaterialBake>, bones: Vec<Bone>) -> Result<(), E> where T: Write + Seek;
+pub trait Gltf {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error> where Self: Sized, T: Read + Seek;
+	fn write<T>(&self, writer: &mut T, materials: HashMap<String, MaterialBake>, bones: Vec<Bone>) -> Result<(), crate::Error> where T: Write + Seek;
 }

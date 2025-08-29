@@ -34,4 +34,6 @@ pub mod game {
 	pub use mdl::Mdl;
 	pub mod sklb;
 	pub use sklb::Sklb;
+	pub mod hwc;
+	pub use hwc::Hwc;
 }

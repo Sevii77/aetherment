@@ -7,6 +7,7 @@ pub(crate) mod tex;
 mod mdl;
 mod mtrl;
 mod sklb;
+mod hwc;
 
 #[derive(Debug, Clone)]
 pub enum Path {
@@ -275,6 +276,7 @@ fn load_resource_view(path: &Path) -> Box<dyn ResourceView> {
 		"mdl" => mdl::MdlView::new(path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
 		"mtrl" => mtrl::MtrlView::new(path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
 		"sklb" => sklb::SklbView::new(path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
+		"hwc" => hwc::HwcView::new(path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
 		_ => raw::RawView::new(path).map_or_else::<Box<dyn ResourceView> , _, _>(|err| Box::new(error::ErrorView::new(err)), |v| Box::new(v)),
 	}
 }

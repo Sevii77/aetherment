@@ -64,13 +64,13 @@ impl super::Extension for Sklb {
 	const EXT: &[&str] = EXT;
 }
 
-impl crate::format::external::Bytes<Error> for Sklb {
-	fn read<T>(reader: &mut T) -> Result<Self, Error>
+impl crate::format::external::Bytes for Sklb {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error>
 	where T: Read + Seek {
 		Ok(Sklb::read_le(reader)?)
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		self.write_le(writer)?;
 		

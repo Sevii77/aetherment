@@ -79,17 +79,17 @@ impl Exd {
 
 impl ironworks::file::File for Exd {
 	fn read(mut data: impl ironworks::FileStream) -> Result<Self, ironworks::Error> {
-		<Exd as crate::format::external::Bytes<Error>>::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
+		<Exd as crate::format::external::Bytes>::read(&mut data).map_err(|e| ironworks::Error::Resource(e.into()))
 	}
 }
 
-impl crate::format::external::Bytes<Error> for Exd {
-	fn read<T>(reader: &mut T) -> Result<Self, Error>
+impl crate::format::external::Bytes for Exd {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error>
 	where T: Read + Seek {
 		Ok(Exd::read_be(reader)?)
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		self.write_be(writer)?;
 		

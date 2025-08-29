@@ -609,13 +609,13 @@ impl ironworks::file::File for Mtrl {
 	}
 }
 
-impl crate::format::external::Bytes<Error> for Mtrl {
-	fn read<T>(reader: &mut T) -> Result<Self, Error>
+impl crate::format::external::Bytes for Mtrl {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error>
 	where T: Read + Seek {
 		Ok(Mtrl::read_le(reader)?)
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		self.write_le(writer)?;
 		

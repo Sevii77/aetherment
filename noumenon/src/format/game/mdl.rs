@@ -115,12 +115,12 @@ impl Mdl {
 	pub fn bake_materials(&self, file_reader: impl Fn(&str) -> Option<Vec<u8>>) -> HashMap<String, MaterialBake> {
 		fn read_mtrl(file_reader: &impl Fn(&str) -> Option<Vec<u8>>, path: &str) -> Option<super::Mtrl> {
 			let data = file_reader(path)?;
-			<super::Mtrl as crate::format::external::Bytes<super::mtrl::Error>>::read(&mut Cursor::new(data)).ok()
+			<super::Mtrl as crate::format::external::Bytes>::read(&mut Cursor::new(data)).ok()
 		}
 		
 		fn read_tex(file_reader: &impl Fn(&str) -> Option<Vec<u8>>, path: &str) -> Option<super::Tex> {
 			let data = file_reader(path)?;
-			<super::Tex as crate::format::external::Bytes<super::tex::Error>>::read(&mut Cursor::new(data)).ok()
+			<super::Tex as crate::format::external::Bytes>::read(&mut Cursor::new(data)).ok()
 		}
 		
 		let mut textures = HashMap::new();
@@ -468,13 +468,13 @@ impl super::Extension for Mdl {
 	const EXT: &[&str] = EXT;
 }
 
-impl crate::format::external::Bytes<Error> for Mdl {
-	fn read<T>(reader: &mut T) -> Result<Self, Error>
+impl crate::format::external::Bytes for Mdl {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error>
 	where T: Read + Seek {
 		Ok(Mdl::read_le(reader)?)
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		self.write_le(writer)?;
 		
@@ -484,13 +484,13 @@ impl crate::format::external::Bytes<Error> for Mdl {
 
 // ----------
 
-impl crate::format::external::Gltf<Error> for Mdl {
-	fn read<T>(reader: &mut T) -> Result<Self, Error> where
+impl crate::format::external::Gltf for Mdl {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error> where
 	T: Read + Seek {
 		todo!()
 	}
 	
-	fn write<T>(&self, writer: &mut T, materials: HashMap<String, MaterialBake>, bones: Vec<crate::format::external::gltf::Bone>) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T, materials: HashMap<String, MaterialBake>, bones: Vec<crate::format::external::gltf::Bone>) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		use gltf::json::{self, validation::Checked::Valid};
 		

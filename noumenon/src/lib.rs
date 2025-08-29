@@ -1,4 +1,4 @@
-use std::{ops::{Deref, DerefMut}, path::{Path, PathBuf}};
+use std::{io::Cursor, ops::{Deref, DerefMut}, path::{Path, PathBuf}};
 pub use ironworks::file::File;
 
 macro_rules! simple_reader {
@@ -77,7 +77,13 @@ pub enum Convert {
 	Mdl(format::game::Mdl),
 	Mtrl(format::game::Mtrl),
 	Tex(format::game::Tex),
+	Hwc(format::game::Hwc),
 	Uld(format::game::Uld),
+	
+	Dds(Vec<u8>),
+	Png(Vec<u8>),
+	Tiff(Vec<u8>),
+	Tga(Vec<u8>),
 }
 
 impl Convert {
@@ -85,17 +91,18 @@ impl Convert {
 	R: std::io::Read + std::io::Seek {
 		use format::{game::*, external::*};
 		
-		if mdl::EXT.contains(&ext) {return Ok(Self::Mdl(<Mdl as Bytes<mdl::Error>>::read(reader)?))}
+		if mdl::EXT.contains(&ext) {return Ok(Self::Mdl(<Mdl as Bytes>::read(reader)?))}
+		if mtrl::EXT.contains(&ext) {return Ok(Self::Mtrl(<Mtrl as Bytes>::read(reader)?))}
+		if tex::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Bytes>::read(reader)?))}
+		if hwc::EXT.contains(&ext) {return Ok(Self::Hwc(<Hwc as Bytes>::read(reader)?))}
+		if uld::EXT.contains(&ext) {return Ok(Self::Uld(<Uld as Bytes>::read(reader)?))}
 		
-		if mtrl::EXT.contains(&ext) {return Ok(Self::Mtrl(<Mtrl as Bytes<mtrl::Error>>::read(reader)?))}
-		
-		if tex::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Bytes<tex::Error>>::read(reader)?))}
-		if dds::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Dds<tex::Error>>::read(reader)?))}
-		if png::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Png<tex::Error>>::read(reader)?))}
-		if tiff::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Tiff<tex::Error>>::read(reader)?))}
-		if tga::EXT.contains(&ext) {return Ok(Self::Tex(<Tex as Tga<tex::Error>>::read(reader)?))}
-		
-		if uld::EXT.contains(&ext) {return Ok(Self::Uld(<Uld as Bytes<uld::Error>>::read(reader)?))}
+		let mut data = Vec::new();
+		reader.read_to_end(&mut data)?;
+		if dds::EXT.contains(&ext) {return Ok(Self::Dds(data))}
+		if png::EXT.contains(&ext) {return Ok(Self::Png(data))}
+		if tiff::EXT.contains(&ext) {return Ok(Self::Tiff(data))}
+		if tga::EXT.contains(&ext) {return Ok(Self::Tga(data))}
 		
 		Err(Error::InvalidFormatFrom(ext.to_string()))
 	}
@@ -106,7 +113,7 @@ impl Convert {
 		
 		match self {
 			Convert::Mdl(v) => {
-				if mdl::EXT.contains(&ext) {return Ok(<Mdl as Bytes<mdl::Error>>::write(v, writer)?)}
+				if mdl::EXT.contains(&ext) {return Ok(<Mdl as Bytes>::write(v, writer)?)}
 				if gltf::EXT.contains(&ext) {
 					let Some(file_path) = file_path else {return Err(Error::ParametersRequires)};
 					let Some(file_reader) = file_reader else {return Err(Error::ParametersRequires)};
@@ -115,7 +122,7 @@ impl Convert {
 						.into_iter()
 						.flat_map(|v| {
 							let sklb_data = file_reader(&v).unwrap();
-							let sklb = <Sklb as Bytes<sklb::Error>>::read(&mut std::io::Cursor::new(sklb_data)).unwrap();
+							let sklb = <Sklb as Bytes>::read(&mut std::io::Cursor::new(sklb_data)).unwrap();
 							
 							sklb.bones
 								.iter()
@@ -129,30 +136,66 @@ impl Convert {
 						}).collect::<Vec<_>>();
 					let materials = v.bake_materials(file_reader);
 					
-					return Ok(<Mdl as Gltf<mdl::Error>>::write(v, writer, materials, skeletons)?)
+					return Ok(<Mdl as Gltf>::write(v, writer, materials, skeletons)?)
 				}
 				
 				Err(Error::InvalidFormatTo(ext.to_string()))
 			}
 			
 			Convert::Mtrl(v) => {
-				if mtrl::EXT.contains(&ext) {return Ok(<Mtrl as Bytes<mtrl::Error>>::write(v, writer)?)}
+				if mtrl::EXT.contains(&ext) {return Ok(<Mtrl as Bytes>::write(v, writer)?)}
 				
 				Err(Error::InvalidFormatTo(ext.to_string()))
 			}
 			
 			Convert::Tex(v) => {
-				if tex::EXT.contains(&ext) {return Ok(<Tex as Bytes<tex::Error>>::write(v, writer)?)}
-				if dds::EXT.contains(&ext) {return Ok(<Tex as Dds<tex::Error>>::write(v, writer)?)}
-				if png::EXT.contains(&ext) {return Ok(<Tex as Png<tex::Error>>::write(v, writer)?)}
-				if tiff::EXT.contains(&ext) {return Ok(<Tex as Tiff<tex::Error>>::write(v, writer)?)}
-				if tga::EXT.contains(&ext) {return Ok(<Tex as Tga<tex::Error>>::write(v, writer)?)}
+				if tex::EXT.contains(&ext) {return Ok(<Tex as Bytes>::write(v, writer)?)}
+				if dds::EXT.contains(&ext) {return Ok(<Tex as Dds>::write(v, writer)?)}
+				if png::EXT.contains(&ext) {return Ok(<Tex as Png>::write(v, writer)?)}
+				if tiff::EXT.contains(&ext) {return Ok(<Tex as Tiff>::write(v, writer)?)}
+				if tga::EXT.contains(&ext) {return Ok(<Tex as Tga>::write(v, writer)?)}
+				
+				Err(Error::InvalidFormatTo(ext.to_string()))
+			}
+			
+			Convert::Hwc(v) => {
+				if hwc::EXT.contains(&ext) {return Ok(<Hwc as Bytes>::write(v, writer)?)}
+				if png::EXT.contains(&ext) {return Ok(<Hwc as Png>::write(v, writer)?)}
+				if tiff::EXT.contains(&ext) {return Ok(<Hwc as Tiff>::write(v, writer)?)}
+				if tga::EXT.contains(&ext) {return Ok(<Hwc as Tga>::write(v, writer)?)}
 				
 				Err(Error::InvalidFormatTo(ext.to_string()))
 			}
 			
 			Convert::Uld(v) => {
-				if uld::EXT.contains(&ext) {return Ok(<Uld as Bytes<uld::Error>>::write(v, writer)?)}
+				if uld::EXT.contains(&ext) {return Ok(<Uld as Bytes>::write(v, writer)?)}
+				
+				Err(Error::InvalidFormatTo(ext.to_string()))
+			}
+			
+			Convert::Dds(v) => {
+				if tex::EXT.contains(&ext) {return Ok(<Tex as Bytes>::write(&<Tex as Dds>::read(&mut Cursor::new(v))?, writer)?)}
+				
+				Err(Error::InvalidFormatTo(ext.to_string()))
+			}
+			
+			Convert::Png(v) => {
+				if tex::EXT.contains(&ext) {return Ok(<Tex as Bytes>::write(&<Tex as Png>::read(&mut Cursor::new(v))?, writer)?)}
+				if hwc::EXT.contains(&ext) {return Ok(<Hwc as Bytes>::write(&<Hwc as Png>::read(&mut Cursor::new(v))?, writer)?)}
+				
+				Err(Error::InvalidFormatTo(ext.to_string()))
+			}
+			
+			Convert::Tiff(v) => {
+				if tex::EXT.contains(&ext) {return Ok(<Tex as Bytes>::write(&<Tex as Tiff>::read(&mut Cursor::new(v))?, writer)?)}
+				if hwc::EXT.contains(&ext) {return Ok(<Hwc as Bytes>::write(&<Hwc as Tiff>::read(&mut Cursor::new(v))?, writer)?)}
+				
+				Err(Error::InvalidFormatTo(ext.to_string()))
+			}
+			
+			Convert::Tga(v) => {
+				if tex::EXT.contains(&ext) {return Ok(<Tex as Bytes>::write(&<Tex as Tga>::read(&mut Cursor::new(v))?, writer)?)}
+				if hwc::EXT.contains(&ext) {return Ok(<Hwc as Bytes>::write(&<Hwc as Tga>::read(&mut Cursor::new(v))?, writer)?)}
 				
 				Err(Error::InvalidFormatTo(ext.to_string()))
 			}
@@ -211,12 +254,12 @@ impl std::error::Error for SizeError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-	// #[error("Mtrl error {0:?}")]
-	// Mtrl(#[from] format::game::mtrl::Error),
-	#[error("Tex error {0:?}")]
-	Tex(#[from] format::game::tex::Error),
-	#[error("Uld error {0:?}")]
-	Uld(#[from] format::game::uld::Error),
+	#[error("{0:?}")] Io(#[from] std::io::Error),
+	#[error("{0:?}")] Binrw(#[from] binrw::Error),
+	#[error("{0:?}")] Dds(#[from] image_dds::ddsfile::Error),
+	#[error("{0:?}")] DdsCreate(#[from] image_dds::CreateDdsError),
+	#[error("{0:?}")] DdsSurface(#[from] image_dds::error::SurfaceError),
+	#[error("{0:?}")] Image(#[from] image::ImageError),
 	
 	#[error("Invalid format to convert from {0:?}")]
 	InvalidFormatFrom(String),

@@ -5,15 +5,6 @@ use image_dds::ImageFormat;
 
 pub const EXT: &'static [&'static str] = &["tex", "atex"];
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-	#[error("{0:?}")] Binrw(#[from] binrw::Error),
-	#[error("{0:?}")] Dds(#[from] image_dds::ddsfile::Error),
-	#[error("{0:?}")] DdsCreate(#[from] image_dds::CreateDdsError),
-	#[error("{0:?}")] DdsSurface(#[from] image_dds::error::SurfaceError),
-	#[error("{0:?}")] Image(#[from] image::ImageError),
-}
-
 pub struct Slice<'a> {
 	pub width: u32,
 	pub height: u32,
@@ -282,20 +273,20 @@ impl super::Extension for Tex {
 
 // ----------
 
-impl crate::format::external::Bytes<Error> for Tex {
-	fn read<T>(reader: &mut T) -> Result<Self, Error> where
+impl crate::format::external::Bytes for Tex {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error> where
 	T: Read + Seek {
 		Ok(Tex::read_le(reader)?)
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		Ok(self.write_le(writer)?)
 	}
 }
 
-impl crate::format::external::Dds<Error> for Tex {
-	fn read<T>(reader: &mut T) -> Result<Self, Error> where
+impl crate::format::external::Dds for Tex {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error> where
 	T: Read + Seek {
 		let dds = image_dds::ddsfile::Dds::read(reader)?;
 		let data = image_dds::Surface::from_dds(&dds)?;
@@ -328,7 +319,7 @@ impl crate::format::external::Dds<Error> for Tex {
 		})
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		let surface = image_dds::SurfaceRgba8 {
 			width: self.width as u32,
@@ -346,8 +337,8 @@ impl crate::format::external::Dds<Error> for Tex {
 	}
 }
 
-impl crate::format::external::Png<Error> for Tex {
-	fn read<T>(reader: &mut T) -> Result<Self, Error> where
+impl crate::format::external::Png for Tex {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error> where
 	T: Read + Seek {
 		let img = image::ImageReader::with_format(BufReader::new(reader), image::ImageFormat::Png)
 			.decode()?;
@@ -364,7 +355,7 @@ impl crate::format::external::Png<Error> for Tex {
 		})
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		let img = image::codecs::png::PngEncoder::new(writer);
 		img.write_image(
@@ -378,8 +369,8 @@ impl crate::format::external::Png<Error> for Tex {
 	}
 }
 
-impl crate::format::external::Tiff<Error> for Tex {
-	fn read<T>(reader: &mut T) -> Result<Self, Error> where
+impl crate::format::external::Tiff for Tex {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error> where
 	T: Read + Seek {
 		let img = image::ImageReader::with_format(BufReader::new(reader), image::ImageFormat::Tiff)
 			.decode()?;
@@ -396,7 +387,7 @@ impl crate::format::external::Tiff<Error> for Tex {
 		})
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		let img = image::codecs::tiff::TiffEncoder::new(writer);
 		img.write_image(
@@ -410,8 +401,8 @@ impl crate::format::external::Tiff<Error> for Tex {
 	}
 }
 
-impl crate::format::external::Tga<Error> for Tex {
-	fn read<T>(reader: &mut T) -> Result<Self, Error> where
+impl crate::format::external::Tga for Tex {
+	fn read<T>(reader: &mut T) -> Result<Self, crate::Error> where
 	T: Read + Seek {
 		let img = image::ImageReader::with_format(BufReader::new(reader), image::ImageFormat::Tga)
 			.decode()?;
@@ -428,7 +419,7 @@ impl crate::format::external::Tga<Error> for Tex {
 		})
 	}
 	
-	fn write<T>(&self, writer: &mut T) -> Result<(), Error> where
+	fn write<T>(&self, writer: &mut T) -> Result<(), crate::Error> where
 	T: Write + Seek {
 		let img = image::codecs::tga::TgaEncoder::new(writer);
 		img.write_image(

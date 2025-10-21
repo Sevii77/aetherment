@@ -31,6 +31,11 @@ fn current_collection() -> super::Collection {get_collection(super::CollectionTy
 fn get_collections() -> Vec<super::Collection> {unsafe {(FUNCS.as_ref().unwrap().get_collections)()}}
 
 pub fn subscriber_modchanged(typ: u8, collection_id: &str, mod_id: &str) {
+	// this function gets called for mare changes with an empty mod_id, we dont want anything to do with that
+	if mod_id.trim().is_empty() {
+		return;
+	}
+	
 	// log!("{typ} {mod_id} {collection_id}");
 	// super fucking cheesy, idc
 	let is_aeth = root_path().join(mod_id).join("aetherment").exists();

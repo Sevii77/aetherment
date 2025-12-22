@@ -53,7 +53,7 @@
 	</Target>
 	
 	<ItemGroup>
-		<PackageReference Include="DalamudPackager" Version="14.0.2" />
+		<PackageReference Include="DalamudPackager" Version="14.0.1" />
 		<Reference Include="Dalamud">
 			<HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>
 			<Private>false</Private>

@@ -60,6 +60,12 @@ impl Mods {
 		self.collections = backend.get_collections().into_iter().map(|v| (v.id, v.name)).collect();
 		self.mod_settings = self.mods.iter().map(|m| (m.to_owned(), crate::modman::settings::Settings::open(&backend.get_mod_meta(m).unwrap(), m))).collect();
 		self.mod_settings_remote = self.mods.iter().map(|m| (m.to_owned(), crate::remote::settings::Settings::open(m))).collect();
+		
+		let config = crate::config();
+		if !self.collections.contains_key(&config.config.active_collection) && self.collections.len() > 0 {
+			config.config.active_collection = self.collections.keys().next().unwrap().to_owned();
+			_ = config.save_forced();
+		}
 	}
 	
 	fn check_apply(&self) {

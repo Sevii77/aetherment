@@ -59,6 +59,7 @@ jobs:
           git add ./plugin/plugin/Aetherment.csproj
           git add ./plugin/Cargo.toml
           git add ./client/Cargo.toml
+          git add ./Cargo.lock
           git commit -m "[CI] Update version to ${{ env.VERSION }}"
           git push origin master
       
@@ -85,7 +86,7 @@ jobs:
         uses: actions/setup-dotnet@v1
         if: matrix.build == 'plugin'
         with:
-          dotnet-version: '9.x.x'
+          dotnet-version: '10.x.x'
       
       - name: Download Dalamud
         shell: bash

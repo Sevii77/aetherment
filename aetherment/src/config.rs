@@ -62,6 +62,7 @@ pub struct Config {
 	pub browser_content_rating: crate::remote::ContentRating,
 	pub auto_apply_last_viewed: std::time::Duration,
 	pub auto_apply_last_interacted: std::time::Duration,
+	pub proxy: Option<String>,
 	
 	pub mod_paths: Vec<PathBuf>,
 	pub file_dialog_path: PathBuf,
@@ -79,6 +80,7 @@ impl Default for Config {
 			browser_content_rating: crate::remote::ContentRating::Sfw,
 			auto_apply_last_viewed: std::time::Duration::from_secs(1),
 			auto_apply_last_interacted: std::time::Duration::from_secs(15),
+			proxy: None,
 			
 			mod_paths: Vec::new(),
 			file_dialog_path: dirs::document_dir().unwrap_or(PathBuf::new()),

@@ -62,7 +62,8 @@ impl egui::load::BytesLoader for HttpLoader {
 					return;
 				}
 				
-				let resp = match ureq::get(&uri).call() {
+				// let resp = match ureq::get(&uri).call() {
+				let resp = match crate::http::get(&uri).call() {
 					Ok(v) => v,
 					Err(e) => {
 						cache.lock().insert(uri, Poll::Ready(Err(e.to_string())));

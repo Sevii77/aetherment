@@ -77,7 +77,8 @@ impl RemoteOrigin for XivMa {
 		
 		// println!("{query:#?}");
 		
-		let result = ureq::get(&format!("{REMOTE_URL}/search"))
+		// let result = ureq::get(&format!("{REMOTE_URL}/search"))
+		let result = crate::http::get(&format!("{REMOTE_URL}/search"))
 			.query_pairs(query)
 			.call()?
 			.into_body()
@@ -128,7 +129,8 @@ impl RemoteOrigin for XivMa {
 			search_rows: Vec<SearchRow>,
 		}
 		
-		let mut results = ureq::get(&format!("{REMOTE_URL}/?json=true"))
+		// let mut results = ureq::get(&format!("{REMOTE_URL}/?json=true"))
+		let mut results = crate::http::get(&format!("{REMOTE_URL}/?json=true"))
 			.call()?
 			.into_body()
 			.read_json::<Result>()?
@@ -234,7 +236,8 @@ impl RemoteOrigin for XivMa {
 			order: i32,
 		}
 		
-		let mod_entry = ureq::get(&format!("{REMOTE_URL}/modid/{mod_id}?json=true"))
+		// let mod_entry = ureq::get(&format!("{REMOTE_URL}/modid/{mod_id}?json=true"))
+		let mod_entry = crate::http::get(&format!("{REMOTE_URL}/modid/{mod_id}?json=true"))
 			.call()?
 			.into_body()
 			.read_json::<Result>()?

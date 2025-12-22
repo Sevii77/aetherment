@@ -499,7 +499,8 @@ fn update_paths(progress: crate::modman::backend::Progress) {
 			log!("downloading");
 			progress.set_msg("Downloading");
 			
-			let resp = ureq::get(PATHSURL)
+			// let resp = ureq::get(PATHSURL)
+			let resp = crate::http::get(PATHSURL)
 				.call()?;
 			
 			let size = 's: {

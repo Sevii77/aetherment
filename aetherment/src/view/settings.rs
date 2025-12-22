@@ -70,6 +70,40 @@ impl super::View for Settings {
 			});
 		});
 		
+		ui.collapsing("Proxy", |ui| {
+			let mut proxy = config.proxy.is_some();
+			ui.checkbox(&mut proxy, "Use Proxy");
+			if proxy != config.proxy.is_some() {
+				if proxy {
+					config.proxy = Some("".to_owned());
+				} else {
+					config.proxy = None;
+				}
+			}
+			
+			if let Some(proxy) = &mut config.proxy {
+				egui::TextEdit::singleline(proxy)
+					.hint_text("<protocol>://<user>:<password>@<host>:port")
+					.show(ui);
+				
+				ui.label("\
+Your proxy config is stored in plain text, this includes username & password!
+
+Protocols
+- http: HTTP CONNECT proxy
+- https: HTTPS CONNECT proxy
+- socks4: SOCKS4
+- socks4a: SOCKS4A
+- socks5 and socks: SOCKS5
+
+Examples proxy formats
+- http://127.0.0.1:8080
+- socks5://john:smith@socks.google.com
+- john:smith@socks.google.com:8000
+- localhost");
+			}
+		});
+		
 		_ = config_manager.save();
 	}
 }

@@ -41,7 +41,8 @@ impl RemoteOrigin for Aetherment {
 	fn search(&self, options: SearchOptions) -> Result<SearchResult, Error> {
 		let query = options.query.to_ascii_lowercase();
 		Ok(SearchResult {
-			entries: ureq::get(&format!("{REMOTE_URL}/mods"))
+			// entries: ureq::get(&format!("{REMOTE_URL}/mods"))
+			entries: crate::http::get(&format!("{REMOTE_URL}/mods"))
 				.call()?
 				.into_body()
 				.read_json::<Vec<RemoteModEntry>>()?
@@ -70,7 +71,8 @@ impl RemoteOrigin for Aetherment {
 			HomeResultEntry {
 				name: "Mods".to_string(),
 				continued: None,
-				entries: ureq::get(&format!("{REMOTE_URL}/mods"))
+				// entries: ureq::get(&format!("{REMOTE_URL}/mods"))
+				entries: crate::http::get(&format!("{REMOTE_URL}/mods"))
 					.call()?
 					.into_body()
 					.read_json::<Vec<RemoteModEntry>>()?
@@ -88,7 +90,8 @@ impl RemoteOrigin for Aetherment {
 	}
 	
 	fn mod_page(&self, mod_id: &str) -> Result<ModPage, Error> {
-		let mod_entry = ureq::get(&format!("{REMOTE_URL}/mods"))
+		// let mod_entry = ureq::get(&format!("{REMOTE_URL}/mods"))
+		let mod_entry = crate::http::get(&format!("{REMOTE_URL}/mods"))
 			.call()?
 			.into_body()
 			.read_json::<Vec<RemoteModEntry>>()?

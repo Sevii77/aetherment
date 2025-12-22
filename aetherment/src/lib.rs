@@ -2,7 +2,7 @@
 
 #[macro_use]
 mod log;
-
+pub mod http;
 mod resource_loader;
 mod config;
 pub mod modman;

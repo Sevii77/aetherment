@@ -206,7 +206,8 @@ pub fn download(origin_url: &str, download_url: &str, mod_id: &str, progress: cr
 	s.auto_update = origin.default_auto_update();
 	s.save(mod_id);
 	
-	let resp = ureq::get(download_url)
+	// let resp = ureq::get(download_url)
+	let resp = crate::http::get(download_url)
 		.call()?;
 	
 	let size = 's: {
@@ -236,7 +237,8 @@ pub fn download(origin_url: &str, download_url: &str, mod_id: &str, progress: cr
 }
 
 pub fn download_size(download_url: &str) -> Option<u64> {
-	ureq::get(download_url)
+	// ureq::get(download_url)
+	crate::http::get(download_url)
 		.call().ok()?
 		.headers()
 		.get("Content-Length")?

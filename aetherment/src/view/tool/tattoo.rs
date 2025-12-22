@@ -273,7 +273,7 @@ impl super::super::View for Tattoo {
 		"Tattoo Overlay Creator"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _viewer: &super::super::Viewer) {
 		self.ui_creator(ui, None);
 		
 		ui.add_space(20.0);

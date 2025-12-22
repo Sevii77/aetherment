@@ -317,7 +317,8 @@ impl super::View for Explorer {
 		"Explorer"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, viewer2: &super::Viewer) {
+		let renderer = viewer2.renderer;
 		let mut viewer = Viewer {
 			action: Action::None,
 			renderer,

@@ -155,7 +155,7 @@ impl super::super::View for Creator {
 		"Collection Modpack Creator"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _viewer: &super::super::Viewer) {
 		let progress = self.progress.get();
 		if progress > 0.0 {
 			ui.label(format!("{} {:.0}%", self.progress.get_msg(), progress * 100.0));

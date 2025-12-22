@@ -7,12 +7,13 @@ pub mod debug;
 
 pub trait View {
 	fn title(&self) -> &'static str;
-	fn ui(&mut self, ui: &mut egui::Ui, renderer: &renderer::Renderer);
+	fn ui(&mut self, ui: &mut egui::Ui, viewer: &Viewer);
 	fn tick(&mut self) {}
 }
 
 pub struct Viewer<'r> {
 	pub renderer: &'r renderer::Renderer,
+	pub backend_status: &'r crate::modman::backend::Status
 }
 
 impl<'r> egui_dock::TabViewer for Viewer<'r> {
@@ -23,6 +24,6 @@ impl<'r> egui_dock::TabViewer for Viewer<'r> {
 	}
 	
 	fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-		tab.ui(ui, self.renderer);
+		tab.ui(ui, self);
 	}
 }

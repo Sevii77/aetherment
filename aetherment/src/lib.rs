@@ -185,7 +185,6 @@ impl Core {
 		let spacing = ui.spacing().item_spacing.y;
 		ui.add_space(-spacing);
 		
-		// TODO: disable mods and browser tab if backend error
 		egui_dock::DockArea::new(&mut self.views)
 			.id(egui::Id::new("tabs"))
 			.style(egui_dock::Style::from_egui(ui.style().as_ref()))
@@ -194,7 +193,10 @@ impl Core {
 			.show_leaf_close_all_buttons(false)
 			.show_leaf_collapse_buttons(false)
 			.tab_context_menus(false)
-			.show_inside(ui, &mut view::Viewer{renderer: renderer});
+			.show_inside(ui, &mut view::Viewer {
+				renderer,
+				backend_status: &status,
+			});
 	}
 	
 	pub fn tick(&mut self) {

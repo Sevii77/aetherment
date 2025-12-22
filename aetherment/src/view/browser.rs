@@ -320,7 +320,12 @@ impl super::View for Browser {
 		"Browser"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, viewer: &super::Viewer) {
+		if let crate::modman::backend::Status::Error(error) = viewer.backend_status {
+			ui.label(error);
+			return;
+		}
+		
 		// user intervention
 		let mut lock = self.download_user_input.lock().unwrap();
 		match lock.deref_mut() {

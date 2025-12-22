@@ -444,7 +444,12 @@ impl super::View for Mods {
 		"Mods"
 	}
 
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, viewer: &super::Viewer) {
+		if let crate::modman::backend::Status::Error(error) = viewer.backend_status {
+			ui.label(error);
+			return;
+		}
+		
 		ui.splitter("splitter", crate::ui_ext::SplitterAxis::Horizontal, 0.3, |ui_left, ui_right| {
 			let h = ui_left.available_height() - 20.0;
 			egui::ScrollArea::vertical()

@@ -17,7 +17,7 @@ impl super::View for Settings {
 		"Settings"
 	}
 	
-	fn ui(&mut self, ui: &mut egui::Ui, _renderer: &renderer::Renderer) {
+	fn ui(&mut self, ui: &mut egui::Ui, _viewer: &super::Viewer) {
 		let config_manager = crate::config();
 		config_manager.mark_for_changes();
 		let config = &mut config_manager.config;

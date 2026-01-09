@@ -8,17 +8,17 @@ mod loader {
 	pub mod asset;
 	pub mod http;
 }
-pub use loader::asset::*;
-pub use loader::http::*;
+pub(crate) use loader::asset::*;
+pub(crate) use loader::http::*;
 
 mod splitter;
-pub use splitter::*;
+pub(crate) use splitter::*;
 mod coloredit;
 pub use coloredit::ColorEditValue;
 mod interactable_scene;
-pub use interactable_scene::InteractableScene;
+pub(crate) use interactable_scene::InteractableScene;
 mod importer_dialog;
-pub use importer_dialog::{ImporterDialog, DialogResult};
+pub(crate) use importer_dialog::{ImporterDialog, DialogResult};
 
 pub trait ResponseExt {
 	/// Element was changed before it lost focus

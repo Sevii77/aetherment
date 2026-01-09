@@ -17,7 +17,7 @@ impl Backend for Dummy {
 	// fn is_functional(&self) -> bool {false}
 	fn get_status(&self) -> Status {Status::Error("Dummy backend does not support mod installation".to_string())}
 	
-	fn get_mods(&self) -> Vec<Arc<String>> {Vec::new()}
+	fn get_mods(&self) -> Vec<Arc<str>> {Vec::new()}
 	// fn get_active_collection(&self) -> String {String::new()}
 	fn get_collections(&self) -> Vec<Collection> {Vec::new()}
 	fn install_mods(&self, _progress: TaskProgress, _files: Vec<(String, std::fs::File)>) {}
@@ -29,6 +29,7 @@ impl Backend for Dummy {
 	fn apply_services(&self) {}
 	
 	fn load_mods(&self) {}
+	fn is_mod_aeth(&self, _mod_id: &str) -> bool {true}
 	fn get_mod_meta(&self, _mod_id: &str) -> Option<Arc<crate::modman::meta::Meta>> {None}
 	fn get_mod_asset(&self, _mod_id: &str, _path: &str) -> std::io::Result<Vec<u8>> {Err(std::io::ErrorKind::Unsupported.into())}
 	

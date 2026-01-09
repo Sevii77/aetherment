@@ -26,7 +26,7 @@ fn set_mod_priority(collection_id: &str, mod_id: &str, priority: i32) -> u8 {uns
 fn set_mod_inherit(collection_id: &str, mod_id: &str, inherit: bool) -> u8 {unsafe {(FUNCS.as_ref().unwrap().set_mod_inherit)(collection_id, mod_id, inherit)}}
 fn set_mod_settings(collection_id: &str, mod_id: &str, option: &str, sub_options: Vec<&str>) -> u8 {unsafe {(FUNCS.as_ref().unwrap().set_mod_settings)(collection_id, mod_id, option, sub_options)}}
 pub(crate) fn get_mod_settings(collection_id: &str, mod_id: &str, inherit: bool) -> GetModSettings {unsafe {(FUNCS.as_ref().unwrap().get_mod_settings)(collection_id, mod_id, inherit)}}
-pub(crate) fn get_collection(collection_type: super::CollectionType) -> super::Collection {unsafe {(FUNCS.as_ref().unwrap().get_collection)(collection_type)}}
+pub fn get_collection(collection_type: super::CollectionType) -> super::Collection {unsafe {(FUNCS.as_ref().unwrap().get_collection)(collection_type)}}
 fn current_collection() -> super::Collection {get_collection(super::CollectionType::Current)}
 fn get_collections() -> Vec<super::Collection> {unsafe {(FUNCS.as_ref().unwrap().get_collections)()}}
 
@@ -94,7 +94,7 @@ struct ModInfo {
 pub struct Penumbra {
 	apply_queue: RwLock<ApplyQueue>,
 	
-	mods: RwLock<Vec<Arc<String>>>,
+	mods: RwLock<Vec<Arc<str>>>,
 	mod_infos: RwLock<HashMap<String, ModInfo>>,
 }
 
@@ -285,7 +285,7 @@ impl super::Backend for Penumbra {
 		}
 	}
 	
-	fn get_mods(&self) -> Vec<Arc<String>> {
+	fn get_mods(&self) -> Vec<Arc<str>> {
 		self.mods.read().unwrap().clone()
 	}
 	
@@ -334,7 +334,7 @@ impl super::Backend for Penumbra {
 							
 							progress.add_message(format!("Mod '{mod_id}' ({}) has been installed", meta.version), false);
 							
-							self.mods.write().unwrap().push(Arc::new(mod_id.clone()));
+							self.mods.write().unwrap().push(mod_id.clone().into());
 							self.mod_infos.write().unwrap().insert(mod_id, ModInfo {
 								is_aeth,
 								meta: Arc::new(meta)
@@ -363,7 +363,7 @@ impl super::Backend for Penumbra {
 		let queue = queue_lock.clone();
 		queue_lock.clear();
 		drop(queue_lock);
-		let comp_info = get_composite_info(self.mods.read().unwrap().iter().map(|v| v.as_str()).collect());
+		let comp_info = get_composite_info(self.mods.read().unwrap().iter().map(|v| v.as_ref()).collect());
 		finalize_apply(queue, comp_info, progress);
 	}
 	
@@ -387,7 +387,7 @@ impl super::Backend for Penumbra {
 				let pmeta = read_json::<PMeta>(&mod_dir.join("meta.json")).ok()?;
 				meta::Meta {
 					name: pmeta.Name,
-					description: format!("{}\n\n\nThis is a Penumbra mod, configure it within Penumbra.", pmeta.Description),
+					description: pmeta.Description,
 					version: pmeta.Version,
 					author: pmeta.Author,
 					website: pmeta.Website,
@@ -404,10 +404,14 @@ impl super::Backend for Penumbra {
 			}))
 		}).collect::<HashMap<_, _>>();
 		
-		let mut mods = infos.iter().map(|(v, _)| Arc::new(v.clone())).collect::<Vec<_>>();
+		let mut mods = infos.iter().map(|(v, _)| v.to_owned().into()).collect::<Vec<_>>();
 		mods.sort();
 		*self.mods.write().unwrap() = mods;
 		*self.mod_infos.write().unwrap() = infos;
+	}
+	
+	fn is_mod_aeth(&self, mod_id: &str) -> bool {
+		self.mod_infos.read().unwrap().get(mod_id).map_or(false, |v| v.is_aeth)
 	}
 	
 	fn get_mod_meta(&self, mod_id: &str) -> Option<Arc<crate::modman::meta::Meta>> {

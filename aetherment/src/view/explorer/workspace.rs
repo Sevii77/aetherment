@@ -41,7 +41,7 @@ impl Workspace {
 		*status.write().unwrap() = PackStatus::Busy("Creating Modpack".to_string());
 		
 		std::thread::spawn(move|| {
-			match crate::modman::create_mod(&root, crate::modman::ModCreationSettings {
+			match crate::modman::modpack::create_mod(&root, crate::modman::modpack::ModCreationSettings {
 				current_game_files_hash: true,
 			}) {
 				Ok(path) => *status.write().unwrap() = PackStatus::Success(format!("Created modpack at {path:?}")),

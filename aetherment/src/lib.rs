@@ -6,9 +6,9 @@ pub mod http;
 mod resource_loader;
 mod config;
 pub mod modman;
-#[cfg(any(feature = "plugin", feature = "client"))] mod ui_ext;
+#[cfg(any(feature = "plugin", feature = "client"))] pub mod ui_ext;
 #[cfg(any(feature = "plugin", feature = "client"))] mod view;
-#[cfg(any(feature = "plugin", feature = "client"))] mod remote;
+#[cfg(any(feature = "plugin", feature = "client"))] pub mod remote;
 #[cfg(any(feature = "plugin", feature = "client"))] pub mod service;
 pub use noumenon;
 
@@ -64,10 +64,9 @@ pub fn json_pretty<T: serde::Serialize>(data: &T) -> Result<String, serde_json::
 #[cfg(any(feature = "plugin", feature = "client"))]
 pub struct Core {
 	views: egui_dock::DockState<Box<dyn view::View>>,
-	
 	backend_last_error: bool,
-	
 	progress: crate::modman::backend::TaskProgress,
+	pub mod_manager: modman::manager::Manager,
 }
 
 #[cfg(any(feature = "plugin", feature = "client"))]
@@ -98,20 +97,20 @@ impl Core {
 		}
 		
 		let progress = crate::modman::backend::TaskProgress::new();
+		let mod_manager = modman::manager::Manager::new();
 		
 		let s = Self {
 			views: egui_dock::DockState::new(vec![
-				Box::new(view::mods::Mods::new(progress.clone())),
+				Box::new(view::mods::Mods::new(progress.clone(), mod_manager.clone())),
 				Box::new(view::browser::Browser::new(progress.clone())),
 				Box::new(view::settings::Settings::new()),
 				Box::new(view::tool::Tools::new()),
 				Box::new(view::explorer::Explorer::new()),
 				Box::new(view::debug::Debug::new()),
 			]),
-			
 			backend_last_error: matches!(backend().get_status(), modman::backend::Status::Error(_)),
-			
 			progress,
+			mod_manager,
 		};
 		
 		if !s.backend_last_error {

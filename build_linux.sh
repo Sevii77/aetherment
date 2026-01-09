@@ -1,9 +1,9 @@
 if [ "$1" = "client" ] && [ "$2" = "release" ]; then
 	echo "client release"
-	cargo build --release --target x86_64-unknown-linux-gnu --manifest-path=./client/Cargo.toml
+	RUSTFLAGS="-l dylib=stdc++" cargo build --release --target x86_64-unknown-linux-gnu --manifest-path=./client/Cargo.toml
 elif [ "$1" = "client" ]; then
 	echo "client dev"
-	cargo run --manifest-path=./client/Cargo.toml
+	RUSTFLAGS="-l dylib=stdc++" cargo run --manifest-path=./client/Cargo.toml
 elif [ "$1" = "plugin" ] && [ "$2" = "release" ]; then
 	echo "plugin release"
 	cargo xwin build --lib --release --target x86_64-pc-windows-msvc --manifest-path=./plugin/Cargo.toml

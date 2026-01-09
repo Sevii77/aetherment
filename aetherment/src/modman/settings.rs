@@ -77,6 +77,17 @@ pub struct Preset {
 	pub settings: HashMap<String, Value>,
 }
 
+impl Preset {
+	pub fn from_sharable_string(s: &str) -> Option<Self> {
+		let json = base64::Engine::decode(&base64::prelude::BASE64_STANDARD_NO_PAD, s.trim().trim_end_matches(|v| v == '=')).ok()?;
+		serde_json::from_slice(&json).ok()
+	}
+	
+	pub fn sharable_string(&self) -> String {
+		base64::Engine::encode(&base64::prelude::BASE64_STANDARD_NO_PAD, serde_json::to_vec(self).unwrap())
+	}
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Value {
 	Grouped(u32),

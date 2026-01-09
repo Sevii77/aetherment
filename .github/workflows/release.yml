@@ -47,21 +47,21 @@ jobs:
           sed -i "0,/version = \"[0-9\.]*\"/s//version = \"$version\"/" ./plugin/Cargo.toml
           sed -i "0,/version = \"[0-9\.]*\"/s//version = \"$version\"/" ./client/Cargo.toml
       
-      - name: Commit Version
-        shell: bash
-        if: matrix.build == 'linux'
-        run: |
-          git config --global user.name "Actions User"
-          git config --global user.email "actions@github.com"
-          git fetch origin master
-          git branch -f master ${{ github.sha }}
-          git checkout master
-          git add ./plugin/plugin/Aetherment.csproj
-          git add ./plugin/Cargo.toml
-          git add ./client/Cargo.toml
-          git add ./Cargo.lock
-          git commit -m "[CI] Update version to ${{ env.VERSION }}"
-          git push origin master
+      # - name: Commit Version
+      #   shell: bash
+      #   if: matrix.build == 'linux'
+      #   run: |
+      #     git config --global user.name "Actions User"
+      #     git config --global user.email "actions@github.com"
+      #     git fetch origin master
+      #     git branch -f master ${{ github.sha }}
+      #     git checkout master
+      #     git add ./plugin/plugin/Aetherment.csproj
+      #     git add ./plugin/Cargo.toml
+      #     git add ./client/Cargo.toml
+      #     git add ./Cargo.lock
+      #     git commit -m "[CI] Update version to ${{ env.VERSION }}"
+      #     git push origin master
       
       - name: Install dependencies
         shell: bash

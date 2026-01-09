@@ -79,4 +79,5 @@ public static class Native {
 	[DllImport("aetherment_core.dll")] public static extern unsafe void tick(nint state);
 	[DllImport("aetherment_core.dll")] public static extern unsafe byte config_plugin_open_on_launch(nint state);
 	[DllImport("aetherment_core.dll")] public static extern unsafe void backend_penumbraipc_modchanged(byte type, FFI.Str collection_id, FFI.Str mod_id);
+	[DllImport("aetherment_core.dll")] public static extern unsafe byte backend_penumbraipc_drawsettings(nint state, FFI.Str mod_id);
 }

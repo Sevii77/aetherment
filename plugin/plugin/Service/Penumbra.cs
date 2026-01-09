@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using System.Runtime.InteropServices;
+using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Ipc;
 
@@ -10,8 +12,6 @@ namespace Aetherment;
 
 // https://github.com/Ottermandias/Penumbra.Api/blob/9472b6e327109216368c3dc1720159f5295bdb13/IPenumbraApi.cs
 public unsafe class Penumbra: IDisposable {
-	// private ICallGateSubscriber<string, object> postSettingsDraw;
-	
 	public Penumbra() {
 		redraw = Redraw;
 		redrawSelf = RedrawSelf;
@@ -29,27 +29,43 @@ public unsafe class Penumbra: IDisposable {
 		getCollection = GetCollection;
 		getCollections = GetCollections;
 		
-		// postSettingsDraw = Aetherment.Interface.GetIpcSubscriber<string, object>("Penumbra.PostSettingsDraw");
-		// postSettingsDraw.Subscribe(DrawSettings);
+		postEnabledDraw = Aetherment.Interface.GetIpcSubscriber<string, object>("Penumbra.PostEnabledDraw");
+		postEnabledDraw.Subscribe(PostEnabledDraw);
+		
+		postSettingsPanelDraw = Aetherment.Interface.GetIpcSubscriber<string, object>("Penumbra.PostSettingsDraw");
+		postSettingsPanelDraw.Subscribe(PostSettingsPanelDraw);
 		
 		modSettingChanged = Aetherment.Interface.GetIpcSubscriber<int, Guid, string, bool, object>("Penumbra.ModSettingChanged.V5");
 		modSettingChanged.Subscribe(ModSettingChanged);
 	}
 	
 	public void Dispose() {
-		// postSettingsDraw.Unsubscribe(DrawSettings);
+		postEnabledDraw.Unsubscribe(PostEnabledDraw);
 		modSettingChanged.Unsubscribe(ModSettingChanged);
 	}
 	
-	// private static void DrawSettings(string id) {
-	// 	if(Aetherment.state == IntPtr.Zero) return;
-	// 	
-	// 	try {
-	// 		draw_settings(Aetherment.state, id);
-	// 	} catch(Exception e) {
-	// 		PluginLog.Error("draw_settings somehow paniced, even tho it's supposed to catch those, wtf", e);
-	// 	}
-	// }
+	private static bool preventNextUi = false;
+	private ICallGateSubscriber<string, object> postEnabledDraw;
+	private static void PostEnabledDraw(string mod_id) {
+		if(Aetherment.state == 0) return;
+		
+		preventNextUi = Native.backend_penumbraipc_drawsettings(Aetherment.state, mod_id) != 0;
+		
+		// used to hide the _collection option, used for collection support, hacky solution for another hacky solution
+		if(preventNextUi) {
+			ImGui.SetNextWindowPos(Vector2.One * -100000);
+			ImGui.BeginChild("capture", Vector2.Zero, false, ImGuiWindowFlags.NoInputs | ImGuiWindowFlags.NoNav | ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoSavedSettings);
+		}
+	}
+	
+	private ICallGateSubscriber<string, object> postSettingsPanelDraw;
+	private static void PostSettingsPanelDraw(string _mod_id) {
+		if(preventNextUi) {
+			ImGui.EndChild();
+			
+			preventNextUi = false;
+		}
+	}
 	
 	private ICallGateSubscriber<int, Guid, string, bool, object> modSettingChanged;
 	private static void ModSettingChanged(int type, Guid collection_id, string mod_id, bool inherited) {

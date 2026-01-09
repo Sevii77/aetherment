@@ -33,7 +33,7 @@ public class Aetherment: IDalamudPlugin {
 	private const string texfindercommand = "/texfinder";
 	
 	private bool open = false;
-	private bool reset_cursor = false;
+	private static bool reset_cursor = false;
 	
 	internal static nint state;
 	private static string? error;
@@ -75,7 +75,7 @@ public class Aetherment: IDalamudPlugin {
 	private UiColor uicolor;
 	private TexFinder texfinder;
 	
-	private nint device;
+	private static nint device;
 	
 	[StructLayout(LayoutKind.Sequential)]
 	public unsafe struct Initializers {
@@ -257,83 +257,90 @@ public class Aetherment: IDalamudPlugin {
 			ImGui.SetNextWindowPos(new Vector2(50), ImGuiCond.FirstUseEver);
 			ImGui.SetNextWindowSize(new Vector2(200), ImGuiCond.FirstUseEver);
 			ImGui.Begin("Aetherment", ref open);
-			if(state != 0) {
-				try {
-					var io = ImGui.GetIO();
-					var pos = ImGui.GetCursorScreenPos();
-					var size = ImGui.GetContentRegionAvail();
-					var focused = ImGui.IsWindowFocused();
-					var drawlist = ImGui.GetWindowDrawList();
-					
-					ImGui.InvisibleButton("input_blocker", size);
-					if(ImGui.IsItemHovered()) {
-						io.ConfigFlags = io.ConfigFlags | ImGuiConfigFlags.NoMouseCursorChange;
-						reset_cursor = true;
-					} else if(reset_cursor) {
-						io.ConfigFlags = io.ConfigFlags & ~ImGuiConfigFlags.NoMouseCursorChange;
-						reset_cursor = false;
-					}
-					
-					nint input_buf_ptr = 0;
-					nint input_buf_len = io.InputQueueCharacters.Size;
-					if(input_buf_len > 0) {
-						input_buf_ptr = Marshal.AllocHGlobal(input_buf_len  * 2);
-						
-						for(var i = 0; i < io.InputQueueCharacters.Size; i++)
-							unsafe{*(ushort*)(input_buf_ptr + i * 2) = io.InputQueueCharacters[i];}
-					}
-					
-					byte set_keyboard_focus = 0;
-					nint tex;
-					unsafe {
-						tex = Native.draw(state, device, new() {
-							width = size.X,
-							height = size.Y,
-							mouse_x = io.MousePos.X - pos.X,
-							mouse_y = io.MousePos.Y - pos.Y,
-							wheel_x = io.MouseWheelH,
-							wheel_y = io.MouseWheel,
-							mods = (uint)(
-								(io.KeyAlt ? 0b001 : 0) +
-								(io.KeyCtrl ? 0b010 : 0) +
-								(io.KeyShift ? 0b100 : 0) +
-								
-								(io.MouseDown[0] ? 0b00001000 : 0) +
-								(io.MouseDown[1] ? 0b00010000 : 0) +
-								(io.MouseDown[2] ? 0b00100000 : 0) +
-								(io.MouseDown[3] ? 0b01000000 : 0) +
-								(io.MouseDown[4] ? 0b10000000 : 0) +
-								
-								(focused ? 0b1_00000000 : 0)),
-							input_buf_ptr = input_buf_ptr,
-							input_buf_len = input_buf_len,
-							
-							ui_scale = Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale,
-							
-							set_keyboard_focus = &set_keyboard_focus,
-						});
-					}
-					
-					if(set_keyboard_focus != 0)
-						io.WantTextInput = true;
-					
-					drawlist.AddImage(new ImTextureID(tex), pos, pos + size);
-					
-					if(input_buf_ptr != 0)
-						Marshal.FreeHGlobal(input_buf_ptr);
-				} catch(Exception e) {
-					Kill($"Fatal error in draw\n\n{e}", 1);
-				}
-			} else {
-				ImGui.Text("Aetherment has encountered an unrecoverable error");
-				ImGui.Text(error ?? "No Error");
-			}
+			DrawNative(Native.draw);
 			ImGui.End();
 		}
 		
 		Native.tick(state);
 		
 		texfinder.Draw();
+	}
+	
+	public static void DrawNative(Func<nint, nint, Io, nint> draw) {
+		if(state == 0) {
+			ImGui.Text("Aetherment has encountered an unrecoverable error");
+			ImGui.Text(error ?? "No Error");
+			return;
+		}
+		
+		try {
+			var io = ImGui.GetIO();
+			var pos = ImGui.GetCursorScreenPos();
+			var size = ImGui.GetContentRegionAvail();
+			var focused = ImGui.IsWindowFocused();
+			var drawlist = ImGui.GetWindowDrawList();
+			
+			ImGui.InvisibleButton("input_blocker", size);
+			if(ImGui.IsItemHovered()) {
+				io.ConfigFlags = io.ConfigFlags | ImGuiConfigFlags.NoMouseCursorChange;
+				reset_cursor = true;
+			} else if(reset_cursor) {
+				io.ConfigFlags = io.ConfigFlags & ~ImGuiConfigFlags.NoMouseCursorChange;
+				reset_cursor = false;
+			}
+			
+			nint input_buf_ptr = 0;
+			nint input_buf_len = io.InputQueueCharacters.Size;
+			if(input_buf_len > 0) {
+				input_buf_ptr = Marshal.AllocHGlobal(input_buf_len  * 2);
+				
+				for(var i = 0; i < io.InputQueueCharacters.Size; i++)
+					unsafe{*(ushort*)(input_buf_ptr + i * 2) = io.InputQueueCharacters[i];}
+			}
+			
+			byte set_keyboard_focus = 0;
+			nint tex;
+			unsafe {
+				var nativeio = new Io() {
+					width = size.X,
+					height = size.Y,
+					mouse_x = io.MousePos.X - pos.X,
+					mouse_y = io.MousePos.Y - pos.Y,
+					wheel_x = io.MouseWheelH,
+					wheel_y = io.MouseWheel,
+					mods = (uint)(
+						(io.KeyAlt ? 0b001 : 0) +
+						(io.KeyCtrl ? 0b010 : 0) +
+						(io.KeyShift ? 0b100 : 0) +
+						
+						(io.MouseDown[0] ? 0b00001000 : 0) +
+						(io.MouseDown[1] ? 0b00010000 : 0) +
+						(io.MouseDown[2] ? 0b00100000 : 0) +
+						(io.MouseDown[3] ? 0b01000000 : 0) +
+						(io.MouseDown[4] ? 0b10000000 : 0) +
+						
+						(focused ? 0b1_00000000 : 0)),
+					input_buf_ptr = input_buf_ptr,
+					input_buf_len = input_buf_len,
+					
+					ui_scale = Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale,
+					
+					set_keyboard_focus = &set_keyboard_focus,
+				};
+				
+				tex = draw(state, device, nativeio);
+			}
+			
+			if(set_keyboard_focus != 0)
+				io.WantTextInput = true;
+			
+			drawlist.AddImage(new ImTextureID(tex), pos, pos + size);
+			
+			if(input_buf_ptr != 0)
+				Marshal.FreeHGlobal(input_buf_ptr);
+		} catch(Exception e) {
+			Kill($"Fatal error in DrawNative\n\n{e}", 1);
+		}
 	}
 	
 	private void OnCommand(string cmd, string args) {
@@ -356,7 +363,7 @@ public class Aetherment: IDalamudPlugin {
 		}
 	}
 	
-	private void Kill(string msg, byte strip) {
+	private static void Kill(string msg, byte strip) {
 		if(error != null)
 			return;
 		

@@ -142,7 +142,7 @@ pub trait Backend {
 	fn name(&self) -> &'static str;
 	fn description(&self) -> &'static str;
 	fn get_status(&self) -> Status;
-	fn get_mods(&self) -> Vec<Arc<String>>;
+	fn get_mods(&self) -> Vec<Arc<str>>;
 	// fn get_active_collection(&self) -> String;
 	fn get_collections(&self) -> Vec<Collection>;
 	fn install_mods_path(&self, progress: TaskProgress, files: Vec<std::path::PathBuf>) {
@@ -169,6 +169,7 @@ pub trait Backend {
 	fn apply_services(&self);
 	
 	fn load_mods(&self);
+	fn is_mod_aeth(&self, mod_id: &str) -> bool;
 	fn get_mod_meta(&self, mod_id: &str) -> Option<Arc<crate::modman::meta::Meta>>;
 	fn get_mod_asset(&self, mod_id: &str, path: &str) -> std::io::Result<Vec<u8>>;
 	

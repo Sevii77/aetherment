@@ -239,7 +239,7 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 		Some(("pack", sub)) => {
 			let path = sub.get_one::<PathBuf>("path").ok_or("path is required")?;
 			
-			match aetherment::modman::create_mod(path, aetherment::modman::ModCreationSettings {
+			match aetherment::modman::modpack::create_mod(path, aetherment::modman::modpack::ModCreationSettings {
 				current_game_files_hash: true,
 			}) {
 				Ok(path) => println!("Created modpack at {path:?}"),
@@ -251,7 +251,7 @@ pub fn handle_cli() -> Result<(), Box<dyn std::error::Error>> {
 			let path = sub.get_one::<PathBuf>("path").ok_or("path is required")?;
 			let file = File::open(path)?;
 			
-			match aetherment::modman::check_diff(file) {
+			match aetherment::modman::modpack::check_diff(file) {
 				Ok(changes) => {
 					println!("Changed files:\n");
 					for path in changes {

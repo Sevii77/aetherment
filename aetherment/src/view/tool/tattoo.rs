@@ -232,7 +232,7 @@ mods ontop of one another (multiple tattoos for example).");
 		}
 		
 		// let modpack_file = std::fs::File::create(path.with_extension("aeth"))?;
-		let mut modpack = crate::modman::ModPack::new(std::io::BufWriter::new(modpack_file), crate::modman::ModCreationSettings {
+		let mut modpack = crate::modman::modpack::ModPack::new(std::io::BufWriter::new(modpack_file), crate::modman::modpack::ModCreationSettings {
 			current_game_files_hash: true,
 		});
 		

@@ -1,5 +1,5 @@
-use std::{collections::{HashMap, HashSet}, sync::Arc};
-use crate::{modman::settings::Settings, ui_ext::UiExt};
+use std::collections::{HashMap, HashSet};
+use crate::ui_ext::UiExt;
 
 pub struct Mods {
 	progress: crate::modman::backend::TaskProgress,
@@ -12,10 +12,7 @@ pub struct Mods {
 	new_preset_name: String,
 	
 	last_was_busy: bool,
-	mods: Vec<Arc<String>>,
-	collections: HashMap<String, String>,
-	mod_settings: HashMap<Arc<String>, Settings>,
-	mod_settings_remote: HashMap<Arc<String>, crate::remote::settings::Settings>,
+	mod_manager: crate::modman::manager::Manager,
 	markdown_cache: egui_commonmark::CommonMarkCache,
 	
 	last_viewed: std::time::Instant,
@@ -23,8 +20,8 @@ pub struct Mods {
 }
 
 impl Mods {
-	pub fn new(progress: crate::modman::backend::TaskProgress) -> Self {
-		let mut s = Self {
+	pub fn new(progress: crate::modman::backend::TaskProgress, mod_manager: crate::modman::manager::Manager) -> Self {
+		Self {
 			progress,
 			
 			selected_mod: String::new(),
@@ -35,36 +32,11 @@ impl Mods {
 			new_preset_name: String::new(),
 			
 			last_was_busy: false,
-			mods: Vec::new(),
-			collections: HashMap::new(),
-			mod_settings: HashMap::new(),
-			mod_settings_remote: HashMap::new(),
+			mod_manager,
 			markdown_cache: Default::default(),
 			
 			last_viewed: std::time::Instant::now(),
 			last_interacted: std::time::Instant::now(),
-		};
-		
-		s.refresh();
-		
-		s
-	}
-	
-	pub fn refresh(&mut self) {
-		let backend = crate::backend();
-		backend.load_mods();
-		
-		self.mods = backend.get_mods();
-		self.mods.sort_unstable();
-		
-		self.collections = backend.get_collections().into_iter().map(|v| (v.id, v.name)).collect();
-		self.mod_settings = self.mods.iter().map(|m| (m.to_owned(), crate::modman::settings::Settings::open(&backend.get_mod_meta(m).unwrap(), m))).collect();
-		self.mod_settings_remote = self.mods.iter().map(|m| (m.to_owned(), crate::remote::settings::Settings::open(m))).collect();
-		
-		let config = crate::config();
-		if !self.collections.contains_key(&config.config.active_collection) && self.collections.len() > 0 {
-			config.config.active_collection = self.collections.keys().next().unwrap().to_owned();
-			_ = config.save_forced();
 		}
 	}
 	
@@ -113,12 +85,15 @@ impl Mods {
 		config.mark_for_changes();
 		let is_busy = !self.progress.is_finished();
 		if self.last_was_busy && !is_busy {
-			self.refresh();
+			self.mod_manager.reload();
 		}
 		self.last_was_busy = is_busy;
 		
-		ui.combo(self.collections.get(&config.config.active_collection).map_or("Invalid Collection", |v| v.as_str()), "", |ui| {
-			for (id, name) in &self.collections {
+		ui.combo(self.mod_manager.collections.get(&config.config.active_collection).map_or("Invalid Collection".to_string(), |v| v.to_string()), "", |ui| {
+			for v in self.mod_manager.collections.iter() {
+				let id = v.key();
+				let name = v.value();
+				
 				if ui.selectable_label(config.config.active_collection == *id, name).clicked() {
 					config.config.active_collection = id.clone();
 				}
@@ -159,7 +134,7 @@ impl Mods {
 		}
 		
 		if !is_busy && ui.button("Reload Mods").clicked() {
-			self.refresh();
+			self.mod_manager.reload();
 		}
 		
 		ui.add_space(16.0);
@@ -179,7 +154,7 @@ impl Mods {
 		
 		ui.add_space(16.0);
 		
-		for m in &self.mods {
+		for m in self.mod_manager.mods.iter() {
 			let Some(meta) = backend.get_mod_meta(m) else {continue};
 			
 			ui.push_id(m, |ui| {
@@ -206,10 +181,10 @@ impl Mods {
 	fn draw_modpage(&mut self, ui: &mut egui::Ui) {
 		use crate::modman::{meta::OptionSettings, backend::SettingsType};
 		
+		let Some(meta) = self.mod_manager.metas.get(self.selected_mod.as_str()) else {return};
+		let Some(mut mod_settings) = self.mod_manager.settings.get_mut(self.selected_mod.as_str()) else {return};
+		let Some(mut remote_settings) = self.mod_manager.settings_remote.get_mut(self.selected_mod.as_str()) else {return};
 		let backend = crate::backend();
-		let Some(meta) = backend.get_mod_meta(&self.selected_mod) else {return};
-		let Some(mod_settings) = self.mod_settings.get_mut(&self.selected_mod) else {return};
-		let Some(remote_settings) = self.mod_settings_remote.get_mut(&self.selected_mod) else {return};
 		
 		let mut presets = mod_settings.presets.clone();
 		let settings = mod_settings.get_collection(&meta, &crate::config().config.active_collection);
@@ -245,6 +220,11 @@ impl Mods {
 		
 		if !remote_settings.origin.is_empty() && ui.checkbox(&mut remote_settings.auto_update, "Auto Update").changed() {
 			remote_settings.save(&self.selected_mod);
+		}
+		
+		if !self.mod_manager.aeth_mods.contains(self.selected_mod.as_str()) {
+			ui.label("This is a Penumbra mod, configure it within Penumbra.");
+			return;
 		}
 		
 		let mut selected_preset = "Custom".to_string();

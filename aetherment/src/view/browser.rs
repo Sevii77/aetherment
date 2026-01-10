@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, ops::{Deref, DerefMut}, sync::{atomic::AtomicBool, Arc, Mutex}};
+use std::{collections::VecDeque, fs, ops::{Deref, DerefMut}, sync::{Arc, Mutex, atomic::AtomicBool}};
 use crate::{remote::ORIGINS, ui_ext::UiExt};
 
 enum Page {
@@ -102,7 +102,7 @@ impl Browser {
 						crate::remote::FileType::Aetherment |
 						crate::remote::FileType::Penumbra => {
 							let file = crate::remote::download(origin_url, &download_url, &mod_id, progress.sub_task.clone())?;
-							crate::backend().install_mods(progress.clone(), vec![(mod_id.clone(), file)]);
+							crate::backend().install_mods(progress.clone(), vec![(mod_id.clone(), file.into_file())]);
 						}
 						
 						crate::remote::FileType::Textools =>
@@ -118,8 +118,18 @@ impl Browser {
 							*user_input.lock().unwrap() = UserInput::RequiredPick(picker);
 						}
 						
-						crate::remote::FileType::Rar =>
-							Err("Rar files are currently unsupported".to_string())?,
+						crate::remote::FileType::Rar |
+						crate::remote::FileType::Zip7 => {
+							let tempdir = tempfile::tempdir()?;
+							let file = crate::remote::download(origin_url, &download_url, &mod_id, progress.sub_task.clone())?;
+							let (file, path) = file.keep()?;
+							drop(file);
+							extract(path.to_str().unwrap(), &tempdir.path().to_str().unwrap())?;
+							fs::remove_file(path)?;
+							let picker = ArchivePicker::new(&tempdir);
+							tempdir_holder = Some(tempdir);
+							*user_input.lock().unwrap() = UserInput::RequiredPick(picker);
+						}
 						
 						crate::remote::FileType::Other(ext) =>
 							Err(format!("Unsupported extension '{ext}'"))?,
@@ -702,6 +712,11 @@ impl ArchivePicker {
 				}
 				
 				ui.label("Create an overlay or tattoo mod from raw (transparent) files, this will will automatically overlay it onto your body texture, tattoos, and other mods that modify the body texture. This type of mod will automatically overlay itself onto such texture even if they are changed in the future.");
+				
+				ui.spacer();
+				if ui.button("Cancel").clicked() {
+					return Some(Err("Download was canceled".into()));
+				}
 			}
 			
 			ArchivePickerTarget::Modpack => {
@@ -753,4 +768,47 @@ impl ArchivePicker {
 		
 		None
 	}
+}
+
+// ----------
+
+#[cfg(windows)]
+const BIN_7Z_EXE: &[u8] = include_bytes!("../../lib/7z.exe");
+#[cfg(windows)]
+const BIN_7Z_DLL: &[u8] = include_bytes!("../../lib/7z.dll");
+
+#[cfg(windows)]
+fn extract(archive: &str, target_dir: &str) -> Result<(), crate::resource_loader::BacktraceError> {
+	let dir = dirs::cache_dir().ok_or("No cache directory")?.join("Aetherment/bin");
+	if !dir.exists() {
+		std::fs::create_dir_all(&dir)?;
+	}
+	
+	let path_exe = dir.join("7z.exe");
+	if !path_exe.exists() {
+		fs::write(&path_exe, BIN_7Z_EXE)?;
+	}
+	
+	let path_dll = dir.join("7z.dll");
+	if !path_dll.exists() {
+		fs::write(&path_dll, BIN_7Z_DLL)?;
+	}
+	
+	use std::os::windows::process::CommandExt;
+	let r = std::process::Command::new(path_exe)
+		.arg("x")
+		.arg(archive)
+		.arg(format!("-o{target_dir}"))
+		.arg("-t*")
+		.creation_flags(0x08000000) // avoid creating window
+		.output()?;
+	
+	log!("extract output {r:?}");
+	
+	Ok(())
+}
+
+#[cfg(unix)]
+fn extract(_archive: &str, _target_dir: &str) -> Result<(), crate::resource_loader::BacktraceError> {
+	Err("Unsupported")?
 }

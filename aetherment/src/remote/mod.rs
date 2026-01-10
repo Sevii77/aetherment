@@ -120,6 +120,7 @@ pub enum FileType {
 	Penumbra,
 	Textools,
 	Zip,
+	Zip7,
 	Rar,
 	Other(String),
 }
@@ -133,7 +134,8 @@ impl FileType {
 			"aeth" => Self::Aetherment,
 			"pmp" => Self::Penumbra,
 			"ttmp" | "ttmp2" => Self::Textools, // are these the extensions? i honestly havent seen one in ages
-			"7z" | "zip" => Self::Zip,
+			"zip" => Self::Zip,
+			"7z" => Self::Zip7,
 			"rar" => Self::Rar,
 			_ => Self::Other(ext.to_string()),
 		}
@@ -197,7 +199,7 @@ pub enum TextFormatting {
 	Markdown,
 }
 
-pub fn download(origin_url: &str, download_url: &str, mod_id: &str, progress: crate::modman::backend::Progress) -> Result<std::fs::File, crate::resource_loader::BacktraceError> {
+pub fn download(origin_url: &str, download_url: &str, mod_id: &str, progress: crate::modman::backend::Progress) -> Result<tempfile::NamedTempFile, crate::resource_loader::BacktraceError> {
 	progress.set_msg("");
 	
 	let Some((_, origin)) = ORIGINS.iter().find(|(_, v)| v.url() == origin_url) else {return Err("Invalid origin".into())};
@@ -216,7 +218,8 @@ pub fn download(origin_url: &str, download_url: &str, mod_id: &str, progress: cr
 		s.parse::<u64>().unwrap_or(0)
 	};
 	
-	let mut writer = BufWriter::new(tempfile::tempfile()?);
+	let mut file = tempfile::NamedTempFile::new()?;
+	let mut writer = BufWriter::new(file.as_file_mut());
 	let mut reader = resp
 		.into_body()
 		.into_reader();
@@ -233,7 +236,8 @@ pub fn download(origin_url: &str, download_url: &str, mod_id: &str, progress: cr
 		progress.set(total_read as f32  / size as f32);
 	}
 	
-	Ok(writer.into_inner()?)
+	drop(writer);
+	Ok(file)
 }
 
 pub fn download_size(download_url: &str) -> Option<u64> {
@@ -303,7 +307,7 @@ pub fn check_updates(progress: crate::modman::backend::TaskProgress) {
 			if !download_entry.is_direct {break 'u}
 			log!("updating {mod_id}");
 			let Ok(file) = download(origin_url, &download_entry.link, &mod_id, progress.sub_task.clone()) else {break 'u};
-			files.push((mod_id.to_string(), file));
+			files.push((mod_id.to_string(), file.into_file()));
 		}
 		
 		progress.progress_task();

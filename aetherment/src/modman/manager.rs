@@ -1,25 +1,29 @@
-use std::{collections::HashSet, sync::Arc};
-use dashmap::DashMap;
+use std::{sync::{Arc, RwLock}, time::Instant};
+use dashmap::{DashMap, DashSet};
 
 #[derive(Clone)]
 pub struct Manager {
 	pub collections: Arc<DashMap<String, String>>,
-	pub mods: Arc<Vec<Arc<str>>>,
 	pub metas: Arc<DashMap<Arc<str>, Arc<super::meta::Meta>>>,
 	pub settings: Arc<DashMap<Arc<str>, super::settings::Settings>>,
 	pub settings_remote: Arc<DashMap<Arc<str>, crate::remote::settings::Settings>>,
-	pub aeth_mods: Arc<HashSet<Arc<str>>>,
+	pub aeth_mods: Arc<DashSet<Arc<str>>>,
+	
+	last_viewed: Arc<RwLock<Instant>>,
+	last_interacted: Arc<RwLock<Instant>>,
 }
 
 impl Manager {
 	pub fn new() -> Self {
-		let mut s = Self {
+		let s = Self {
 			collections: Arc::new(DashMap::new()),
-			mods: Arc::new(Vec::new()),
 			metas: Arc::new(DashMap::new()),
 			settings: Arc::new(DashMap::new()),
 			settings_remote: Arc::new(DashMap::new()),
-			aeth_mods: Arc::new(HashSet::new()),
+			aeth_mods: Arc::new(DashSet::new()),
+			
+			last_viewed: Arc::new(RwLock::new(Instant::now())),
+			last_interacted: Arc::new(RwLock::new(Instant::now())),
 		};
 		
 		s.reload();
@@ -27,25 +31,60 @@ impl Manager {
 		s
 	}
 	
-	pub fn reload(&mut self) {
+	pub fn reload(&self) {
 		let backend = crate::backend();
 		backend.load_mods();
 		
-		self.collections = Arc::new(backend.get_collections().into_iter().map(|v| (v.id, v.name)).collect());
+		self.collections.clear();
+		for v in backend.get_collections() {
+			self.collections.insert(v.id, v.name);
+		}
 		
 		let mut mods = backend.get_mods();
 		mods.sort_unstable();
-		self.mods = Arc::new(mods);
 		
-		self.metas = Arc::new(self.mods.iter().map(|m| (m.clone(), backend.get_mod_meta(m).unwrap())).collect());
-		self.settings = Arc::new(self.mods.iter().map(|m| (m.clone(), crate::modman::settings::Settings::open(&backend.get_mod_meta(m).unwrap(), m))).collect());
-		self.settings_remote = Arc::new(self.mods.iter().map(|m| (m.clone(), crate::remote::settings::Settings::open(m))).collect());
-		self.aeth_mods = Arc::new(self.mods.iter().filter(|m| backend.is_mod_aeth(m)).map(|v| v.clone()).collect());
+		self.metas.clear();
+		for m in &mods {
+			self.metas.insert(m.clone(), backend.get_mod_meta(m).unwrap());
+		}
+		
+		self.settings.clear();
+		for m in &mods {
+			self.settings.insert(m.clone(), crate::modman::settings::Settings::open(&backend.get_mod_meta(m).unwrap(), m));
+		}
+		
+		self.settings_remote.clear();
+		for m in &mods {
+			self.settings_remote.insert(m.clone(), crate::remote::settings::Settings::open(m));
+		}
+		
+		self.aeth_mods.clear();
+		for m in &mods {
+			if backend.is_mod_aeth(m) {
+				self.aeth_mods.insert(m.clone());
+			}
+		}
 		
 		let config = crate::config();
 		if !self.collections.contains_key(&config.config.active_collection) && self.collections.len() > 0 {
 			config.config.active_collection = self.collections.iter().next().unwrap().key().to_owned();
 			_ = config.save_forced();
 		}
+	}
+	
+	pub fn update_last_viewed(&self) {
+		*self.last_viewed.write().unwrap() = Instant::now();
+	}
+	
+	pub fn update_last_interacted(&self) {
+		*self.last_interacted.write().unwrap() = Instant::now();
+	}
+	
+	pub fn should_auto_update(&self) -> bool {
+		let config = &crate::config().config;
+		let now = Instant::now();
+		if now.duration_since(*self.last_viewed.read().unwrap()) > config.auto_apply_last_viewed {return true}
+		if now.duration_since(*self.last_interacted.read().unwrap()) > config.auto_apply_last_interacted {return true}
+		false
 	}
 }

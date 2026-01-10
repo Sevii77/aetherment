@@ -349,8 +349,9 @@ pub extern "C" fn config_plugin_open_on_launch(_state: *mut State) -> u8 {
 }
 
 #[no_mangle]
-pub extern "C" fn backend_penumbraipc_modchanged(typ: u8, collection_id: FfiString, mod_id: FfiString) {
-	aetherment::modman::backend::penumbra_ipc::subscriber_modchanged(typ, &collection_id.to_string(), &mod_id.to_string());
+pub extern "C" fn backend_penumbraipc_modchanged(state: *mut State, typ: aetherment::modman::backend::penumbra_ipc::ModChangeType, collection_id: FfiString, mod_id: FfiString) {
+	let state = unsafe{&mut *state};
+	aetherment::modman::backend::penumbra_ipc::subscriber_modchanged(state.core.mod_manager.clone(), typ, &collection_id.to_string(), &mod_id.to_string());
 }
 
 #[no_mangle]

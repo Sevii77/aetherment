@@ -14,9 +14,6 @@ pub struct Mods {
 	last_was_busy: bool,
 	mod_manager: crate::modman::manager::Manager,
 	markdown_cache: egui_commonmark::CommonMarkCache,
-	
-	last_viewed: std::time::Instant,
-	last_interacted: std::time::Instant,
 }
 
 impl Mods {
@@ -34,17 +31,13 @@ impl Mods {
 			last_was_busy: false,
 			mod_manager,
 			markdown_cache: Default::default(),
-			
-			last_viewed: std::time::Instant::now(),
-			last_interacted: std::time::Instant::now(),
 		}
 	}
 	
 	fn check_apply(&self) {
-		let config = &crate::config().config;
 		if !self.progress.is_finished()  {return}
 		if crate::backend().apply_queue_size() == 0 {return}
-		if self.last_viewed.elapsed() < config.auto_apply_last_viewed && self.last_interacted.elapsed() < config.auto_apply_last_interacted {return}
+		if !self.mod_manager.should_auto_update() {return}
 		
 		let progress = self.progress.clone();
 		progress.add_task_count(1);
@@ -80,7 +73,6 @@ impl Mods {
 	}
 	
 	fn draw_modlist_simple(&mut self, ui: &mut egui::Ui) {
-		let backend = crate::backend();
 		let config = crate::config();
 		config.mark_for_changes();
 		let is_busy = !self.progress.is_finished();
@@ -139,7 +131,7 @@ impl Mods {
 		
 		ui.add_space(16.0);
 		
-		let queue_size = backend.apply_queue_size();
+		let queue_size = crate::backend().apply_queue_size();
 		ui.add_enabled_ui(!is_busy && queue_size > 0 , |ui| {
 			ui.label(format!("{queue_size} mods have changes that might require an apply"));
 			if ui.button("Manually Apply Now").clicked() {
@@ -154,19 +146,20 @@ impl Mods {
 		
 		ui.add_space(16.0);
 		
-		for m in self.mod_manager.mods.iter() {
-			let Some(meta) = backend.get_mod_meta(m) else {continue};
+		for v in self.mod_manager.metas.iter() {
+			let mod_id = v.key();
+			let meta = v.value();
 			
-			ui.push_id(m, |ui| {
-				if !backend.get_mod_enabled(m, &config.config.active_collection) {
+			ui.push_id(mod_id, |ui| {
+				if !crate::backend().get_mod_enabled(mod_id, &config.config.active_collection) {
 					let style = ui.style_mut();
 					let color = style.visuals.noninteractive().fg_stroke;
 					style.visuals.override_text_color = Some(color.color);
 				}
 				
-				if ui.selectable_label(self.selected_mod == **m, &meta.name).clicked() {
+				if ui.selectable_label(self.selected_mod == mod_id.as_ref(), &meta.name).clicked() {
 					ui.free_textures("aetherment://");
-					self.selected_mod = m.to_string();
+					self.selected_mod = mod_id.to_string();
 				}
 			});
 		}
@@ -414,7 +407,7 @@ impl Mods {
 			backend.apply_mod_settings(&self.selected_mod, &crate::config().config.active_collection, SettingsType::Some(settings.clone()));
 			mod_settings.presets = presets;
 			mod_settings.save(&self.selected_mod);
-			self.last_interacted = std::time::Instant::now();
+			self.mod_manager.update_last_interacted();
 		}
 	}
 }
@@ -425,6 +418,8 @@ impl super::View for Mods {
 	}
 
 	fn ui(&mut self, ui: &mut egui::Ui, viewer: &super::Viewer) {
+		self.mod_manager.update_last_viewed();
+		
 		if let crate::modman::backend::Status::Error(error) = viewer.backend_status {
 			ui.label(error);
 			return;
@@ -447,8 +442,6 @@ impl super::View for Mods {
 				.auto_shrink(false)
 				.show(ui_right, |ui| self.draw_modpage(ui));
 		});
-		
-		self.last_viewed = std::time::Instant::now();
 	}
 	
 	fn tick(&mut self) {

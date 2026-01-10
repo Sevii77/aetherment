@@ -78,7 +78,7 @@ impl TaskProgress {
 		self.task_progress.load(std::sync::atomic::Ordering::Relaxed) as f32 / self.task_count.load(std::sync::atomic::Ordering::Relaxed) as f32
 	}
 	
-	pub fn get_task_msg(&self) -> RwLockReadGuard<String> {
+	pub fn get_task_msg(&self) -> RwLockReadGuard<'_, String> {
 		self.task_msg.read().unwrap()
 	}
 	
@@ -110,14 +110,14 @@ impl Progress {
 	}
 	
 	pub fn get(&self) -> f32 {
-		unsafe{std::mem::transmute::<u32, f32>(self.inner.load(std::sync::atomic::Ordering::Relaxed))}
+		f32::from_bits(self.inner.load(std::sync::atomic::Ordering::Relaxed))
 	}
 	
 	pub fn set(&self, value: f32) {
-		self.inner.store(unsafe{std::mem::transmute::<f32, u32>(value)}, std::sync::atomic::Ordering::Relaxed);
+		self.inner.store(f32::to_bits(value), std::sync::atomic::Ordering::Relaxed);
 	}
 	
-	pub fn get_msg(&self) -> RwLockReadGuard<String> {
+	pub fn get_msg(&self) -> RwLockReadGuard<'_, String> {
 		self.msg.read().unwrap()
 	}
 	

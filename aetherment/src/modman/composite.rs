@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fs::File, path::Path};
+use std::{borrow::Cow, collections::HashMap, fs::File, io::Read, path::Path};
 use serde::{Deserialize, Serialize};
 
 pub mod tex;
@@ -35,6 +35,8 @@ pub struct CompositeCache {
 }
 
 pub fn build_cache(mod_dir: &Path) -> Result<CompositeCache, crate::resource_loader::BacktraceError> {
+	// log!("building comp cache for {}", mod_dir.file_name().unwrap().to_str().unwrap());
+	
 	let mut cache = CompositeCache {
 		composite_external_files: HashMap::new(),
 		option_composite_files: HashMap::new(),
@@ -44,14 +46,41 @@ pub fn build_cache(mod_dir: &Path) -> Result<CompositeCache, crate::resource_loa
 	let files_dir = mod_dir.join("files");
 	let remap = serde_json::from_reader::<_, HashMap<String, String>>(std::io::BufReader::new(File::open(aeth_dir.join("remap"))?))?;
 	let meta = serde_json::from_reader::<_, super::meta::Meta>(std::io::BufReader::new(File::open(aeth_dir.join("meta.json"))?))?;
+	
+	// copied mostly from penumbra_ipc
+	// TODO: unify it
+	let mut files_compdata = File::open(files_dir.join("_compdata")).ok().and_then(|v| zip::ZipArchive::new(std::io::BufReader::new(v)).ok());
+	let mut read_compdata = |path: &str| {
+		if let Some(compdata) = &mut files_compdata {
+			if let Ok(mut f) = compdata.by_name(&format!("files/{path}")) {
+				if f.is_file() {
+					let mut buf = Vec::new();
+					f.read_to_end(&mut buf).ok()?;
+					return Some(buf);
+				}
+			}
+		}
+		
+		None
+	};
+	
+	let mut read_file = |path: &str| {
+		if let Some(data) = read_compdata(path) {
+			return Some(data);
+		}
+		
+		let Ok(mut f) = File::open(files_dir.join(path)) else {return None};
+		let mut buf = Vec::new();
+		f.read_to_end(&mut buf).ok()?;
+		
+		Some(buf)
+	};
+	
 	for (real_path, game_paths) in meta.get_registered_files() {
+		// log!("\t {real_path} {game_paths:?}");
 		if let (Some(real_path_remapped), Some(game_path)) = (remap.get(real_path), game_paths.iter().find(|v| v.ends_with(".comp"))) {
 			let ext = game_path.trim_end_matches(".comp").split(".").last().unwrap();
-			let comp: Option<Box<dyn Composite>> = match ext {
-				"tex" | "atex" => Some(Box::new(serde_json::from_reader::<_, tex::Tex>(std::io::BufReader::new(File::open(files_dir.join(real_path_remapped))?))?)),
-				_ => None
-			};
-			
+			let comp = read_file(real_path_remapped).map(|data| open_composite(ext, &data)).flatten();
 			if let Some(comp) = comp {
 				let files = comp.get_files_game();
 				if files.len() > 0 {

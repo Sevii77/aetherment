@@ -1,6 +1,6 @@
-use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, io::{BufReader, Read, Write}, sync::{Arc, Mutex, RwLock}};
+use std::{borrow::Cow, collections::{HashMap, HashSet}, fs::File, io::{BufReader, Read, Write}, sync::{Arc, RwLock}};
 use serde::{Deserialize, Serialize};
-use crate::{log, modman::{meta, OptionOrStatic}, resource_loader::read_json};
+use crate::{modman::{meta, OptionOrStatic}, resource_loader::read_json};
 
 #[repr(packed)]
 pub struct GetModSettings {
@@ -30,21 +30,44 @@ pub fn get_collection(collection_type: super::CollectionType) -> super::Collecti
 fn current_collection() -> super::Collection {get_collection(super::CollectionType::Current)}
 fn get_collections() -> Vec<super::Collection> {unsafe {(FUNCS.as_ref().unwrap().get_collections)()}}
 
-pub fn subscriber_modchanged(typ: u8, collection_id: &str, mod_id: &str) {
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModChangeType {
+	/// It was set to inherit from other collections or not to inherit anymore.
+	Inheritance = 0,
+	/// It was enabled or disabled.
+	EnableState = 1,
+	/// Its priority was changed.
+	Priority = 2,
+	/// A specific setting for an option group was changed.
+	Setting = 3,
+	/// Multiple mods were set to inherit from other collections or not inherit anymore at once.
+	MultiInheritance = 4,
+	/// Multiple mods were enabled or disabled at once.
+	MultiEnableState = 5,
+	/// A temporary mod was enabled or disabled.
+	TemporaryMod = 6,
+	/// A mod was edited. Only invoked on edits affecting the current players collection and for that for now.
+	Edited = 7,
+	/// A temporary setting was added, removed or changed.
+	TemporarySetting = 8,
+}
+
+pub fn subscriber_modchanged(mod_manager: crate::modman::manager::Manager, typ: ModChangeType, collection_id: &str, mod_id: &str) {
 	// this function gets called for mare changes with an empty mod_id, we dont want anything to do with that
-	if mod_id.trim().is_empty() {
-		return;
-	}
+	if mod_id.trim().is_empty() {return}
 	
-	// log!("{typ} {mod_id} {collection_id}");
-	// super fucking cheesy, idc
-	let is_aeth = root_path().join(mod_id).join("aetherment").exists();
-	if typ == 3 { // settings
-		if !is_aeth {
-			crate::backend().apply_mod_settings(mod_id, collection_id, super::SettingsType::Keep);
-		}
-	} else if !is_aeth || typ != 7 { // edited
-		crate::backend().apply_mod_settings(mod_id, collection_id, super::SettingsType::Keep);
+	mod_manager.update_last_interacted();
+	
+	let is_aeth = mod_manager.aeth_mods.contains(mod_id);
+	// log!("subscriber_modchanged {mod_id} {collection_id} {is_aeth} {typ:?}");
+	match (is_aeth, typ) {
+		(false, ModChangeType::Setting) |
+		(false, ModChangeType::Edited) |
+		(_, ModChangeType::EnableState) |
+		(_, ModChangeType::Inheritance) |
+		(_, ModChangeType::Priority) => crate::backend().apply_mod_settings(mod_id, collection_id, super::SettingsType::Keep),
+		_ => {},
 	}
 }
 
@@ -641,6 +664,11 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 			let mut add_queue = HashSet::new();
 			for f in &changed_files {
 				if let Some(linked_mods) = composite_links.get(f) {
+					// log!(inf, "linked mods for file {f}:");
+					// for v in linked_mods {
+					// 	log!(inf, "\t{v}");
+					// }
+					
 					for linked_mod_id in linked_mods {
 						let linked_settings = get_mod_settings(&collection_id, linked_mod_id, true);
 						if linked_settings.exists && linked_settings.enabled && linked_settings.priority > priority {
@@ -654,7 +682,7 @@ fn finalize_apply(apply_queue: ApplyQueue, composite_info: CompositeInfo, progre
 			for (to_add_id, to_add_priority) in add_queue {
 				if push_queue(queue, (to_add_id.to_owned(), to_add_priority, super::SettingsType::Keep, Some(changed_files.clone()))) {
 					do_sort_queue = true;
-					total_mods += 1;
+					// total_mods += 1;
 					progress.add_task_count(1);
 				}
 			}
@@ -1267,7 +1295,7 @@ fn get_mod_groups(path: &std::path::Path) -> Option<HashMap<String, PGroup>> {
 		.filter_map(|v| v.ok())
 		.filter_map(|v| {
 			let file_name = v.file_name().to_string_lossy().into_owned();
-			if file_name.starts_with("group_") {
+			if file_name.starts_with("group_") && !file_name.ends_with(".bak") {
 				match read_json::<PGroup>(&v.path()) {
 					Ok(v) => Some((v.Name.clone(), v)),
 					Err(e) => {log!(err, "Failed to load or parse group file {file_name} for mod {mod_id}\n{e:?}"); None},

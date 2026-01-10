@@ -4,9 +4,10 @@ fn main() {
 	println!("cargo:rerun-if-changed=build.rs");
 	println!("cargo:rerun-if-changed=./lib/cimgui.lib");
 	
-	generate_bindings();
+	// generate_bindings();
 }
 
+#[allow(dead_code)]
 fn generate_bindings() {
 	bindgen::Builder::default()
 		.header("./lib/cimgui.h")

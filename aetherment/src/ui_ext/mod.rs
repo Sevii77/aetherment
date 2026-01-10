@@ -295,7 +295,7 @@ impl UiExt for Ui {
 	}
 }
 
-fn create_drag<Num: egui::emath::Numeric>(value: &mut Num) -> egui::DragValue {
+fn create_drag<Num: egui::emath::Numeric>(value: &mut Num) -> egui::DragValue<'_> {
 	if Num::INTEGRAL {
 		egui::DragValue::new(value)
 	} else {

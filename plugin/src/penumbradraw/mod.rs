@@ -19,6 +19,8 @@ impl PenumbraDraw {
 	}
 	
 	pub fn settings(&mut self, ui_scale: f32, mod_id: &str) -> bool {
+		self.mod_manager.update_last_viewed();
+		
 		let Some(meta) = self.mod_manager.metas.get(mod_id) else {return false};
 		let Some(mut mod_settings) = self.mod_manager.settings.get_mut(mod_id) else {return false};
 		let Some(mut remote_settings) = self.mod_manager.settings_remote.get_mut(mod_id) else {return false};
@@ -36,119 +38,121 @@ impl PenumbraDraw {
 		
 		if !self.mod_manager.aeth_mods.contains(mod_id) {return false};
 		
-		// get active preset, yoinked from views::mods
-		let mut selected_preset = "Custom".to_string();
-		'default: {
-			for (name, value) in settings.iter() {
-				if let Some(opt) = meta.options.options_iter().find(|v| v.name == *name) {
-					if aetherment::modman::settings::Value::from_meta_option(opt) != *value {break 'default}
-				}
-			}
-			
-			selected_preset = "Default".to_owned();
-		}
-		
-		let mut check_presets = |presets: &Vec<aetherment::modman::settings::Preset>| {
-			'preset: for v in presets.iter() {
-				for (name, value) in settings.iter() {
-					match v.settings.get(name) {
-						Some(v) => if v != value {continue 'preset},
-						None => if aetherment::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()) != *value {continue 'preset}
-					}
-				}
-				
-				selected_preset = v.name.to_owned();
-			}
-		};
-		check_presets(&meta.presets);
-		check_presets(&presets);
-		
-		// preset dropdown
 		let mut changed = false;
-		imgui::combo(&selected_preset, "Preset", || {
-			let mut set_settings = |values: &HashMap<String, aetherment::modman::settings::Value>| {
-				for (name, value) in settings.iter_mut() {
-					*value = values.get(name).map_or_else(|| aetherment::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()), |v| v.to_owned());
+		if meta.options.len() > 0 {
+			// get active preset, yoinked from views::mods
+			let mut selected_preset = "Custom".to_string();
+			'default: {
+				for (name, value) in settings.iter() {
+					if let Some(opt) = meta.options.options_iter().find(|v| v.name == *name) {
+						if aetherment::modman::settings::Value::from_meta_option(opt) != *value {break 'default}
+					}
 				}
 				
-				changed = true;
+				selected_preset = "Default".to_owned();
+			}
+			
+			let mut check_presets = |presets: &Vec<aetherment::modman::settings::Preset>| {
+				'preset: for v in presets.iter() {
+					for (name, value) in settings.iter() {
+						match v.settings.get(name) {
+							Some(v) => if v != value {continue 'preset},
+							None => if aetherment::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()) != *value {continue 'preset}
+						}
+					}
+					
+					selected_preset = v.name.to_owned();
+				}
 			};
+			check_presets(&meta.presets);
+			check_presets(&presets);
 			
-			// built in presets
-			if meta.presets.len() == 0 {
-				if imgui::selectable_label("Default" == selected_preset, "Default") {
-					set_settings(&HashMap::new());
-				}
-			}
-			
-			for p in &meta.presets {
-				if imgui::selectable_label(p.name == selected_preset, &p.name) {
-					set_settings(&p.settings);
-				}
-			}
-			
-			// custom presets
-			let mut delete = None;
-			for (i, p) in presets.iter().enumerate() {
-				imgui::push_id(i, || {
-					if imgui::button("X") {
-						delete = Some(i);
+			// preset dropdown
+			imgui::combo(&selected_preset, "Preset", || {
+				let mut set_settings = |values: &HashMap<String, aetherment::modman::settings::Value>| {
+					for (name, value) in settings.iter_mut() {
+						*value = values.get(name).map_or_else(|| aetherment::modman::settings::Value::from_meta_option(meta.options.options_iter().find(|v| v.name == *name).unwrap()), |v| v.to_owned());
 					}
-					imgui::hover_text("Delete");
 					
-					imgui::same_line();
-					if imgui::button("^") {
-						_ = clipboard_win::set_clipboard_string(&p.sharable_string());
+					changed = true;
+				};
+				
+				// built in presets
+				if meta.presets.len() == 0 {
+					if imgui::selectable_label("Default" == selected_preset, "Default") {
+						set_settings(&HashMap::new());
 					}
-					imgui::hover_text("Copy to clipboard");
-					
-					imgui::same_line();
+				}
+				
+				for p in &meta.presets {
 					if imgui::selectable_label(p.name == selected_preset, &p.name) {
 						set_settings(&p.settings);
 					}
-				});
-			}
-			
-			if let Some(delete) = delete {
-				presets.remove(delete);
-				changed = true;
-			}
-			
-			// new preset
-			if imgui::button("+") && self.new_preset_name.len() > 0 && self.new_preset_name != "Custom" && self.new_preset_name != "Default" {
-				let preset = aetherment::modman::settings::Preset {
-					name: self.new_preset_name.clone(),
-					settings: settings.iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect()
-				};
-				
-				if let Some(existing) = presets.iter_mut().find(|v| v.name == preset.name) {
-					*existing = preset;
-				} else {
-					presets.push(preset);
 				}
 				
-				self.new_preset_name.clear();
-				changed = true;
-			}
-			
-			imgui::same_line();
-			imgui::text_edit_singleline(&mut self.new_preset_name, "##newpreset");
-			
-			// import
-			if imgui::button("Import preset from clipboard") {'import: {
-				let Ok(clip) = clipboard_win::get_clipboard_string() else {break 'import};
-				let Some(preset) = aetherment::modman::settings::Preset::from_sharable_string(&clip) else {break 'import};
-				if preset.name.len() == 0 || preset.name == "Custom" || preset.name == "Default" {break 'import}
-				
-				if let Some(existing) = presets.iter_mut().find(|v| v.name == preset.name) {
-					*existing = preset;
-				} else {
-					presets.push(preset);
+				// custom presets
+				let mut delete = None;
+				for (i, p) in presets.iter().enumerate() {
+					imgui::push_id(i, || {
+						if imgui::button("X") {
+							delete = Some(i);
+						}
+						imgui::hover_text("Delete");
+						
+						imgui::same_line();
+						if imgui::button("^") {
+							_ = clipboard_win::set_clipboard_string(&p.sharable_string());
+						}
+						imgui::hover_text("Copy to clipboard");
+						
+						imgui::same_line();
+						if imgui::selectable_label(p.name == selected_preset, &p.name) {
+							set_settings(&p.settings);
+						}
+					});
 				}
 				
-				changed = true;
-			}}
-		});
+				if let Some(delete) = delete {
+					presets.remove(delete);
+					changed = true;
+				}
+				
+				// new preset
+				if imgui::button("+") && self.new_preset_name.len() > 0 && self.new_preset_name != "Custom" && self.new_preset_name != "Default" {
+					let preset = aetherment::modman::settings::Preset {
+						name: self.new_preset_name.clone(),
+						settings: settings.iter().map(|(a, b)| (a.to_owned(), b.to_owned())).collect()
+					};
+					
+					if let Some(existing) = presets.iter_mut().find(|v| v.name == preset.name) {
+						*existing = preset;
+					} else {
+						presets.push(preset);
+					}
+					
+					self.new_preset_name.clear();
+					changed = true;
+				}
+				
+				imgui::same_line();
+				imgui::text_edit_singleline(&mut self.new_preset_name, "##newpreset");
+				
+				// import
+				if imgui::button("Import preset from clipboard") {'import: {
+					let Ok(clip) = clipboard_win::get_clipboard_string() else {break 'import};
+					let Some(preset) = aetherment::modman::settings::Preset::from_sharable_string(&clip) else {break 'import};
+					if preset.name.len() == 0 || preset.name == "Custom" || preset.name == "Default" {break 'import}
+					
+					if let Some(existing) = presets.iter_mut().find(|v| v.name == preset.name) {
+						*existing = preset;
+					} else {
+						presets.push(preset);
+					}
+					
+					changed = true;
+				}}
+			});
+		}
 		
 		// categories
 		imgui::dummy([0.0, 10.0 * ui_scale]);
@@ -201,6 +205,7 @@ impl PenumbraDraw {
 			backend.apply_mod_settings(mod_id, &collection_id, aetherment::modman::backend::SettingsType::Some(settings.clone()));
 			mod_settings.presets = presets;
 			mod_settings.save(mod_id);
+			self.mod_manager.update_last_interacted();
 		}
 		
 		true

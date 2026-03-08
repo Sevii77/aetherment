@@ -60,9 +60,13 @@ pub struct Config {
 	pub repos: Vec<String>,
 	pub browser_default_origin: String,
 	pub browser_content_rating: crate::remote::ContentRating,
+	pub auto_apply_enabled: bool,
 	pub auto_apply_last_viewed: std::time::Duration,
 	pub auto_apply_last_interacted: std::time::Duration,
+	pub auto_apply_redraw: bool,
 	pub proxy: Option<String>,
+	
+	// pub tool_tattoo_presets: Option<Vec<(crate::view::tool::tattoo::TextureType, Vec<(String, Vec<String>)>)>>,
 	
 	pub mod_paths: Vec<PathBuf>,
 	pub file_dialog_path: PathBuf,
@@ -78,9 +82,13 @@ impl Default for Config {
 			repos: Vec::new(),
 			browser_default_origin: "Aetherment".to_string(),
 			browser_content_rating: crate::remote::ContentRating::Sfw,
+			auto_apply_enabled: true,
 			auto_apply_last_viewed: std::time::Duration::from_secs(1),
 			auto_apply_last_interacted: std::time::Duration::from_secs(15),
+			auto_apply_redraw: false,
 			proxy: None,
+			
+			// tool_tattoo_presets: None,
 			
 			mod_paths: Vec::new(),
 			file_dialog_path: dirs::document_dir().unwrap_or(PathBuf::new()),

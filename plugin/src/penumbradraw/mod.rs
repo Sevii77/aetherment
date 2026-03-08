@@ -25,9 +25,9 @@ impl PenumbraDraw {
 		let Some(mut mod_settings) = self.mod_manager.settings.get_mut(mod_id) else {return false};
 		let Some(mut remote_settings) = self.mod_manager.settings_remote.get_mut(mod_id) else {return false};
 		let collection_id = aetherment::modman::backend::penumbra_ipc::get_collection(aetherment::modman::backend::CollectionType::Current).id;
-		let Some(collection) = self.mod_manager.collections.get(collection_id.as_str()) else {return false};
+		// let Some(collection) = self.mod_manager.collections.get(collection_id.as_str()) else {return false};
 		let mut presets = mod_settings.presets.clone();
-		let settings = mod_settings.get_collection(&meta, &collection);
+		let settings = mod_settings.get_collection(&meta, &collection_id);
 		
 		if !remote_settings.origin.is_empty() {
 			imgui::dummy([0.0, 10.0 * ui_scale]);

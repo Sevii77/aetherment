@@ -68,6 +68,9 @@ impl Mods {
 				crate::set_notification(1.0, 2, "There were issues applying mods");
 			} else {
 				crate::set_notification(1.0, 1, &format!("Mods have been successfully applied"));
+				if crate::config().config.auto_apply_redraw {
+					crate::backend().redraw_self();
+				}
 			}
 		});
 	}

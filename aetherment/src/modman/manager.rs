@@ -82,6 +82,8 @@ impl Manager {
 	
 	pub fn should_auto_update(&self) -> bool {
 		let config = &crate::config().config;
+		if !config.auto_apply_enabled {return false}
+		
 		let now = Instant::now();
 		if now.duration_since(*self.last_viewed.read().unwrap()) > config.auto_apply_last_viewed {return true}
 		if now.duration_since(*self.last_interacted.read().unwrap()) > config.auto_apply_last_interacted {return true}

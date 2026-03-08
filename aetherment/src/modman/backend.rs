@@ -181,6 +181,8 @@ pub trait Backend {
 	
 	fn get_file(&self, path: &str, collection: &str, priority: i32) -> Option<Vec<u8>>;
 	fn get_collection_merged(&self, collection: &str) -> (HashMap<String, (String, std::path::PathBuf)>, HashMap<String, (String, String)>, Vec<(String, serde_json::Value)>);
+	
+	fn redraw_self(&self);
 }
 
 pub enum BackendInitializers {

@@ -15,7 +15,7 @@ static mut FUNCS: Option<PenumbraFunctions> = None;
 
 // #[allow(unused)] pub(crate) fn config_dir() -> Option<std::path::PathBuf> {unsafe {FUNCS.as_ref().map(|v| Some(v.config_dir.clone())).unwrap_or(None)}}
 #[allow(unused)] fn redraw() {unsafe {(FUNCS.as_ref().unwrap().redraw)()}}
-#[allow(unused)] fn redraw_self() {unsafe {(FUNCS.as_ref().unwrap().redraw_self)()}}
+fn redraw_self() {unsafe {(FUNCS.as_ref().unwrap().redraw_self)()}}
 fn is_enabled() -> bool {unsafe {(FUNCS.as_ref().unwrap().is_enabled)()}}
 fn root_path() -> std::path::PathBuf {unsafe {(FUNCS.as_ref().unwrap().root_path)()}}
 fn mod_list() -> Vec<String> {unsafe {(FUNCS.as_ref().unwrap().mod_list)()}}
@@ -27,7 +27,7 @@ fn set_mod_inherit(collection_id: &str, mod_id: &str, inherit: bool) -> u8 {unsa
 fn set_mod_settings(collection_id: &str, mod_id: &str, option: &str, sub_options: Vec<&str>) -> u8 {unsafe {(FUNCS.as_ref().unwrap().set_mod_settings)(collection_id, mod_id, option, sub_options)}}
 pub(crate) fn get_mod_settings(collection_id: &str, mod_id: &str, inherit: bool) -> GetModSettings {unsafe {(FUNCS.as_ref().unwrap().get_mod_settings)(collection_id, mod_id, inherit)}}
 pub fn get_collection(collection_type: super::CollectionType) -> super::Collection {unsafe {(FUNCS.as_ref().unwrap().get_collection)(collection_type)}}
-fn current_collection() -> super::Collection {get_collection(super::CollectionType::Current)}
+// fn current_collection() -> super::Collection {get_collection(super::CollectionType::Current)}
 fn get_collections() -> Vec<super::Collection> {unsafe {(FUNCS.as_ref().unwrap().get_collections)()}}
 
 #[repr(u8)]
@@ -539,6 +539,10 @@ impl super::Backend for Penumbra {
 			swaps.into_iter().map(|(k, v)| (k, v.1)).collect(),
 			manips
 		)
+	}
+	
+	fn redraw_self(&self) {
+		redraw_self();
 	}
 }
 
@@ -1533,24 +1537,24 @@ type PManipulation = serde_json::Value;
 // 	UnknownTotal: Option<i32>,
 // 	Value: Option<u64>,
 // }
-
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct SortOrder {
-	pub Data: HashMap<String, String>,
-	pub EmptyFolders: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct Collection {
-	pub Version: i32,
-	pub Name: String,
-	pub Settings: HashMap<String, CollectionModSettings>,
-	pub Inheritance: Vec<String>,
-}
-
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct CollectionModSettings {
-	pub Settings: HashMap<String, i32>,
-	pub Priority: i32,
-	pub Enabled: bool,
-}
+// 
+// #[derive(Debug, Deserialize, Serialize)]
+// pub(crate) struct SortOrder {
+// 	pub Data: HashMap<String, String>,
+// 	pub EmptyFolders: Vec<String>,
+// }
+// 
+// #[derive(Debug, Deserialize, Serialize)]
+// pub(crate) struct Collection {
+// 	pub Version: i32,
+// 	pub Name: String,
+// 	pub Settings: HashMap<String, CollectionModSettings>,
+// 	pub Inheritance: Vec<String>,
+// }
+// 
+// #[derive(Debug, Deserialize, Serialize)]
+// pub(crate) struct CollectionModSettings {
+// 	pub Settings: HashMap<String, i32>,
+// 	pub Priority: i32,
+// 	pub Enabled: bool,
+// }

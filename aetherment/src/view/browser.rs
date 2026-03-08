@@ -113,7 +113,7 @@ impl Browser {
 							let file = crate::remote::download(origin_url, &download_url, &mod_id, progress.sub_task.clone())?;
 							let mut pack = zip::ZipArchive::new(std::io::BufReader::new(file))?;
 							pack.extract(tempdir.path())?;
-							let picker = ArchivePicker::new(&tempdir);
+							let picker = ArchivePicker::new(&tempdir, progress.clone());
 							tempdir_holder = Some(tempdir);
 							*user_input.lock().unwrap() = UserInput::RequiredPick(picker);
 						}
@@ -126,7 +126,7 @@ impl Browser {
 							drop(file);
 							extract(path.to_str().unwrap(), &tempdir.path().to_str().unwrap())?;
 							fs::remove_file(path)?;
-							let picker = ArchivePicker::new(&tempdir);
+							let picker = ArchivePicker::new(&tempdir, progress.clone());
 							tempdir_holder = Some(tempdir);
 							*user_input.lock().unwrap() = UserInput::RequiredPick(picker);
 						}
@@ -677,6 +677,7 @@ enum ArchivePickerTarget {
 }
 
 struct ArchivePicker {
+	progress: crate::modman::backend::TaskProgress,
 	path: std::path::PathBuf,
 	target: ArchivePickerTarget,
 	file_picker: egui_file::FileDialog,
@@ -684,14 +685,15 @@ struct ArchivePicker {
 }
 
 impl ArchivePicker {
-	fn new(tempdir: &tempfile::TempDir) -> Self {
+	fn new(tempdir: &tempfile::TempDir, progress: crate::modman::backend::TaskProgress) -> Self {
 		Self {
+			progress: progress.clone(),
 			path: tempdir.path().to_path_buf(),
 			target: ArchivePickerTarget::Menu,
 			file_picker: egui_file::FileDialog::open_file(Some(tempdir.path().to_path_buf()))
 				.title("Select modpack")
 				.filename_filter(Box::new(|name| name.ends_with(".aeth") | name.ends_with(".pmp"))),
-			tattoo_creator: super::tool::tattoo::Tattoo::new(),
+			tattoo_creator: super::tool::tattoo::Tattoo::new(progress),
 		}
 	}
 	
@@ -761,7 +763,7 @@ impl ArchivePicker {
 				}
 				
 				if ui.button("Clear").clicked() {
-					self.tattoo_creator = super::tool::tattoo::Tattoo::new();
+					self.tattoo_creator = super::tool::tattoo::Tattoo::new(self.progress.clone());
 				}
 			}
 		}

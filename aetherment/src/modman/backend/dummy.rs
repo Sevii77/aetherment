@@ -9,9 +9,9 @@ impl Backend for Dummy {
 	
 	fn description(&self) -> &'static str {
 		#[cfg(feature = "plugin")]
-		return "No valid backend found for plugin";
+		#[allow(unused)] return "No valid backend found for plugin";
 		#[cfg(feature = "client")]
-		return "No valid backend found for standalone";
+		#[allow(unused)] return "No valid backend found for standalone";
 	}
 	
 	// fn is_functional(&self) -> bool {false}
@@ -44,4 +44,6 @@ impl Backend for Dummy {
 	}
 	
 	fn get_collection_merged(&self, _collection: &str) -> (HashMap<String, (String, std::path::PathBuf)>, HashMap<String, (String, String)>, Vec<(String, serde_json::Value)>) {(HashMap::new(), HashMap::new(), Vec::new())}
+	
+	fn redraw_self(&self) {}
 }

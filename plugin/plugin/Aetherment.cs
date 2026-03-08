@@ -261,6 +261,7 @@ public class Aetherment: IDalamudPlugin {
 			ImGui.End();
 		}
 		
+		penumbra.Tick();
 		Native.tick(state);
 		
 		texfinder.Draw();

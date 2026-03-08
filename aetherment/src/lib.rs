@@ -104,7 +104,7 @@ impl Core {
 				Box::new(view::mods::Mods::new(progress.clone(), mod_manager.clone())),
 				Box::new(view::browser::Browser::new(progress.clone())),
 				Box::new(view::settings::Settings::new()),
-				Box::new(view::tool::Tools::new()),
+				Box::new(view::tool::Tools::new(progress.clone())),
 				Box::new(view::explorer::Explorer::new()),
 				Box::new(view::debug::Debug::new()),
 			]),

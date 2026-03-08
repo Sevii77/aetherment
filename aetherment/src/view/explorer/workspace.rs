@@ -206,7 +206,7 @@ impl super::ExplorerView for Workspace {
 							});
 							
 							match &mut opt.settings {
-								meta::OptionSettings::Grouped(val) => {
+								meta::OptionSettings::Grouped(_val) => {
 									ui.label("todo Grouped");
 								}
 								

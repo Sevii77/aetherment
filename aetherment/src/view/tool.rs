@@ -6,10 +6,10 @@ pub struct Tools {
 }
 
 impl Tools {
-	pub fn new() -> Self {
+	pub fn new(progress: crate::modman::backend::TaskProgress) -> Self {
 		Self {
 			views: egui_dock::DockState::new(vec![
-				Box::new(tattoo::Tattoo::new()),
+				Box::new(tattoo::Tattoo::new(progress)),
 				Box::new(collection_modpack::Creator::new()),
 			]),
 		}

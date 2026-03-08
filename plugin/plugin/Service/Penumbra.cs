@@ -12,6 +12,8 @@ namespace Aetherment;
 
 // https://github.com/Ottermandias/Penumbra.Api/blob/9472b6e327109216368c3dc1720159f5295bdb13/IPenumbraApi.cs
 public unsafe class Penumbra: IDisposable {
+	private int? localPlayerId;
+	
 	public Penumbra() {
 		redraw = Redraw;
 		redrawSelf = RedrawSelf;
@@ -42,6 +44,13 @@ public unsafe class Penumbra: IDisposable {
 	public void Dispose() {
 		postEnabledDraw.Unsubscribe(PostEnabledDraw);
 		modSettingChanged.Unsubscribe(ModSettingChanged);
+	}
+	
+	public void Tick() {
+		if(Aetherment.Objects.LocalPlayer != null)
+			localPlayerId = (int)Aetherment.Objects.LocalPlayer.BaseId;
+		else
+			localPlayerId = null;
 	}
 	
 	private static bool preventNextUi = false;
@@ -89,7 +98,8 @@ public unsafe class Penumbra: IDisposable {
 	public delegate void RedrawSelfDelegate();
 	public void RedrawSelf() {
 		try {
-			Aetherment.Interface.GetIpcSubscriber<IGameObject, byte, object>("Penumbra.RedrawObject").InvokeAction(Aetherment.Objects[0]!, 0);
+			if(localPlayerId.HasValue)
+				Aetherment.Interface.GetIpcSubscriber<int, byte, object>("Penumbra.RedrawObject.V5").InvokeAction(localPlayerId.Value, 0);
 		} catch(Exception e) {
 			Aetherment.Logger.Error(e, "Penumbra IPC RedrawSelf");
 		}

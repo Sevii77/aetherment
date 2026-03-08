@@ -53,6 +53,8 @@ impl super::View for Settings {
 		});
 		
 		ui.collapsing("Auto Apply", |ui| {
+			ui.checkbox(&mut config.auto_apply_enabled, "Enabled");
+			
 			ui.horizontal(|ui| {
 				let mut val = config.auto_apply_last_viewed.as_secs();
 				if ui.num_edit(&mut val, "Seconds since last viewed").changed() {
@@ -68,6 +70,8 @@ impl super::View for Settings {
 				}
 				ui.helptext("Time in seconds since a change to a mod setting was made in order to auto apply.");
 			});
+			
+			ui.checkbox(&mut config.auto_apply_redraw, "Redraw self after auto apply");
 		});
 		
 		ui.collapsing("Proxy", |ui| {

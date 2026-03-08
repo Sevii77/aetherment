@@ -63,7 +63,7 @@ impl Into<Box<dyn ExplorerView>> for TabType {
 enum Split {
 	None,
 	Horizontal(f32),
-	Vertical(f32),
+	#[allow(dead_code)] Vertical(f32),
 }
 
 struct ExplorerTab {

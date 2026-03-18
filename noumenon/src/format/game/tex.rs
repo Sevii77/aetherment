@@ -20,7 +20,7 @@ pub struct SliceMut<'a> {
 #[binrw]
 #[brw(little, repr = u32)]
 #[repr(u32)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
 	L8 = 0x1130,
 	
@@ -65,7 +65,7 @@ impl From<Format> for ImageFormat {
 }
 
 impl Format {
-	pub fn convert_from(&self, width: u32, height: u32, depth: u32, data: &[u8]) -> Vec<u8> {
+	pub fn convert_from(&self, width: u32, height: u32, depth: u32, data: &[u8]) -> Result<Vec<u8>, image_dds::error::SurfaceError> {
 		let surface = image_dds::Surface {
 			width,
 			height,
@@ -76,7 +76,7 @@ impl Format {
 			data,
 		};
 		
-		surface.decode_rgba8().unwrap().data
+		Ok(surface.decode_rgba8()?.data)
 	}
 	
 	pub fn convert_to(&self, width: u32, height: u32, depth: u32, mipmaps: u32, data: &[u8]) -> Vec<u8> {
@@ -185,6 +185,12 @@ impl Tex {
 			pixels: pixels,
 		}
 	}
+	
+	pub fn resized(&self, width: u32, height: u32) -> Self {
+		let img: image::ImageBuffer<image::Rgba<u8>, &[u8]> = image::ImageBuffer::from_raw(self.width, self.height, &self.pixels[0..self.width as usize * self.height as usize * 4]).unwrap();
+		let new = image::imageops::resize(&img, width, height, image::imageops::FilterType::Lanczos3);
+		Self::new(width, height, new.into_raw())
+	}
 }
 
 impl BinRead for Tex {
@@ -215,7 +221,15 @@ impl BinRead for Tex {
 				mip_levels = mip_level as u32;
 				break;
 			};
-			pixels.extend(format.convert_from(width, height, depth, &data[offset..offset + seg_size]));
+			
+			match (mip_level, format.convert_from(width, height, depth, &data[offset..offset + seg_size])) {
+				(_, Ok(data)) => pixels.extend(data),
+				(0, Err(err)) => return Err(binrw::Error::Custom{pos: reader.stream_position()?, err: Box::new(err)}),
+				_ => {
+					mip_levels = mip_level as u32;
+					break;
+				}
+			}
 		}
 		
 		Ok(Self {

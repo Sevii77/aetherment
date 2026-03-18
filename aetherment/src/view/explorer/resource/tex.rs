@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use noumenon::format::{external::Bytes, game::Tex};
+use noumenon::format::{external::Bytes, game::Tex, game::tex::Format};
 use crate::{modman::{composite::tex::{self as comp, OptionSetting}, meta}, ui_ext::UiExt, view::explorer::{Action, ModInfo}, EnumTools};
 
 pub struct TexView {
@@ -9,6 +9,7 @@ pub struct TexView {
 	path: super::Path,
 	changed: bool,
 	
+	format: Format,
 	depth: u32,
 	mip: u32,
 	
@@ -21,28 +22,31 @@ impl TexView {
 	pub fn new(path: &super::Path) -> Result<Self, crate::resource_loader::BacktraceError> {
 		let data = super::read_file(path)?;
 		
-		let (tex, mod_info) = if path.is_composite() {
+		let tex;
+		let mod_info;
+		let format;
+		
+		if path.is_composite() {
 			let super::Path::Mod{mod_meta, mod_root, option, ..} = path else {unreachable!()};
 			
-			(
-				TexType::Composite(Composite {
-					settings: crate::modman::settings::CollectionSettings::from_meta(&mod_meta.borrow()),
-					composite: serde_json::from_slice::<comp::Tex>(&data)?,
-					textures: HashMap::new(),
-					textures_previews: HashMap::new(),
-				}),
-				Some(ModInfo {
-					root: mod_root.to_path_buf(),
-					meta: mod_meta.clone(),
-					option: option.clone(),
-				})
-			)
+			format = Format::A8R8G8B8;
+			tex = TexType::Composite(Composite {
+				settings: crate::modman::settings::CollectionSettings::from_meta(&mod_meta.borrow()),
+				composite: serde_json::from_slice::<comp::Tex>(&data)?,
+				textures: HashMap::new(),
+				textures_previews: HashMap::new(),
+			});
+			mod_info = Some(ModInfo {
+				root: mod_root.to_path_buf(),
+				meta: mod_meta.clone(),
+				option: option.clone(),
+			});
 		} else {
-			(
-				TexType::Tex(Tex::read(&mut std::io::Cursor::new(&data))?),
-				None
-			)
-		};
+			let t = Tex::read(&mut std::io::Cursor::new(&data))?;
+			format = t.format;
+			tex = TexType::Tex(t);
+			mod_info = None;
+		}
 		
 		Ok(Self {
 			tex,
@@ -51,6 +55,7 @@ impl TexView {
 			path: path.clone(),
 			changed: false,
 			
+			format,
 			depth: 0,
 			mip: 0,
 			
@@ -345,6 +350,8 @@ impl super::ResourceView for TexView {
 			}
 			
 			let ui = ui_right;
+			self.changed |= ui.combo_enum(&mut self.format, "Format").changed();
+			
 			act.or(self.draw_layers(ui));
 			
 			if matches!(self.tex, TexType::Tex(_)) && ui.button("Convert to composite texture").clicked() {
@@ -657,5 +664,49 @@ fn path_name(path: &crate::modman::Path) -> String {
 		
 		crate::modman::Path::Option(option, id) =>
 			format!("Path Option: {option}/{id}"),
+	}
+}
+
+impl EnumTools for Format {
+	type Iterator = std::array::IntoIter<Self, 15>;
+	
+	fn to_str(&self) -> &'static str {
+		match self {
+			Self::L8 => "L8",
+			Self::A4R4G4B4 => "A4R4G4B4",
+			Self::A1R5G5B5 => "A1R5G5B5",
+			Self::A8R8G8B8 => "A8R8G8B8",
+			Self::X8R8G8B8 => "X8R8G8B8",
+			Self::R32 => "R32",
+			Self::R16G16 => "R16G16",
+			Self::R32G32 => "R32G32",
+			Self::A16B16G16R16 => "A16B16G16R16",
+			Self::A32B32G32R32 => "A32B32G32R32",
+			Self::Bc1 => "Bc1",
+			Self::Bc2 => "Bc2",
+			Self::Bc3 => "Bc3",
+			Self::Bc5 => "Bc5",
+			Self::Bc7 => "Bc7",
+		}
+	}
+	
+	fn iter() -> Self::Iterator {
+		[
+			Self::L8,
+			Self::A4R4G4B4,
+			Self::A1R5G5B5,
+			Self::A8R8G8B8,
+			Self::X8R8G8B8,
+			Self::R32,
+			Self::R16G16,
+			Self::R32G32,
+			Self::A16B16G16R16,
+			Self::A32B32G32R32,
+			Self::Bc1,
+			Self::Bc2,
+			Self::Bc3,
+			Self::Bc5,
+			Self::Bc7,
+		].into_iter()
 	}
 }

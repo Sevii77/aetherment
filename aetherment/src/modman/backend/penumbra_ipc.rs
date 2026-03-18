@@ -470,7 +470,7 @@ impl super::Backend for Penumbra {
 	fn get_file(&self, path: &str, collection: &str, priority: i32) -> Option<Vec<u8>> {
 		// generating a cache every fucking time and not caching it is really dumb
 		// TODO: CACHE IT!!!
-		get_file(&root_path(), &get_mod_cache(), path, collection, priority)
+		get_file(&root_path(), &get_mod_cache(), path, collection, priority).ok()
 	}
 	
 	fn get_collection_merged(&self, collection: &str) -> (HashMap<String, (String, std::path::PathBuf)>, HashMap<String, (String, String)>, Vec<(String, serde_json::Value)>) {
@@ -585,7 +585,7 @@ fn apply_ui_colors() {
 	}
 }
 
-fn get_file(root: &std::path::Path, mod_file_cache: &ModFileCache, path: &str, collection: &str, priority: i32) -> Option<Vec<u8>> {
+fn get_file(root: &std::path::Path, mod_file_cache: &ModFileCache, path: &str, collection: &str, priority: i32) -> Result<Vec<u8>, crate::resource_loader::BacktraceError> {
 	let mut real_path = None;
 	let mut real_path_prio = i32::MIN;
 	if let Some(collection) = mod_file_cache.get(collection) {
@@ -601,10 +601,10 @@ fn get_file(root: &std::path::Path, mod_file_cache: &ModFileCache, path: &str, c
 	
 	if let Some((mod_id, path)) = real_path {
 		// log!("Loading file {path} from mod {mod_id} to overlay onto");
-		crate::resource_loader::load_file_disk(&root.join(&mod_id).join(path)).ok()
+		Ok(crate::resource_loader::load_file_disk(&root.join(&mod_id).join(path))?)
 	} else {
 		// log!("Loading file {path} from game to overlay onto");
-		crate::noumenon_instance()?.file(path).ok()
+		Ok(crate::noumenon_instance().ok_or("No noumenon instance")?.file(path)?)
 	}
 }
 
@@ -750,7 +750,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	
 	// TODO: store this and update it properly after every mod apply, this is increddibly inefficient
 	let mod_file_cache = get_mod_cache();
-	let get_file = |path: &str, collection: &str, priority: i32| -> Option<Vec<u8>> {
+	let get_file = |path: &str, collection: &str, priority: i32| -> Result<Vec<u8>, crate::resource_loader::BacktraceError> {
 		get_file(&root, &mod_file_cache, path, collection, priority)
 	};
 	
@@ -772,13 +772,13 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	let file_resolver = |path: &crate::modman::Path| {
 		match path {
 			crate::modman::Path::Mod(path) => {
-				let Some(true_path) = remap.get(path) else {return None};
+				let true_path = remap.get(path).ok_or("Remap did not contain path")?;
 				
 				if let Some(data) = read_compdata(&true_path) {
-					return Some(Cow::Owned(data));
+					return Ok(Cow::Owned(data));
 				}
 				
-				crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).ok().map(|v| Cow::Owned::<Vec<u8>>(v))
+				crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).map(|v| Cow::Owned::<Vec<u8>>(v))
 			}
 			
 			crate::modman::Path::Game(path) => {
@@ -786,14 +786,14 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 			}
 			
 			crate::modman::Path::Option(..) => {
-				let Some(path) = path.resolve_option(&meta, &settings) else {return None};
-				let Some(true_path) = remap.get(&path) else {return None};
+				let path = path.resolve_option(&meta, &settings).ok_or("Failed resolving option")?;
+				let true_path = remap.get(&path).ok_or("Remap did not contain path")?;
 				
 				if let Some(data) = read_compdata(&true_path) {
-					return Some(Cow::Owned(data));
+					return Ok(Cow::Owned(data));
 				}
 				
-				crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).ok().map(|v| Cow::Owned(v))
+				crate::resource_loader::load_file_disk::<Vec<u8>>(&files_dir.join(true_path)).map(|v| Cow::Owned(v))
 			}
 			
 			// crate::modman::Path::Option(id, sub_id) => {
@@ -913,7 +913,7 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 						}
 						
 						Err(err) => {
-							log!(log, "Failed to composite file {game_path} ({err:?})");
+							log!(err, "Failed to composite file {game_path} ({err:?})");
 							
 							files_done += 1;
 							continue;
@@ -1352,7 +1352,7 @@ struct PGroup {
 	#[serde(deserialize_with = "null_deserialize")] Description: String,
 	#[serde(deserialize_with = "null_deserialize")] Priority: i64,
 	#[serde(deserialize_with = "null_deserialize")] Type: String,
-	#[serde(deserialize_with = "null_deserialize")] DefaultSettings: u32,
+	#[serde(deserialize_with = "null_deserialize")] DefaultSettings: u64,
 	#[serde(deserialize_with = "null_deserialize")] Options: Vec<POption>,
 }
 

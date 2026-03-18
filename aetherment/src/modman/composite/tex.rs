@@ -8,8 +8,8 @@ pub enum CompositeError {
 	#[error("Composite texture has no first layer")]
 	NoFirstLayer,
 	
-	#[error("Layer {layer} has an invalid texture '{path:?}'")]
-	NoFileResolverReturn{path: Path, layer: usize},
+	#[error("Layer {layer} has an invalid texture '{path:?}' ({err:?})")]
+	NoFileResolverReturn{path: Path, layer: usize, err: crate::resource_loader::BacktraceError},
 	
 	#[error("Layer {layer} has an issue with one of its modifiers:\n\t{modifier}")]
 	Modifier{layer: usize, modifier: ModifierError},
@@ -23,8 +23,8 @@ impl From<CompositeError> for super::CompositeError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ModifierError {
-	#[error("Modifier has an invalid texture '{path:?}'")]
-	NoFileResolverReturn{path: Path},
+	#[error("Modifier has an invalid texture '{path:?}' ({err:?})")]
+	NoFileResolverReturn{path: Path, err: crate::resource_loader::BacktraceError},
 	
 	#[error("Modifier has an invalid mask option for cull point")]
 	CullPoint,
@@ -40,14 +40,14 @@ pub struct Tex {
 
 impl Tex {
 	pub fn composite_raw_hashmap(&self, settings: &crate::modman::settings::CollectionSettings, textures: std::collections::HashMap<&Path, &noumenon::format::game::Tex>) -> Result<(u32, u32, Vec<u8>), CompositeError> {
-		self.composite_raw(settings, move |path| textures.get(path).map(|v| Cow::Borrowed(*v)))
+		self.composite_raw(settings, move |path| Ok(textures.get(path).map(|v| Cow::Borrowed(*v)).ok_or_else(|| format!("Textures hashmap did not contain path '{path:?}'"))?))
 	}
 	
-	pub fn composite_raw<'a>(&'a self, settings: &crate::modman::settings::CollectionSettings, textures_handler: impl Fn(&Path) -> Option<Cow<'a, noumenon::format::game::Tex>>) -> Result<(u32, u32, Vec<u8>), CompositeError> {
+	pub fn composite_raw<'a>(&'a self, settings: &crate::modman::settings::CollectionSettings, textures_handler: impl Fn(&Path) -> Result<Cow<'a, noumenon::format::game::Tex>, crate::resource_loader::BacktraceError>) -> Result<(u32, u32, Vec<u8>), CompositeError> {
 		let mut layers = self.layers.iter().rev();
 		
 		let layer = layers.next().ok_or(CompositeError::NoFirstLayer)?;
-		let tex = &textures_handler(&layer.path).ok_or(CompositeError::NoFileResolverReturn{path: layer.path.clone(), layer: 0})?;
+		let tex = &textures_handler(&layer.path).map_err(|err| CompositeError::NoFileResolverReturn{path: layer.path.clone(), layer: 0, err})?;
 		let (width, height) = (tex.width as u32, tex.height as u32);
 		let mut data = tex.slice(0, 0).pixels.to_vec();
 		
@@ -57,7 +57,7 @@ impl Tex {
 				match modifier {
 					Modifier::AlphaMask{path, cull_point} => {
 						let cull_point = cull_point.get_value(settings).ok_or(ModifierError::CullPoint)?;
-						let tex = &textures_handler(path).ok_or(ModifierError::NoFileResolverReturn{path: path.clone()})?;
+						let tex = &textures_handler(path).map_err(|err| ModifierError::NoFileResolverReturn{path: path.clone(), err})?;
 						let (w, h) = (tex.width as u32, tex.height as u32);
 						let mask_data = get_resized(tex, w, h, width, height);
 						
@@ -73,7 +73,7 @@ impl Tex {
 					
 					Modifier::AlphaMaskAlphaStretch{path, cull_point} => {
 						let cull_point = cull_point.get_value(settings).ok_or(ModifierError::CullPoint)?;
-						let tex = &textures_handler(path).ok_or(ModifierError::NoFileResolverReturn{path: path.clone()})?;
+						let tex = &textures_handler(path).map_err(|err| ModifierError::NoFileResolverReturn{path: path.clone(), err})?;
 						let (w, h) = (tex.width as u32, tex.height as u32);
 						let mask_data = get_resized(tex, w, h, width, height);
 						
@@ -116,7 +116,7 @@ impl Tex {
 		apply_modifiers(layer, &mut data).map_err(|modifier| CompositeError::Modifier{layer: 0, modifier})?;
 		
 		for (i, layer) in layers.enumerate() {
-			let tex = &textures_handler(&layer.path).ok_or(CompositeError::NoFileResolverReturn{path: layer.path.clone(), layer: i + 1})?;
+			let tex = &textures_handler(&layer.path).map_err(|err| CompositeError::NoFileResolverReturn{path: layer.path.clone(), layer: i + 1, err})?;
 			let (w, h) = (tex.width as u32, tex.height as u32);
 			let mut layer_data = get_resized(tex, w, h, width, height);
 			
@@ -247,9 +247,9 @@ impl super::Composite for Tex {
 		options
 	}
 	
-	fn composite<'a>(&self, _meta: &crate::modman::meta::Meta, settings: &crate::modman::settings::CollectionSettings, file_resolver: &dyn Fn(&crate::modman::Path) -> Option<Cow<'a, Vec<u8>>>) -> Result<Vec<u8>, super::CompositeError> {
-		let textures_handler = |path: &crate::modman::Path| -> Option<Cow<noumenon::format::game::Tex>> {
-			Some(Cow::Owned(noumenon::format::game::Tex::read(&mut std::io::Cursor::new(file_resolver(path)?.as_ref())).ok()?))
+	fn composite<'a>(&self, _meta: &crate::modman::meta::Meta, settings: &crate::modman::settings::CollectionSettings, file_resolver: &dyn Fn(&crate::modman::Path) -> Result<Cow<'a, Vec<u8>>, crate::resource_loader::BacktraceError>) -> Result<Vec<u8>, super::CompositeError> {
+		let textures_handler = |path: &crate::modman::Path| -> Result<Cow<noumenon::format::game::Tex>, crate::resource_loader::BacktraceError> {
+			Ok(Cow::Owned(noumenon::format::game::Tex::read(&mut std::io::Cursor::new(file_resolver(path)?.as_ref()))?))
 		};
 		
 		let (width, height, pixels) = self.composite_raw(settings, textures_handler)?;

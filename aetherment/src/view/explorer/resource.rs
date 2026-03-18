@@ -27,14 +27,16 @@ impl Path {
 		let path = path.into();
 		
 		#[cfg(target_family = "windows")]
-		if path.len() >= 3 && &path[1..=2] == ":/" {
+		// if path.len() >= 3 && &path[1..=2] == ":/" {
+		if path.len() >= 3 && let Some(sub) = path.get(1..=2) && (sub == ":/" || sub == ":\\") {
 			Path::Real(path.into())
 		} else {
 			Path::Game(path)
 		}
 		
 		#[cfg(not(target_family = "windows"))]
-		if path.len() >= 1 && &path[0..=0] == "/" {
+		// if path.len() >= 1 && &path[0..=0] == "/" {
+		if path.len() >= 1 && let Some(sub) = path.get(0..=0) && sub == "/" {
 			Path::Real(path.into())
 		} else {
 			Path::Game(path)

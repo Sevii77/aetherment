@@ -42,7 +42,7 @@ impl super::ResourceView for MdlView {
 			
 			// load in textures and modify them for our viewing pleasure
 			let textures = self.mdl.bake_materials(|path| {
-				crate::noumenon_instance().unwrap().file::<Vec<u8>>(path).ok()
+				super::read_file(&super::Path::Game(path.to_owned())).ok()
 			}).into_iter()
 				.map(|(k, material)| (k, (
 					material.diffuse.map(|v| renderer.create_texture_initialized(v.width, v.height, renderer::renderer::TextureFormat::Rgba8Unorm, renderer::renderer::TextureUsage::TEXTURE_BINDING, &v.data)),

@@ -113,7 +113,7 @@ jobs:
           mkdir "$dirname"
           releasedir="./target/x86_64-pc-windows-msvc/release"
           # zip $dirname.zip "$releasedir/Aetherment.json" "$releasedir/Aetherment.dll" "$releasedir/aetherment_core.dll"
-          7z a $dirname.zip "$releasedir/Aetherment.json" "$releasedir/Aetherment.dll" "$releasedir/aetherment_core.dll" "./lib/bcryptprimitives.dll"
+          7z a $dirname.zip "$releasedir/Aetherment.json" "$releasedir/Aetherment.dll" "$releasedir/aetherment_core.dll" "./lib/bcryptprimitives.dll" "$releasedir/logo_64_green.png"
           echo "ASSET=$dirname.zip" >> $GITHUB_ENV
       
       - name: Release Plugin

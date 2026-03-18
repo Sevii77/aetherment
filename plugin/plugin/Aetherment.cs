@@ -40,35 +40,6 @@ public class Aetherment: IDalamudPlugin {
 	private static Dalamud.Interface.IReadOnlyTitleScreenMenuEntry? title_entry;
 	private IActiveNotification? notification;
 
-	// idfc, entry changed to some other bs that always returns a texture wrap but cant be provided a texture wrap.
-	// i'm not going to dive into the docs to figure out a "proper way"
-	private struct TextureWrap: Dalamud.Interface.Textures.ISharedImmediateTexture {
-		private IDalamudTextureWrap wrap;
-		
-		public TextureWrap(IDalamudTextureWrap wrap) {
-			this.wrap = wrap;
-		}
-		
-		public IDalamudTextureWrap? GetWrapOrDefault(IDalamudTextureWrap? defaultWrap = null) {
-			return wrap ?? defaultWrap;
-		}
-		
-		public IDalamudTextureWrap GetWrapOrEmpty() {
-			return wrap;
-		}
-		
-		public Task<IDalamudTextureWrap> RentAsync(System.Threading.CancellationToken cancellationToken = default) {
-			var wrap = this.wrap;
-			return Task.Run(() => {return wrap;});
-		}
-		
-		public bool TryGetWrap([NotNullWhen(true)] out IDalamudTextureWrap? texture, out Exception? exception) {
-			texture = wrap;
-			exception = null;
-			return true;
-		}
-	}
-	
 	private Requirement requirement;
 	private Penumbra penumbra;
 	private DalamudStyle dalamud;
@@ -196,9 +167,7 @@ public class Aetherment: IDalamudPlugin {
 		Interface.UiBuilder.Draw += Draw;
 		Interface.UiBuilder.OpenMainUi += OpenConf;
 		
-		// TODO: proper icon
-		var icon_data = new byte[64 * 64 * 4];
-		var icon = new TextureWrap(Textures.CreateFromRaw(new Dalamud.Interface.Textures.RawImageSpecification(64, 64, 28), icon_data, "Aetherment Icon"));
+		var icon = Textures.GetFromFile(System.IO.Path.Join(Interface.AssemblyLocation.DirectoryName, "logo_64_green.png"));
 		title_entry ??= TitleMenu.AddEntry(1, "Manage Aetherment", icon, OpenConf);
 		
 		Commands.AddHandler(maincommand, new CommandInfo(OnCommand) {

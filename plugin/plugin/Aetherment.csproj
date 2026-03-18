@@ -53,6 +53,12 @@
 	</Target>
 	
 	<ItemGroup>
+		<Content Include="../../assets/logo_64_green.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+	</ItemGroup>
+	
+	<ItemGroup>
 		<PackageReference Include="DalamudPackager" Version="2.1.12"/>
 		<Reference Include="Dalamud">
 			<HintPath>$(DalamudLibPath)Dalamud.dll</HintPath>

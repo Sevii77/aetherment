@@ -29,8 +29,8 @@ impl PenumbraDraw {
 		let mut presets = mod_settings.presets.clone();
 		let settings = mod_settings.get_collection(&meta, &collection_id);
 		
+		imgui::dummy([0.0, 10.0 * ui_scale]);
 		if !remote_settings.origin.is_empty() {
-			imgui::dummy([0.0, 10.0 * ui_scale]);
 			if imgui::checkbox(&mut remote_settings.auto_update, "Auto Update") {
 				remote_settings.save(mod_id);
 			}
@@ -152,11 +152,11 @@ impl PenumbraDraw {
 					changed = true;
 				}}
 			});
+			
+			imgui::dummy([0.0, 10.0 * ui_scale]);
 		}
 		
 		// categories
-		imgui::dummy([0.0, 10.0 * ui_scale]);
-		
 		let mut categories = meta.options.categories_iter().collect::<Vec<_>>();
 		if !matches!(meta.options.0.get(0), Some(aetherment::modman::meta::OptionType::Category(_))) {
 			categories.insert(0, "Main");

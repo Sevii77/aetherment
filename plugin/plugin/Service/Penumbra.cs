@@ -15,6 +15,8 @@ public unsafe class Penumbra: IDisposable {
 	private int? localPlayerId;
 	
 	public Penumbra() {
+		Aetherment.Logger.Debug($"Penumbra meta fileversion: {MetaVersion()}");
+		metaVersion = MetaVersion;
 		redraw = Redraw;
 		redrawSelf = RedrawSelf;
 		isEnabled = IsEnabled;
@@ -82,6 +84,19 @@ public unsafe class Penumbra: IDisposable {
 		// Aetherment.Logger.Debug($"{type} - {collection_id} - {mod_id} - {inherited}");
 		if(!inherited && Aetherment.state != 0)
 			Native.backend_penumbraipc_modchanged(Aetherment.state, (byte)type, collection_id.ToString(), mod_id);
+	}
+
+	public MetaVersionDelegate metaVersion;
+	public delegate int MetaVersionDelegate();
+	public int MetaVersion() {
+		foreach(var p in Aetherment.Interface.InstalledPlugins) {
+			if(p.InternalName == "Penumbra") {
+				if(p.Version.Major > 1 || (p.Version.Major == 1 && p.Version.Minor >= 7))
+					return 4;
+			}
+		}
+
+		return 3;
 	}
 	
 	public RedrawDelegate redraw;

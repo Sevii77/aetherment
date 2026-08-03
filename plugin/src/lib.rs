@@ -52,6 +52,7 @@ struct PenumbraGetModSettings {
 #[repr(C, packed)]
 pub struct PenumbraFunctions {
 	// config_dir: FfiStr,
+	meta_version: fn() -> i32,
 	redraw: fn(),
 	redraw_self: fn(),
 	is_enabled: fn() -> bool,
@@ -214,6 +215,7 @@ pub extern "C" fn initialize(init: Initializers) -> *mut State {
 			renderer_egui.egui_ctx(),
 			set_notification,
 			backend::BackendInitializers::PenumbraIpc(backend::penumbra_ipc::PenumbraFunctions {
+				meta_version: Box::new(funcs.meta_version),
 				redraw: Box::new(funcs.redraw),
 				redraw_self: Box::new(funcs.redraw_self),
 				is_enabled: Box::new(funcs.is_enabled),

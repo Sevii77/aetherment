@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
-using Dalamud.Game;
 using Dalamud.Game.Command;
-using Dalamud.Interface.Textures.TextureWraps;
 using Dalamud.Interface.ImGuiNotification;
 using Dalamud.IoC;
 using Dalamud.Plugin;
@@ -74,6 +70,7 @@ public class Aetherment: IDalamudPlugin {
 	[StructLayout(LayoutKind.Sequential)]
 	public unsafe struct PenumbraFunctions {
 		// public FFI.Str config_dir;
+		public nint meta_version;
 		public nint redraw;
 		public nint redraw_self;
 		public nint is_enabled;
@@ -113,7 +110,7 @@ public class Aetherment: IDalamudPlugin {
 		// 	if(s.ToLowerInvariant().Contains("resolution") || s.ToLowerInvariant().Contains("ui") || s.ToLowerInvariant().Contains("theme"))
 		// 		Logger.Debug($"[{i}] {s}: {c.ConfigEntry[i].Value.UInt}");
 		// }
-		
+
 		log = Log;
 		setNotification = SetNotification;
 		requirement = new();
@@ -134,6 +131,7 @@ public class Aetherment: IDalamudPlugin {
 			},
 			penumbra = new PenumbraFunctions {
 				// config_dir = Interface.ConfigDirectory.Parent! + "/Penumbra/",
+				meta_version = Marshal.GetFunctionPointerForDelegate(penumbra.metaVersion),
 				redraw = Marshal.GetFunctionPointerForDelegate(penumbra.redraw),
 				redraw_self = Marshal.GetFunctionPointerForDelegate(penumbra.redrawSelf),
 				is_enabled = Marshal.GetFunctionPointerForDelegate(penumbra.isEnabled),

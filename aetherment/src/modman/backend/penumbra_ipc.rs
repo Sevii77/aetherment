@@ -14,6 +14,7 @@ pub struct GetModSettings {
 static mut FUNCS: Option<PenumbraFunctions> = None;
 
 // #[allow(unused)] pub(crate) fn config_dir() -> Option<std::path::PathBuf> {unsafe {FUNCS.as_ref().map(|v| Some(v.config_dir.clone())).unwrap_or(None)}}
+fn meta_version() -> i32 {unsafe {(FUNCS.as_ref().unwrap().meta_version)()}}
 #[allow(unused)] fn redraw() {unsafe {(FUNCS.as_ref().unwrap().redraw)()}}
 fn redraw_self() {unsafe {(FUNCS.as_ref().unwrap().redraw_self)()}}
 fn is_enabled() -> bool {unsafe {(FUNCS.as_ref().unwrap().is_enabled)()}}
@@ -73,6 +74,7 @@ pub fn subscriber_modchanged(mod_manager: crate::modman::manager::Manager, typ: 
 
 pub struct PenumbraFunctions {
 	// pub config_dir: std::path::PathBuf,
+	pub meta_version: Box<dyn Fn() -> i32>,
 	pub redraw: Box<dyn Fn()>,
 	pub redraw_self: Box<dyn Fn()>,
 	pub is_enabled: Box<dyn Fn() -> bool>,
@@ -175,21 +177,41 @@ impl Penumbra {
 			.compression_level(Some(9))
 			.large_file(true))?;
 		
-		File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&PMeta {
-			FileVersion: 3,
-			Name: meta.name.clone(),
-			Author: meta.author.clone(),
-			Description: meta.description.clone(),
-			Version: meta.version.clone(),
-			Website: meta.website.clone(),
-			ModTags: meta.tags.iter().map(|v| v.to_owned()).collect(),
-		})?.as_bytes())?;
-		
-		File::create(mod_dir.join("default_mod.json"))?.write_all(crate::json_pretty(&PDefaultMod {
-			Files: HashMap::new(),
-			FileSwaps: HashMap::new(),
-			Manipulations: Vec::new(),
-		})?.as_bytes())?;
+		match meta_version() {
+			3 => {
+				File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&pmeta3::Meta {
+					FileVersion: 3,
+					Name: meta.name.clone(),
+					Author: meta.author.clone(),
+					Description: meta.description.clone(),
+					Version: meta.version.clone(),
+					Website: meta.website.clone(),
+					ModTags: meta.tags.iter().map(|v| v.to_owned()).collect(),
+				})?.as_bytes())?;
+				
+				File::create(mod_dir.join("default_mod.json"))?.write_all(crate::json_pretty(&PDefaultMod {
+					Files: HashMap::new(),
+					FileSwaps: HashMap::new(),
+					Manipulations: Vec::new(),
+				})?.as_bytes())?;
+			}
+			
+			4 => {
+				File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&pmeta4::Meta {
+					FileVersion: 4,
+					Name: meta.name.clone(),
+					Author: meta.author.clone(),
+					Description: meta.description.clone(),
+					Version: meta.version.clone(),
+					Website: meta.website.clone(),
+					ModTags: meta.tags.iter().map(|v| v.to_owned()).collect(),
+					Groups: Vec::new(),
+					DefaultData: Default::default(),
+				})?.as_bytes())?;
+			}
+			
+			v => return Err(format!("Unsupported penumbra fileversion {v}").into())
+		}
 		
 		let mut remap_buf = Vec::new();
 		pack.by_name("remap")?.read_to_end(&mut remap_buf)?;
@@ -278,7 +300,7 @@ impl Penumbra {
 		progress.set_msg("Unpacking mod");
 		pack.extract(&mod_dir)?;
 		
-		let pmeta = read_json::<PMeta>(&mod_dir.join("meta.json"))?;
+		let pmeta = read_json::<pmeta3::Meta>(&mod_dir.join("meta.json"))?;
 		Ok(meta::Meta {
 			name: pmeta.Name,
 			description: format!("{}\n\n\nThis is a Penumbra mod, configure it within Penumbra.", pmeta.Description),
@@ -407,7 +429,7 @@ impl super::Backend for Penumbra {
 			let meta = if is_aeth {
 				read_json::<meta::Meta>(&mod_dir.join("aetherment").join("meta.json")).ok()?
 			} else if crate::remote::settings::Settings::exists(&id) {
-				let pmeta = read_json::<PMeta>(&mod_dir.join("meta.json")).ok()?;
+				let pmeta = read_json::<pmeta4::Meta>(&mod_dir.join("meta.json")).ok()?;
 				meta::Meta {
 					name: pmeta.Name,
 					description: pmeta.Description,
@@ -482,54 +504,111 @@ impl super::Backend for Penumbra {
 		for mod_id in mod_list() {
 			let settings = get_mod_settings(collection, &mod_id, true);
 			if !settings.exists || !settings.enabled {continue}
-			let Some(groups) = get_mod_groups(&root.join(&mod_id)) else {continue};
-			
-			let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
-				Ok(v) => v,
-				Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); continue},
-			};
-			
 			let priority = settings.priority;
 			
-			for (game_path, real_path) in default.Files {
-				if files.get(&game_path).map_or(i32::MIN, |v| v.0) < priority {
-					files.insert(game_path, (priority, (mod_id.clone(), root.join(&mod_id).join(real_path))));
-				}
-			}
-			
-			for (a, b) in default.FileSwaps {
-				if swaps.get(&a).map_or(i32::MIN, |v| v.0) < priority {
-					swaps.insert(a, (priority, (mod_id.clone(), b)));
-				}
-			}
-			
-			for m in default.Manipulations {
-				manips.push((mod_id.clone(), m));
-			}
-			
-			let options = settings.options;
-			for (option, enabled_sub_options) in &options {
-				if enabled_sub_options.len() == 0 {continue}
-				let Some(group) = groups.get(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
-				
-				for o in &group.Options {
-					if enabled_sub_options.contains(&o.Name) {
-						for (game_path, real_path) in &o.Files {
-							if files.get(game_path).map_or(i32::MIN, |v| v.0) < priority {
-								files.insert(game_path.clone(), (priority, (mod_id.clone(), root.join(&mod_id).join(real_path))));
-							}
-						}
-						
-						for (a, b) in &o.FileSwaps {
-							if swaps.get(a).map_or(i32::MIN, |v| v.0) < priority {
-								swaps.insert(a.clone(), (priority, (mod_id.clone(), b.clone())));
-							}
-						}
-						
-						for m in &o.Manipulations {
-							manips.push((mod_id.clone(), m.clone()));
+			match meta_version() {
+				3 => {
+					let Some(groups) = get_mod_groups_v3(&root.join(&mod_id)) else {continue};
+					let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
+						Ok(v) => v,
+						Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); continue},
+					};
+					
+					for (game_path, real_path) in default.Files {
+						if files.get(&game_path).map_or(i32::MIN, |v| v.0) < priority {
+							files.insert(game_path, (priority, (mod_id.clone(), root.join(&mod_id).join(real_path))));
 						}
 					}
+					
+					for (a, b) in default.FileSwaps {
+						if swaps.get(&a).map_or(i32::MIN, |v| v.0) < priority {
+							swaps.insert(a, (priority, (mod_id.clone(), b)));
+						}
+					}
+					
+					for m in default.Manipulations {
+						manips.push((mod_id.clone(), m));
+					}
+					
+					let options = settings.options;
+					for (option, enabled_sub_options) in &options {
+						if enabled_sub_options.len() == 0 {continue}
+						let Some(group) = groups.get(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
+						
+						for o in &group.Options {
+							if enabled_sub_options.contains(&o.Name) {
+								for (game_path, real_path) in &o.Files {
+									if files.get(game_path).map_or(i32::MIN, |v| v.0) < priority {
+										files.insert(game_path.clone(), (priority, (mod_id.clone(), root.join(&mod_id).join(real_path))));
+									}
+								}
+								
+								for (a, b) in &o.FileSwaps {
+									if swaps.get(a).map_or(i32::MIN, |v| v.0) < priority {
+										swaps.insert(a.clone(), (priority, (mod_id.clone(), b.clone())));
+									}
+								}
+								
+								for m in &o.Manipulations {
+									manips.push((mod_id.clone(), m.clone()));
+								}
+							}
+						}
+					}
+				}
+				
+				4 => {
+					let meta = match read_json::<pmeta4::Meta>(&root.join(&mod_id).join("meta.json")) {
+						Ok(v) => v,
+						Err(e) => {log!(err, "Failed to load or parse meta.json for mod {mod_id}\n{e:?}"); continue},
+					};
+					
+					for (game_path, real_path) in meta.DefaultData.Files {
+						if files.get(&game_path).map_or(i32::MIN, |v| v.0) < priority {
+							files.insert(game_path, (priority, (mod_id.clone(), root.join(&mod_id).join(real_path))));
+						}
+					}
+					
+					for (a, b) in meta.DefaultData.FileSwaps {
+						if swaps.get(&a).map_or(i32::MIN, |v| v.0) < priority {
+							swaps.insert(a, (priority, (mod_id.clone(), b)));
+						}
+					}
+					
+					for m in meta.DefaultData.Manipulations {
+						manips.push((mod_id.clone(), m));
+					}
+					
+					let options = settings.options;
+					for (option, enabled_sub_options) in &options {
+						if enabled_sub_options.len() == 0 {continue}
+						let Some(group) = meta.Groups.iter().find(|v| v.Name == option.as_str()) else {continue};
+						
+						for o in &group.Options {
+							if enabled_sub_options.contains(&o.Name) {
+								for (game_path, real_path) in &o.Files {
+									if files.get(game_path).map_or(i32::MIN, |v| v.0) < priority {
+										files.insert(game_path.clone(), (priority, (mod_id.clone(), root.join(&mod_id).join(real_path))));
+									}
+								}
+								
+								for (a, b) in &o.FileSwaps {
+									if swaps.get(a).map_or(i32::MIN, |v| v.0) < priority {
+										swaps.insert(a.clone(), (priority, (mod_id.clone(), b.clone())));
+									}
+								}
+								
+								for m in &o.Manipulations {
+									manips.push((mod_id.clone(), m.clone()));
+								}
+							}
+						}
+					}
+				}
+				
+				v => {
+					log!(err, "Unsupported penumbra fileversion {v} for mod ({mod_id})");
+					continue;
 				}
 			}
 		}
@@ -741,7 +820,11 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	
 	let penum_settings = get_mod_settings(&collection_id, mod_id, true);
 	if !penum_settings.enabled {
-		let Ok(group) = read_json::<PGroup>(&mod_dir.join("group_001__collection.json")) else {return Ok(changed_files)};
+		let Some(group) = (match meta_version() {
+			3 => read_json::<PGroup>(&mod_dir.join("group_001__collection.json")).ok(),
+			4 => read_json::<pmeta4::Meta>(&mod_dir.join("meta.json")).ok().map(|v| v.Groups.get(0).cloned()).flatten(),
+			_ => return Ok(changed_files),
+		}) else {return Ok(changed_files)};
 		let Some(option) = group.Options.into_iter().find(|v| v.Name == collection_id) else {return Ok(changed_files)};
 		return Ok(option.Files.into_iter().map(|(v, _)| v).collect());
 	}
@@ -1126,25 +1209,54 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 	}
 	
 	// update penumbra mod
-	let mut group = match read_json::<PGroup>(&mod_dir.join("group_001__collection.json")) {
-		Ok(v) => v,
-		Err(_) => PGroup {
-			Name: "_collection".to_string(),
-			Description: "Aetherment managed\nDON'T TOUCH THIS".to_string(),
-			Priority: 1,
-			Type: "Single".to_string(),
-			DefaultSettings: 0,
-			Options: Vec::new(),
+	match meta_version() {
+		3 => {
+			let mut group = match read_json::<PGroup>(&mod_dir.join("group_001__collection.json")) {
+				Ok(v) => v,
+				Err(_) => PGroup {
+					Name: "_collection".to_string(),
+					Description: "Aetherment managed\nDON'T TOUCH THIS".to_string(),
+					Priority: 1,
+					Type: "Single".to_string(),
+					DefaultSettings: 0,
+					Options: Vec::new(),
+				}
+			};
+			
+			if let Some(option) = group.Options.iter_mut().find(|v| v.Name == collection_id) {
+				*option = p_option;
+			} else {
+				group.Options.push(p_option);
+			}
+			
+			File::create(mod_dir.join("group_001__collection.json"))?.write_all(crate::json_pretty(&group)?.as_bytes())?;
 		}
-	};
-	
-	if let Some(option) = group.Options.iter_mut().find(|v| v.Name == collection_id) {
-		*option = p_option;
-	} else {
-		group.Options.push(p_option);
+		
+		4 => {
+			let Ok(mut meta) = read_json::<pmeta4::Meta>(&mod_dir.join("meta.json")) else {return Err(format!("Failed applying mod ({mod_id}) because it does not have a meta file").into())};
+			
+			if meta.Groups.len() == 0 {
+				meta.Groups.push(PGroup {
+					Name: "_collection".to_string(),
+					Description: "Aetherment managed\nDON'T TOUCH THIS".to_string(),
+					Priority: 1,
+					Type: "Single".to_string(),
+					DefaultSettings: 0,
+					Options: Vec::new(),
+				});
+			}
+			
+			if let Some(option) = meta.Groups[0].Options.iter_mut().find(|v| v.Name == collection_id) {
+				*option = p_option;
+			} else {
+				meta.Groups[0].Options.push(p_option);
+			}
+			
+			File::create(mod_dir.join("meta.json"))?.write_all(crate::json_pretty(&meta)?.as_bytes())?;
+		}
+		
+		v => return Err(format!("Unsupported penumbra fileversion {v}").into())
 	}
-	
-	File::create(mod_dir.join("group_001__collection.json"))?.write_all(crate::json_pretty(&group)?.as_bytes())?;
 	
 	reload_mod(&mod_id);
 	set_mod_settings(&collection_id, &mod_id, "_collection", vec![&collection_id]);
@@ -1160,7 +1272,11 @@ fn apply_mod(mod_id: &str, collection_id: &str, settings: super::SettingsType, f
 fn cleanup_mod(mod_id: &str) {
 	let root = root_path();
 	let mod_dir = root.join(mod_id);
-	let Ok(group) = read_json::<PGroup>(&mod_dir.join("group_001__collection.json")) else {return};
+	let Some(group) = (match meta_version() {
+		3 => read_json::<PGroup>(&mod_dir.join("group_001__collection.json")).ok(),
+		4 => read_json::<pmeta4::Meta>(&mod_dir.join("meta.json")).ok().map(|v| v.Groups.get(0).cloned()).flatten(),
+		_ => return,
+	}) else {return};
 	let Ok(read_dir) = std::fs::read_dir(mod_dir.join("files_comp")) else {return};
 	
 	let mut files = HashSet::new();
@@ -1194,37 +1310,76 @@ fn get_mod_cache() -> ModFileCache {
 	};
 	
 	let root = root_path();
-	for mod_id in mod_list() {
-		let Some(groups) = get_mod_groups(&root.join(&mod_id)) else {continue};
-		
-		let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
-			Ok(v) => v,
-			Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); continue},
-		};
-		
-		for col in &collections {
-			let settings = get_mod_settings(&col.id, &mod_id, false);
-			if !settings.exists || !settings.enabled {continue}
-			let priority = settings.priority;
-			
-			for (game_path, real_path) in &default.Files {
-				insert(&col.id, &mod_id, priority, game_path, real_path);
-			}
-			
-			let options = settings.options;
-			for (option, enabled_sub_options) in &options {
-				if enabled_sub_options.len() == 0 {continue}
-				let Some(group) = groups.get(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
+	match meta_version() {
+		3 => {
+			for mod_id in mod_list() {
+				let Some(groups) = get_mod_groups_v3(&root.join(&mod_id)) else {continue};
 				
-				for o in &group.Options {
-					if enabled_sub_options.contains(&o.Name) {
-						for (game_path, real_path) in &o.Files {
-							insert(&col.id, &mod_id, priority, game_path, real_path);
+				let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
+					Ok(v) => v,
+					Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); continue},
+				};
+				
+				for col in &collections {
+					let settings = get_mod_settings(&col.id, &mod_id, false);
+					if !settings.exists || !settings.enabled {continue}
+					let priority = settings.priority;
+					
+					for (game_path, real_path) in &default.Files {
+						insert(&col.id, &mod_id, priority, game_path, real_path);
+					}
+					
+					let options = settings.options;
+					for (option, enabled_sub_options) in &options {
+						if enabled_sub_options.len() == 0 {continue}
+						let Some(group) = groups.get(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
+						
+						for o in &group.Options {
+							if enabled_sub_options.contains(&o.Name) {
+								for (game_path, real_path) in &o.Files {
+									insert(&col.id, &mod_id, priority, game_path, real_path);
+								}
+							}
 						}
 					}
 				}
 			}
 		}
+		
+		4 => {
+			for mod_id in mod_list() {
+				let meta = match read_json::<pmeta4::Meta>(&root.join(&mod_id).join("meta.json")) {
+					Ok(v) => v,
+					Err(e) => {log!(err, "Failed to load or parse meta.json for mod {mod_id}\n{e:?}"); continue},
+				};
+				
+				for col in &collections {
+					let settings = get_mod_settings(&col.id, &mod_id, false);
+					if !settings.exists || !settings.enabled {continue}
+					let priority = settings.priority;
+					
+					for (game_path, real_path) in &meta.DefaultData.Files {
+						insert(&col.id, &mod_id, priority, game_path, real_path);
+					}
+					
+					let options = settings.options;
+					for (option, enabled_sub_options) in &options {
+						if enabled_sub_options.len() == 0 {continue}
+						let Some(group) = meta.Groups.iter().find(|v| v.Name == option.as_str()) else {continue};
+						
+						for o in &group.Options {
+							if enabled_sub_options.contains(&o.Name) {
+								for (game_path, real_path) in &o.Files {
+									insert(&col.id, &mod_id, priority, game_path, real_path);
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		_ => {}
 	}
 	
 	mod_file_cache
@@ -1233,32 +1388,64 @@ fn get_mod_cache() -> ModFileCache {
 fn get_mod_files(collection_id: &str, mod_id: &str) -> Option<HashMap<String, String>> {
 	let mut files = HashMap::new();
 	let root = root_path();
-	let mut groups = get_mod_groups(&root.join(&mod_id))?;
-	
-	let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
-		Ok(v) => v,
-		Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); return None},
-	};
 	
 	let settings = get_mod_settings(collection_id, mod_id, false);
 	if !settings.exists || !settings.enabled {return None};
 	
-	for (game_path, real_path) in default.Files {
-		files.insert(game_path, real_path);
-	}
-	
-	let options = settings.options;
-	for (option, enabled_sub_options) in &options {
-		if enabled_sub_options.len() == 0 {continue}
-		let Some(group) = groups.remove(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
-		
-		for o in group.Options {
-			if enabled_sub_options.contains(&o.Name) {
-				for (game_path, real_path) in o.Files {
-					files.insert(game_path, real_path);
+	match meta_version() {
+		3 => {
+			let mut groups = get_mod_groups_v3(&root.join(&mod_id))?;
+			
+			let default = match read_json::<PDefaultMod>(&root.join(&mod_id).join("default_mod.json")) {
+				Ok(v) => v,
+				Err(e) => {log!(err, "Failed to load or parse default_mod.json for mod {mod_id}\n{e:?}"); return None},
+			};
+			
+			for (game_path, real_path) in default.Files {
+				files.insert(game_path, real_path);
+			}
+			
+			let options = settings.options;
+			for (option, enabled_sub_options) in &options {
+				if enabled_sub_options.len() == 0 {continue}
+				let Some(group) = groups.remove(option.as_str()) else {log!(err, "Failed to find group file ({option}) for mod ({mod_id})"); continue};
+				
+				for o in group.Options {
+					if enabled_sub_options.contains(&o.Name) {
+						for (game_path, real_path) in o.Files {
+							files.insert(game_path, real_path);
+						}
+					}
 				}
 			}
 		}
+		
+		4 => {
+			let meta = match read_json::<pmeta4::Meta>(&root.join(&mod_id).join("meta.json")) {
+				Ok(v) => v,
+				Err(e) => {log!(err, "Failed to load or parse meta.json for mod {mod_id}\n{e:?}"); return None},
+			};
+			
+			for (game_path, real_path) in meta.DefaultData.Files {
+				files.insert(game_path, real_path);
+			}
+			
+			let options = settings.options;
+			for (option, enabled_sub_options) in &options {
+				if enabled_sub_options.len() == 0 {continue}
+				let Some(group) = meta.Groups.iter().find(|v| v.Name == option.as_str()) else {continue};
+				
+				for o in &group.Options {
+					if enabled_sub_options.contains(&o.Name) {
+						for (game_path, real_path) in &o.Files {
+							files.insert(game_path.to_owned(), real_path.to_owned());
+						}
+					}
+				}
+			}
+		}
+		
+		_ => {}
 	}
 	
 	Some(files)
@@ -1292,7 +1479,7 @@ fn get_composite_info(mods: Vec<&str>) -> CompositeInfo {
 	comp_info
 }
 
-fn get_mod_groups(path: &std::path::Path) -> Option<HashMap<String, PGroup>> {
+fn get_mod_groups_v3(path: &std::path::Path) -> Option<HashMap<String, PGroup>> {
 	let mod_id = path.file_name()?.to_string_lossy().to_owned();
 	Some(std::fs::read_dir(path).ok()?
 		.into_iter()
@@ -1323,48 +1510,75 @@ D: serde::Deserializer<'de> {
 	Ok(Option::deserialize(deserializer)?.unwrap_or_default())
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
-#[serde(default)]
-struct PMeta {
-	#[serde(deserialize_with = "null_deserialize")] FileVersion: i32,
-	#[serde(deserialize_with = "null_deserialize")] Name: String,
-	#[serde(deserialize_with = "null_deserialize")] Author: String,
-	#[serde(deserialize_with = "null_deserialize")] Description: String,
-	#[serde(deserialize_with = "null_deserialize")] Version: String,
-	#[serde(deserialize_with = "null_deserialize")] Website: String,
-	#[serde(deserialize_with = "null_deserialize")] ModTags: Vec<String>,
+mod pmeta3 {
+	use serde::{Deserialize, Serialize};
+	use super::null_deserialize;
+
+	#[derive(Debug, Default, Deserialize, Serialize)]
+	#[serde(default)]
+	pub struct Meta {
+		#[serde(deserialize_with = "null_deserialize")] pub FileVersion: i32,
+		#[serde(deserialize_with = "null_deserialize")] pub Name: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Author: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Description: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Version: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Website: String,
+		#[serde(deserialize_with = "null_deserialize")] pub ModTags: Vec<String>,
+	}
+}
+
+mod pmeta4 {
+	use serde::{Deserialize, Serialize};
+	use super::{PGroup, PDefaultMod, null_deserialize};
+	
+	// penumbra does id and lastwrite automatically, i cba
+	#[derive(Debug, Default, Deserialize, Serialize)]
+	#[serde(default)]
+	pub struct Meta {
+		#[serde(deserialize_with = "null_deserialize")] pub FileVersion: i32,
+		// #[serde(deserialize_with = "null_deserialize")] pub Identifier: String,
+		// #[serde(deserialize_with = "null_deserialize")] pub LastWrite: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Name: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Author: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Description: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Version: String,
+		#[serde(deserialize_with = "null_deserialize")] pub Website: String,
+		#[serde(deserialize_with = "null_deserialize")] pub ModTags: Vec<String>,
+		#[serde(deserialize_with = "null_deserialize")] pub Groups: Vec<PGroup>,
+		#[serde(deserialize_with = "null_deserialize")] pub DefaultData: PDefaultMod,
+	}
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
-struct PDefaultMod {
-	// Name: String,
-	// Description: String,
-	#[serde(deserialize_with = "null_deserialize")] Files: HashMap<String, String>,
-	#[serde(deserialize_with = "null_deserialize")] FileSwaps: HashMap<String, String>,
-	#[serde(deserialize_with = "null_deserialize")] Manipulations: Vec<PManipulation>,
+pub struct PDefaultMod {
+	#[serde(deserialize_with = "null_deserialize")] pub Files: HashMap<String, String>,
+	#[serde(deserialize_with = "null_deserialize")] pub FileSwaps: HashMap<String, String>,
+	#[serde(deserialize_with = "null_deserialize")] pub Manipulations: Vec<PManipulation>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 #[serde(default)]
-struct PGroup {
-	#[serde(deserialize_with = "null_deserialize")] Name: String,
-	#[serde(deserialize_with = "null_deserialize")] Description: String,
-	#[serde(deserialize_with = "null_deserialize")] Priority: i64,
-	#[serde(deserialize_with = "null_deserialize")] Type: String,
-	#[serde(deserialize_with = "null_deserialize")] DefaultSettings: u64,
-	#[serde(deserialize_with = "null_deserialize")] Options: Vec<POption>,
+pub struct PGroup {
+	// #[serde(deserialize_with = "null_deserialize")] pub Id: String,
+	#[serde(deserialize_with = "null_deserialize")] pub Name: String,
+	#[serde(deserialize_with = "null_deserialize")] pub Description: String,
+	#[serde(deserialize_with = "null_deserialize")] pub Priority: i64,
+	#[serde(deserialize_with = "null_deserialize")] pub Type: String,
+	#[serde(deserialize_with = "null_deserialize")] pub DefaultSettings: u64,
+	#[serde(deserialize_with = "null_deserialize")] pub Options: Vec<POption>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
 #[serde(default)]
-struct POption {
-	#[serde(deserialize_with = "null_deserialize")] Name: String,
-	#[serde(deserialize_with = "null_deserialize")] Description: String,
-	#[serde(deserialize_with = "null_deserialize")] Priority: i64, // used for multi
-	#[serde(deserialize_with = "null_deserialize")] Files: HashMap<String, String>,
-	#[serde(deserialize_with = "null_deserialize")] FileSwaps: HashMap<String, String>,
-	#[serde(deserialize_with = "null_deserialize")] Manipulations: Vec<PManipulation>,
+pub struct POption {
+	// #[serde(deserialize_with = "null_deserialize")] pub Id: String,
+	#[serde(deserialize_with = "null_deserialize")] pub Name: String,
+	#[serde(deserialize_with = "null_deserialize")] pub Description: String,
+	#[serde(deserialize_with = "null_deserialize")] pub Priority: i64,
+	#[serde(deserialize_with = "null_deserialize")] pub Files: HashMap<String, String>,
+	#[serde(deserialize_with = "null_deserialize")] pub FileSwaps: HashMap<String, String>,
+	#[serde(deserialize_with = "null_deserialize")] pub Manipulations: Vec<PManipulation>,
 }
 
 type PManipulation = serde_json::Value;

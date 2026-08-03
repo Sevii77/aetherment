@@ -447,43 +447,58 @@ pub struct ImageNode {
 pub struct TextNode {
 	pub text_id: u32,
 	pub color: u32,
-	pub alignment: u16,
+	pub alignment: u8,
+	pub unk1: u8,
 	pub font: FontType,
 	pub font_size: u8,
 	pub edge_color: u32,
 	
 	#[br(temp)]
 	#[bw(calc = (*bold as u8) << 7 | (*italic as u8) << 6 | (*edge as u8) << 5 | (*glare as u8) << 4 | (*multiline as u8) << 3 | (*ellipsis as u8) << 2 | (*paragraph as u8) << 1 | (*emboss as u8))]
-	field: u8,
-	#[br(calc = (field & 0x80) == 0x80)]
+	flags: u8,
+	#[br(calc = (flags & 0x80) == 0x80)]
 	#[bw(ignore)]
 	pub bold: bool,
-	#[br(calc = (field & 0x40) == 0x40)]
+	#[br(calc = (flags & 0x40) == 0x40)]
 	#[bw(ignore)]
 	pub italic: bool,
-	#[br(calc = (field & 0x20) == 0x20)]
+	#[br(calc = (flags & 0x20) == 0x20)]
 	#[bw(ignore)]
 	pub edge: bool,
-	#[br(calc = (field & 0x10) == 0x10)]
+	#[br(calc = (flags & 0x10) == 0x10)]
 	#[bw(ignore)]
 	pub glare: bool,
-	#[br(calc = (field & 0x08) == 0x08)]
+	#[br(calc = (flags & 0x08) == 0x08)]
 	#[bw(ignore)]
 	pub multiline: bool,
-	#[br(calc = (field & 0x04) == 0x04)]
+	#[br(calc = (flags & 0x04) == 0x04)]
 	#[bw(ignore)]
 	pub ellipsis: bool,
-	#[br(calc = (field & 0x02) == 0x02)]
+	#[br(calc = (flags & 0x02) == 0x02)]
 	#[bw(ignore)]
 	pub paragraph: bool,
-	#[br(calc = (field & 0x01) == 0x01)]
+	#[br(calc = (flags & 0x01) == 0x01)]
 	#[bw(ignore)]
 	pub emboss: bool,
 	
 	pub sheet_type: SheetType,
 	pub char_spacing: u8,
 	pub line_spacing: u8,
-	pub unk2: u32,
+	
+	#[br(temp)]
+	#[bw(calc = (*is_ui_edge_color as u8) << 2 | (*is_ui_color as u8) << 1 | (*flags2_unk as u8))]
+	flags2: u8,
+	#[br(calc = (flags2 & 0x04) == 0x04)]
+	#[bw(ignore)]
+	pub is_ui_edge_color: bool,
+	#[br(calc = (flags2 & 0x02) == 0x02)]
+	#[bw(ignore)]
+	pub is_ui_color: bool,
+	#[br(calc = (flags2 & 0x01) == 0x01)]
+	#[bw(ignore)]
+	pub flags2_unk: bool,
+	
+	pub unk2: [u8; 3],
 }
 
 #[binrw]
@@ -498,7 +513,8 @@ pub struct NineGridNode {
 	pub bottom_offset: i16,
 	pub left_offset: i16,
 	pub right_offset: i16,
-	pub unk1: u16,
+	pub blend_mode: u8,
+	pub unk1: u8,
 }
 
 #[binrw]
@@ -705,11 +721,13 @@ pub struct TextInputComponentNode {
 #[brw(little)]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct NumericInputComponentNode {
+	pub text_node: TextNode,
 	pub value: i32,
 	pub max: i32,
 	pub min: i32,
+	pub focused_color: u32,
 	pub add: i32,
-	pub unk1: u32,
+	pub end_letter_id: u32,
 	#[br(map = |v: u8| v != 0)]
 	#[bw(map = |v: &bool| if *v {1u8} else {0})]
 	pub comma: bool,

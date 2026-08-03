@@ -259,7 +259,7 @@ pub struct UldTexture {
 	pub path: String,
 	pub icon: u32,
 	#[brw(if(minor_version >= 1))]
-	pub unk1: Option<u32>,
+	pub theme_supported_bitmask: u32,
 }
 
 // ---------------------------------------- //
@@ -453,7 +453,7 @@ impl BinWrite for UldTimeline {
 // #[binrw]
 // #[brw(little, repr = u32)]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[repr(u32)]
+#[repr(u8)]
 pub enum AlignmentType {
 	#[default] TopLeft = 0x0,
 	Top = 0x1,
@@ -464,13 +464,14 @@ pub enum AlignmentType {
 	BottomLeft = 0x6,
 	Bottom = 0x7,
 	BottomRight = 0x8,
-	Unk(u32),
+	Unk(u8),
 }
 
 #[derive(Debug, Clone)]
 pub struct WidgetData {
 	pub id: u32,
 	pub alignment_type: AlignmentType,
+	pub theme_support: bool,
 	pub x: i16,
 	pub y: i16,
 	// _node_count: u16,
@@ -486,7 +487,9 @@ impl BinRead for WidgetData {
 		
 		let id = u32::read_options(reader, endian, ())?;
 		// let alignment_type = AlignmentType::read_options(reader, endian, ())?;
-		let alighment_type = u32::read_options(reader, endian, ())?;
+		let alighment_type = u8::read_options(reader, endian, ())?;
+		let theme_support = u8::read_options(reader, endian, ())? != 0;
+		_ = u16::read_options(reader, endian, ())?;
 		let x = i16::read_options(reader, endian, ())?;
 		let y = i16::read_options(reader, endian, ())?;
 		let node_count = u16::read_options(reader, endian, ())?;
@@ -513,6 +516,7 @@ impl BinRead for WidgetData {
 				0x8 => AlignmentType::BottomRight,
 				_ => AlignmentType::Unk(alighment_type),
 			},
+			theme_support,
 			x,
 			y,
 			// _node_count: node_count,
@@ -531,17 +535,19 @@ impl BinWrite for WidgetData {
 		self.id.write_options(writer, endian, ())?;
 		// self.alignment_type.write_options(writer, endian, ())?;
 		match self.alignment_type {
-			AlignmentType::TopLeft => 0x0u32,
-			AlignmentType::Top => 0x1u32,
-			AlignmentType::TopRight => 0x2u32,
-			AlignmentType::Left => 0x3u32,
-			AlignmentType::Center => 0x4u32,
-			AlignmentType::Right => 0x5u32,
-			AlignmentType::BottomLeft => 0x6u32,
-			AlignmentType::Bottom => 0x7u32,
-			AlignmentType::BottomRight => 0x8u32,
+			AlignmentType::TopLeft => 0x0u8,
+			AlignmentType::Top => 0x1u8,
+			AlignmentType::TopRight => 0x2u8,
+			AlignmentType::Left => 0x3u8,
+			AlignmentType::Center => 0x4u8,
+			AlignmentType::Right => 0x5u8,
+			AlignmentType::BottomLeft => 0x6u8,
+			AlignmentType::Bottom => 0x7u8,
+			AlignmentType::BottomRight => 0x8u8,
 			AlignmentType::Unk(v) => v,
 		}.write_options(writer, endian, ())?;
+		if self.theme_support {1u8} else {0}.write_options(writer, endian, ())?;
+		0u16.write_options(writer, endian, ())?;
 		self.x.write_options(writer, endian, ())?;
 		self.y.write_options(writer, endian, ())?;
 		(self.nodes.len() as u16).write_options(writer, endian, ())?;

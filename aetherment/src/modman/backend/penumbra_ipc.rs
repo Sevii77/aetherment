@@ -1284,7 +1284,7 @@ fn cleanup_mod(mod_id: &str) {
 		let s = get_mod_settings(&o.Name, mod_id, false);
 		if s.enabled {
 			for (_, path) in &o.Files {
-				files.insert(path.split("/").last().unwrap());
+				files.insert(path.split("/").last().unwrap().split("\\").last().unwrap());
 			}
 		}
 	}
